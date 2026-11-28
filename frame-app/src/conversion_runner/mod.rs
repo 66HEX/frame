@@ -7,6 +7,7 @@ mod controller;
 mod gif;
 mod opus;
 mod output_paths;
+mod pass_directory;
 mod process;
 mod publication;
 mod runner;

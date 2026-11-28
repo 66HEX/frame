@@ -31,6 +31,11 @@ pub fn normalize_output_config(
 ) -> bool {
     let before = config.clone();
     let source_kind = source_kind_for(metadata);
+    if let Some(metadata) = metadata {
+        config
+            .audio_track_overrides
+            .retain(|index, _| metadata.audio_track(*index).is_some());
+    }
 
     if source_kind == SourceKind::Audio && !is_audio_only_container(&config.container) {
         config.container = "mp3".to_string();
@@ -61,13 +66,15 @@ pub fn normalize_output_config(
     }
 
     if (source_kind == SourceKind::Image || is_gif_container(&config.container))
-        && config.processing_mode == ProcessingMode::Copy
+        && config.processing_mode != ProcessingMode::Reencode
     {
         config.processing_mode = ProcessingMode::Reencode;
     }
 
-    if config.processing_mode == ProcessingMode::Copy {
+    if config.processing_mode.copies_audio() {
         reset_audio_filter_settings(config);
+    }
+    if config.processing_mode.copies_video() {
         reset_video_filter_settings(config);
         config.subtitle_burn_path = None;
     }
@@ -113,7 +120,7 @@ pub fn normalize_output_config(
         reset_subtitle_settings(config);
     }
 
-    if config.processing_mode != ProcessingMode::Copy
+    if !config.processing_mode.copies_audio()
         && container_supports_audio(&config.container)
         && !is_audio_codec_allowed_for_container(&config.container, &config.audio_codec)
     {
@@ -169,7 +176,7 @@ fn normalize_video_config_values(config: &mut ConversionConfig, metadata: Option
     let is_audio_container = is_audio_only_container(&config.container);
     let is_gif_output = is_gif_container(&config.container);
 
-    if config.processing_mode == ProcessingMode::Copy {
+    if config.processing_mode.copies_video() {
         reset_video_filter_settings(config);
     }
 
@@ -182,7 +189,7 @@ fn normalize_video_config_values(config: &mut ConversionConfig, metadata: Option
         reset_subtitle_settings(config);
     }
 
-    if (is_audio_container || is_gif_output || config.processing_mode == ProcessingMode::Copy)
+    if (is_audio_container || is_gif_output || config.processing_mode.copies_video())
         && let Some(overlay) = config.overlay.as_mut()
     {
         overlay.enabled = false;
@@ -238,6 +245,10 @@ fn normalize_video_config_values(config: &mut ConversionConfig, metadata: Option
     }
     if !is_hardware_video_codec(&config.video_codec) {
         config.hw_decode = false;
+    }
+
+    if !config.video_two_pass_available() {
+        config.video_two_pass = false;
     }
 
     normalize_image_encoding_settings(config);

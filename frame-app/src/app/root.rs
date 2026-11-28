@@ -8,6 +8,7 @@ use crate::app::model::{
     ActiveView, FrameAppState, active_view_from_env_value, visual_fixture_from_env_value,
 };
 use crate::app::preview::state::PreviewUiState;
+use crate::app::queue::encoding_stats::EncodingStatsDialog;
 use crate::app::queue::state::DragDropUiState;
 use crate::app::updates::state::UpdateUiState;
 use crate::app_persistence::{AppPersistence, AppSettings};
@@ -43,6 +44,7 @@ pub struct FrameRoot {
     pub(in crate::app) file_queue: FileQueue,
     pub(in crate::app) file_list_scroll_handle: UniformListScrollHandle,
     pub(in crate::app) conversion_events: ConversionEventState,
+    pub(in crate::app) encoding_stats_dialog: EncodingStatsDialog,
     pub(in crate::app) logs_scroll_handle: UniformListScrollHandle,
     pub(in crate::app) last_log_scroll_target: Option<LogScrollTarget>,
     pub(in crate::app) logs_keyboard_scroll_top: usize,
@@ -65,6 +67,7 @@ pub struct FrameRoot {
     pub(in crate::app) runtime_capabilities_loading: bool,
     runtime_capability_generation: u64,
     pub(in crate::app) active_conversion_task_ids: Vec<String>,
+    pub(in crate::app) conversion_batch_generation: u64,
     pub(in crate::app) notifier: AppNotifier,
     pub(in crate::app) subtitle_font_families: Vec<String>,
     pub(in crate::app) presets: Vec<PresetDefinition>,
@@ -96,7 +99,7 @@ impl FrameRoot {
 
     pub fn load_runtime_capabilities(&mut self, cx: &mut Context<Self>) {
         let generation = self.begin_runtime_capability_load();
-        let executable = crate::runtime_binaries::ffmpeg_executable();
+        let executable = crate::runtime_binaries::media_worker_executable();
         let listing_executable = executable.clone();
         cx.notify();
         cx.spawn(async move |this, cx| {
@@ -239,6 +242,7 @@ impl FrameRoot {
             file_queue: FileQueue::new(),
             file_list_scroll_handle: UniformListScrollHandle::new(),
             conversion_events: ConversionEventState::new(),
+            encoding_stats_dialog: EncodingStatsDialog::default(),
             logs_scroll_handle: UniformListScrollHandle::new(),
             last_log_scroll_target: None,
             logs_keyboard_scroll_top: 0,
@@ -261,6 +265,7 @@ impl FrameRoot {
             runtime_capabilities_loading: false,
             runtime_capability_generation: 0,
             active_conversion_task_ids: Vec::new(),
+            conversion_batch_generation: 0,
             notifier,
             subtitle_font_families: frame_core::fonts::list_system_font_families(),
             presets,

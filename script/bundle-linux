@@ -107,8 +107,6 @@ if [[ "$target_triple" != "$runtime_triple" ]]; then
 	exit 1
 fi
 
-(cd "$repo_root" && cargo xtask setup-ffmpeg --platform linux --arch "$runtime_arch")
-
 export RUSTFLAGS="${RUSTFLAGS:-} -C link-args=-Wl,--disable-new-dtags,-rpath,\$ORIGIN/../lib"
 cargo build --manifest-path "$repo_root/frame-app/Cargo.toml" --release --target "$target_triple"
 cargo build --manifest-path "$repo_root/frame-updater/Cargo.toml" --release --target "$target_triple" --bin frame-update-helper
@@ -138,7 +136,6 @@ trap cleanup EXIT
 app_dir="$temp_dir/frame.app"
 mkdir -p \
 	"$app_dir/bin" \
-	"$app_dir/bin/binaries" \
 	"$app_dir/lib" \
 	"$app_dir/share/applications" \
 	"$app_dir/share/icons/hicolor/32x32/apps" \
@@ -149,6 +146,8 @@ mkdir -p \
 
 cp "$binary_path" "$app_dir/bin/frame"
 cp "$helper_path" "$app_dir/bin/frame-update-helper"
+python3 "$repo_root/script/media-worker.py" bundle --target "$target_triple" \
+	--bin-dir "$app_dir/bin" --lib-dir "$app_dir/lib" --package-root "$app_dir"
 
 find_libs() {
 	ldd "$binary_path" |
@@ -161,15 +160,6 @@ mapfile -t libs < <(find_libs)
 if [[ ${#libs[@]} -gt 0 ]]; then
 	cp "${libs[@]}" "$app_dir/lib"
 fi
-
-for binary in "ffmpeg-$runtime_triple" "ffprobe-$runtime_triple"; do
-	source="$repo_root/frame-app/resources/binaries/$binary"
-	if [[ ! -x "$source" ]]; then
-		echo "Missing runtime binary: $source" >&2
-		exit 1
-	fi
-	cp "$source" "$app_dir/bin/binaries/$binary"
-done
 
 cp "$repo_root/frame-app/resources/app-icons/32x32.png" "$app_dir/share/icons/hicolor/32x32/apps/frame.png"
 cp "$repo_root/frame-app/resources/app-icons/64x64.png" "$app_dir/share/icons/hicolor/64x64/apps/frame.png"

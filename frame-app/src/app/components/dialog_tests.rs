@@ -5,25 +5,19 @@ use crate::{appearance::ColorTheme, theme};
 use gpui::{Styled, div, px};
 
 #[test]
-fn mira_dialog_surface_has_only_the_reference_ring_and_flat_fill() {
+fn dialogs_use_the_settings_drawer_shadow_and_highlight() {
     for mode in ColorTheme::ALL {
         let palette = theme::palette(mode);
         let mut panel = div().dialog_surface(palette);
         let style = panel.style();
-        assert!(
-            style.box_shadow.as_ref().is_none_or(Vec::is_empty),
-            "Mira DialogContent has a 1px ring and no drop shadow"
-        );
-        assert_eq!(style.ring.width, Some(px(1.0)));
         assert_eq!(
-            style.ring.color,
-            Some(gpui::RingColor::Color(
-                color(palette.token("foreground").with_opacity(0.1)).into()
-            ))
+            style.box_shadow.as_deref(),
+            Some(theme::shadows::ShadowLevel::Lg.shadows().as_slice())
         );
+        assert_eq!(style.ring.width, None);
         assert_eq!(
             style.background,
-            Some(color(palette.token("popover")).into())
+            Some(theme::shadows::surface_fill(palette.surface, palette).into())
         );
     }
 }
@@ -434,9 +428,10 @@ fn mira_dialog_painted_backdrop_and_panel_follow_the_same_fade_and_scale() {
             .unwrap();
         near(panel.bounds.center().x.0 / scale, center.x.as_f32());
         near(panel.bounds.center().y.0 / scale, center.y.as_f32());
-        near(
-            gpui::hsla_to_rgba(panel.background.as_solid().unwrap()).alpha,
-            1.0,
+        let palette = theme::palette(ColorTheme::Dark);
+        assert_eq!(
+            panel.background,
+            theme::shadows::surface_fill(palette.surface, palette)
         );
     });
 }

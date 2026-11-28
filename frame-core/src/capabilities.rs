@@ -38,6 +38,7 @@ pub struct AvailableFilters {
     pub vignette: bool,
     pub bwdif: bool,
     pub deshake: bool,
+    pub subtitles: bool,
     pub highpass: bool,
     pub lowpass: bool,
     pub afftdn: bool,
@@ -95,6 +96,7 @@ pub fn parse_available_filters(ffmpeg_filters_stdout: impl AsRef<str>) -> Availa
         vignette: filter_list_contains(stdout, "vignette"),
         bwdif: filter_list_contains(stdout, "bwdif"),
         deshake: filter_list_contains(stdout, "deshake"),
+        subtitles: filter_list_contains(stdout, "subtitles"),
         highpass: filter_list_contains(stdout, "highpass"),
         lowpass: filter_list_contains(stdout, "lowpass"),
         afftdn: filter_list_contains(stdout, "afftdn"),
@@ -213,6 +215,7 @@ Filters:
  ... deband            V->V       Debands video.
  ... vignette          V->V       Make or reverse a vignette effect.
  ... bwdif             V->V       Deinterlace the input image.
+ ... subtitles         V->V       Render subtitles.
  T.C highpass          A->A       Apply a high-pass filter.
  T.C lowpass           A->A       Apply a low-pass filter.
  ... afftdn            A->A       Denoise audio samples.
@@ -241,6 +244,7 @@ Filters:
                 vignette: true,
                 bwdif: true,
                 deshake: false,
+                subtitles: true,
                 highpass: true,
                 lowpass: true,
                 afftdn: true,

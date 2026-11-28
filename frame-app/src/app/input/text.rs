@@ -8,6 +8,7 @@ pub(super) fn sanitize_number_input(value: &str) -> String {
 pub(super) fn sanitize_replacement_text(kind: FrameTextInputKind, value: &str) -> String {
     match kind {
         FrameTextInputKind::MaxConcurrency
+        | FrameTextInputKind::AudioSampleRate
         | FrameTextInputKind::AudioBitrate
         | FrameTextInputKind::CropWidth
         | FrameTextInputKind::CropHeight
@@ -29,6 +30,8 @@ pub(super) fn sanitize_replacement_text(kind: FrameTextInputKind, value: &str) -
         | FrameTextInputKind::MetadataServiceProvider
         | FrameTextInputKind::PresetName
         | FrameTextInputKind::ExternalSubtitleLanguage
+        | FrameTextInputKind::AudioTrackLanguage
+        | FrameTextInputKind::AudioTrackTitle
         | FrameTextInputKind::ExternalSubtitleTitle => {
             value.chars().filter(|ch| !ch.is_control()).collect()
         }

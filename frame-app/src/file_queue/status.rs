@@ -11,6 +11,11 @@ pub enum FileStatus {
 
 impl FileStatus {
     #[must_use]
+    pub const fn has_encoding_statistics(self) -> bool {
+        matches!(self, Self::Converting | Self::Paused | Self::Cancelling)
+    }
+
+    #[must_use]
     pub const fn locks_settings(self) -> bool {
         matches!(
             self,

@@ -4,7 +4,7 @@ use super::crop::{crop_rect_is_full, preview_crop_controls_enabled};
 use crate::app::root::FrameRoot;
 use crate::auto_crop::{AutoCropError, AutoCropRequest, DetectedCrop, detect_auto_crop};
 use crate::preview::{CropRect, parse_time_to_seconds};
-use crate::settings::{ProcessingMode, SourceKind};
+use crate::settings::SourceKind;
 use gpui::{AppContext, Context};
 use std::sync::{
     Arc,
@@ -53,7 +53,7 @@ impl FrameRoot {
             return None;
         }
         let file = self.file_queue.selected_file()?;
-        if file.config.processing_mode == ProcessingMode::Copy {
+        if file.config.processing_mode.copies_video() {
             return None;
         }
         let metadata = self.selected_source_metadata()?;
@@ -216,7 +216,7 @@ impl FrameRoot {
                             "Analysis took too long. Try again or adjust the frame manually."
                         }
                         AutoCropError::Unavailable(_) => {
-                            "Auto crop is unavailable. Check your FFmpeg installation."
+                            "Frame could not start auto crop. Adjust the frame manually."
                         }
                         _ => {
                             "Could not analyze this video. Try again or adjust the frame manually."

@@ -11,7 +11,6 @@ finish-args:
   - --socket=fallback-x11
   - --socket=pulseaudio
   - --device=dri
-  - --env=FRAME_USE_SYSTEM_MEDIA_TOOLS=1
 cleanup:
   - /include
   - /lib/pkgconfig
@@ -27,8 +26,9 @@ modules:
     build-commands:
       - mkdir -p .cargo
       - cp cargo-vendor/cargo-config.toml .cargo/config.toml
-      - cargo build --release --locked --offline --manifest-path frame-app/Cargo.toml
+      - cargo build --release --locked --offline -p frame-app -p frame-media
       - install -Dm755 target/release/frame /app/bin/frame
+      - install -Dm755 target/release/frame-media /app/bin/frame-media
       - install -Dm644 packaging/flathub/io.github._66HEX.Frame.desktop /app/share/applications/io.github._66HEX.Frame.desktop
       - install -Dm644 packaging/flathub/io.github._66HEX.Frame.metainfo.xml /app/share/metainfo/io.github._66HEX.Frame.metainfo.xml
       - install -Dm644 frame-app/resources/app-icons/32x32.png /app/share/icons/hicolor/32x32/apps/io.github._66HEX.Frame.png

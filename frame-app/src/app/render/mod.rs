@@ -175,6 +175,13 @@ impl Render for FrameRoot {
                     self.ensure_text_input_focus(FrameTextInputKind::OutputName, cx);
                 let audio_bitrate_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::AudioBitrate, cx);
+                self.sync_audio_editor(&selected_config_snapshot, source_metadata.as_ref());
+                let sample_rate_focus =
+                    self.ensure_text_input_focus(FrameTextInputKind::AudioSampleRate, cx);
+                let audio_language_focus =
+                    self.ensure_text_input_focus(FrameTextInputKind::AudioTrackLanguage, cx);
+                let audio_title_focus =
+                    self.ensure_text_input_focus(FrameTextInputKind::AudioTrackTitle, cx);
                 let video_width_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::VideoCustomWidth, cx);
                 let video_height_focus =
@@ -268,6 +275,17 @@ impl Render for FrameRoot {
                     settings_disabled: self.file_queue.selected_file_locked(),
                     output_name: &selected_output_name,
                     output_name_focus: Some(&output_name_focus),
+                    audio_editor: crate::app::inspector::audio::TrackEditor {
+                        index: self
+                            .settings_ui
+                            .audio_editor
+                            .as_ref()
+                            .map(|(_, index)| *index),
+                        sample_rate: Some(&sample_rate_focus),
+                        custom_rate: self.settings_ui.custom_audio_rate,
+                        language: Some(&audio_language_focus),
+                        title: Some(&audio_title_focus),
+                    },
                     audio_bitrate_focus: Some(&audio_bitrate_focus),
                     // Draft crop dimensions are display-only until Apply commits them.
                     video_width_focus: (!self.preview_ui.crop_mode).then_some(&video_width_focus),
@@ -428,6 +446,7 @@ impl Render for FrameRoot {
                 .into_any_element()
             });
 
+        let stats_present = self.encoding_stats_dialog.presence.is_present();
         let mut root = div()
             .id(APP_ROOT_FOCUS_ID)
             .size_full()
@@ -472,19 +491,33 @@ impl Render for FrameRoot {
             )
             .on_drop(cx.listener(|root, paths: &ExternalPaths, _window, cx| {
                 cx.stop_propagation();
+                if root.encoding_stats_dialog.presence.is_present() {
+                    return;
+                }
                 root.close_drag_drop_overlay();
                 Self::import_source_paths(paths.paths().to_vec(), cx);
                 cx.notify();
             }))
             .on_drag_move(cx.listener(
                 |root, _event: &DragMoveEvent<ExternalPaths>, _window, cx| {
-                    if !root.update_installation_in_progress() && root.open_drag_drop_overlay() {
+                    if !root.encoding_stats_dialog.presence.is_present()
+                        && !root.update_installation_in_progress()
+                        && root.open_drag_drop_overlay()
+                    {
                         cx.notify();
                     }
                 },
             ))
-            .child(titlebar(state, source_activity, palette, window, cx))
-            .child(content)
+            .child(
+                titlebar(state, source_activity, palette, window, cx)
+                    .id("frame-titlebar-content")
+                    .when(stats_present, gpui::StatefulInteractiveElement::aria_hidden),
+            )
+            .child(
+                content
+                    .id("frame-main-content")
+                    .when(stats_present, gpui::StatefulInteractiveElement::aria_hidden),
+            )
             .child(FileDropLifecycleProbe { owner: cx.entity() });
 
         root = self.render_overlays(root, palette, window, cx);

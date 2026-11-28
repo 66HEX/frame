@@ -14,7 +14,7 @@ use crate::preview::{
 };
 use crate::preview_engine::MIN_PREVIEW_SOURCE_DIMENSION;
 use crate::settings::{
-    ConversionConfig, OverlaySettings, ProcessingMode, is_audio_only_container, is_gif_container,
+    ConversionConfig, OverlaySettings, is_audio_only_container, is_gif_container,
 };
 use gpui::prelude::*;
 use gpui::{Bounds, Context, Pixels, Point, Window};
@@ -25,7 +25,7 @@ impl FrameRoot {
         let Some(file) = self.file_queue.selected_file_mut() else {
             return false;
         };
-        if file.config.processing_mode != ProcessingMode::Copy
+        if !file.config.processing_mode.copies_video()
             && !is_audio_only_container(&file.config.container)
             && !is_gif_container(&file.config.container)
         {

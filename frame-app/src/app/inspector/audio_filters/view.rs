@@ -9,7 +9,7 @@ use crate::app::inspector::audio_filters::spec::audio_filter_spec;
 use crate::app::inspector::panel::settings_field;
 use crate::app::inspector::shared::settings_hint_text;
 use crate::app::root::FrameRoot;
-use crate::settings::{ConversionConfig, ProcessingMode, SourceMetadata, stereo_width_available};
+use crate::settings::{ConversionConfig, SourceMetadata, stereo_width_available};
 use crate::theme;
 use frame_core::capabilities::AvailableFilters;
 use gpui::prelude::*;
@@ -29,7 +29,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let filters = config.audio_filters;
-    let controls_disabled = settings_disabled || config.processing_mode == ProcessingMode::Copy;
+    let controls_disabled = settings_disabled || config.processing_mode.copies_audio();
     let width_available = stereo_width_available(config, metadata);
     let mut stereo = settings_field("Stereo", palette).child(settings_audio_filter_range_field(
         audio_filter_spec(

@@ -59,29 +59,6 @@ fn text_with_demux_flags(
     String::from_utf8(bytes).map_err(|error| error.to_string())
 }
 
-fn packets(tools: &Toolchain, path: &Path, selector: &str) -> TestResult<serde_json::Value> {
-    let bytes = run_tool_output(
-        &tools.ffprobe,
-        &args(&[
-            "-v",
-            "error",
-            "-select_streams",
-            selector,
-            "-show_packets",
-            "-show_data_hash",
-            "sha256",
-            "-show_entries",
-            "packet=pts,dts,duration,size,data_hash",
-            "-of",
-            "json",
-            &path_arg(path),
-        ]),
-    )?;
-    let json: serde_json::Value =
-        serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
-    Ok(json["packets"].clone())
-}
-
 fn text_formats(tools: &Toolchain, srt: &Path) -> TestResult<Vec<PathBuf>> {
     let mut paths = vec![srt.to_path_buf()];
     for extension in ["ass", "vtt"] {
@@ -351,11 +328,11 @@ fn mixed_subtitle_ordinals_should_clip_only_imported_text_and_preserve_bitmap_pa
         let output = sandbox.path(&format!("fixed-{mode}.mkv"));
         let argv = build_ffmpeg_args(&path_arg(&input), &path_arg(&output), &config, &metadata)
             .map_err(|error| error.to_string())?;
-        run_tool(&tools.ffmpeg, &argv)?;
+        tools.native("convert", &argv)?;
         let baseline = sandbox.path(&format!("baseline-{mode}.mkv"));
         let mut baseline_args = without_subtitle_bsfs(&argv);
         *baseline_args.last_mut().unwrap() = path_arg(&baseline);
-        run_tool(&tools.ffmpeg, &baseline_args)?;
+        tools.native("convert", &baseline_args)?;
         for ordinal in [0, 1, 2, 4] {
             let selector = format!("s:{ordinal}");
             let actual = packets(&tools, &output, &selector)?;

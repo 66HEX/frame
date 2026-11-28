@@ -9,14 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Video and Audio Modes:** Choose which streams to re-encode and which to copy. For example, resize the video while keeping the original audio tracks. Resolves [#306](https://github.com/66HEX/frame/issues/306).
+- **Two-Pass Encoding:** H.264 (x264), HEVC (x265) and VP9 can analyze the video before encoding it at the requested average bitrate. Resolves [#307](https://github.com/66HEX/frame/issues/307).
+- **Audio Track Metadata:** Set the language and title of each selected audio track and choose which one players should play by default. Resolves [#308](https://github.com/66HEX/frame/issues/308).
+- **Audio Sample Rate:** Choose an output sample rate for each encoded audio track, or let Frame select one for the codec. Resolves [#309](https://github.com/66HEX/frame/issues/309).
+- **Encoding Statistics:** Choose **Show encoding statistics** in a running file’s queue row to see its progress, estimated time remaining, encoding speed and output size in a dialog. The queue and preview keep their size throughout conversion. Resolves [#310](https://github.com/66HEX/frame/issues/310).
 - **MPEG-PS Source Files:** Adds `.mpg` and `.mpeg` video files to the supported source extensions for drag-and-drop and the file picker. Resolves [#270](https://github.com/66HEX/frame/issues/270).
 
 ### Changed
 
+- **Audio Settings:** If all selected tracks have Default set to No for MP4, MOV or M4A, Frame reports the error in the file’s conversion log when export starts.
+- **Media Engine:** Frame now reads, previews and exports files through a worker linked directly to the FFmpeg libraries. Desktop packages include the worker, while Flathub and Nixpkgs use their distribution’s libraries.
 - **Homebrew Distribution:** Expands the custom Homebrew tap cask (`brew install 66HEX/frame/frame`) to support Linux AppImages alongside macOS DMGs, automatically strips the macOS quarantine attribute on install, and updates installation docs.
 
 ### Fixed
 
+- **Dialogs:** In-app dialogs now use the same shadow and highlighted top edge as the Settings drawer in both themes.
+- **macOS:** Intel and Apple Silicon app bundles now declare macOS 12.0 (Monterey) as their minimum, matching the bundled media libraries.
+- **Text Editing:** On Linux and Windows, Ctrl+A selects the contents of a text field and Ctrl+C, Ctrl+X and Ctrl+V copy, cut and paste text.
+- **Pasting Multiline Text:** Pasting a Windows-style line break into a single-line field now inserts a space. This keeps pasted audio track titles valid for export.
+- **File Queue:** Aligns the column headings with their file rows. [#305](https://github.com/66HEX/frame/pull/305)
 - **Audio Track Selection After Non-Audio Presets:** Restores the default source audio track when switching from a non-audio container or preset (such as GIF) back to an audio-supporting format, while preserving explicit audio exclusion between audio-capable formats. Resolves [#273](https://github.com/66HEX/frame/issues/273).
 - **Windows Bundling:** Stops `cargo xtask bundle windows` from re-entering Cargo via `script/bundle-windows.ps1` and scrubs Cargo package environment variables from child processes so Windows builds no longer fail trying to relink `xtask.exe`. Resolves [#254](https://github.com/66HEX/frame/issues/254).
 

@@ -34,7 +34,9 @@ jobs:
     - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync
+        sudo apt-get install -y clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync flatpak flatpak-builder
+        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        flatpak install --user --no-related -y --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
     - name: steps::setup_appimagetool
       run: |
         curl --fail --location --proto '=https' --tlsv1.2 --output /tmp/appimagetool.AppImage https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
@@ -43,7 +45,7 @@ jobs:
     - name: ./script/bundle-linux
       env:
         APPIMAGETOOL: /tmp/appimagetool.AppImage
-      run: ./script/bundle-linux --tarball --appimage
+      run: dbus-run-session -- ./script/bundle-linux --all
     - name: run_bundling::verify_appimage_update_information
       shell: bash
       run: |
@@ -51,6 +53,23 @@ jobs:
         actual="$(target/release/Frame-x86_64.AppImage --appimage-updateinformation)"
         test "$actual" = "$expected"
         test -s target/release/Frame-x86_64.AppImage.zsync
+    - name: run_bundling::verify_extracted_linux_packages
+      shell: bash
+      run: |
+        output="$GITHUB_WORKSPACE/target/release"
+        cd "$RUNNER_TEMP"
+        tar -xzf "$output/frame-linux-x86_64.tar.gz"
+        "$output/Frame-x86_64.AppImage" --appimage-extract >/dev/null
+        for root in frame.app squashfs-root/usr; do
+          python3 "$GITHUB_WORKSPACE/script/media-worker.py" verify --bin-dir "$root/bin" --lib-dir "$root/lib" --package-root "$root"
+        done
+    - name: run_bundling::verify_installed_devel_flatpak
+      shell: bash
+      run: |
+        flatpak install --user --noninteractive -y target/release/Frame-x86_64.flatpak
+        dbus-run-session -- flatpak run --user --filesystem="$GITHUB_WORKSPACE/script:ro" --env=PATH= \
+          --command=/usr/bin/python3 io.github._66HEX.Frame.Devel//devel "$GITHUB_WORKSPACE/script/media-worker.py" \
+          verify --target x86_64-unknown-linux-gnu --bin-dir /app/bin --lib-dir /app/lib --package-root /app
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
@@ -92,7 +111,9 @@ jobs:
     - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync
+        sudo apt-get install -y clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync flatpak flatpak-builder
+        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        flatpak install --user --no-related -y --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
     - name: steps::setup_appimagetool
       run: |
         curl --fail --location --proto '=https' --tlsv1.2 --output /tmp/appimagetool.AppImage https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-aarch64.AppImage
@@ -101,7 +122,7 @@ jobs:
     - name: ./script/bundle-linux
       env:
         APPIMAGETOOL: /tmp/appimagetool.AppImage
-      run: ./script/bundle-linux --tarball --appimage
+      run: dbus-run-session -- ./script/bundle-linux --all
     - name: run_bundling::verify_appimage_update_information
       shell: bash
       run: |
@@ -109,6 +130,23 @@ jobs:
         actual="$(target/release/Frame-aarch64.AppImage --appimage-updateinformation)"
         test "$actual" = "$expected"
         test -s target/release/Frame-aarch64.AppImage.zsync
+    - name: run_bundling::verify_extracted_linux_packages
+      shell: bash
+      run: |
+        output="$GITHUB_WORKSPACE/target/release"
+        cd "$RUNNER_TEMP"
+        tar -xzf "$output/frame-linux-aarch64.tar.gz"
+        "$output/Frame-aarch64.AppImage" --appimage-extract >/dev/null
+        for root in frame.app squashfs-root/usr; do
+          python3 "$GITHUB_WORKSPACE/script/media-worker.py" verify --bin-dir "$root/bin" --lib-dir "$root/lib" --package-root "$root"
+        done
+    - name: run_bundling::verify_installed_devel_flatpak
+      shell: bash
+      run: |
+        flatpak install --user --noninteractive -y target/release/Frame-aarch64.flatpak
+        dbus-run-session -- flatpak run --user --filesystem="$GITHUB_WORKSPACE/script:ro" --env=PATH= \
+          --command=/usr/bin/python3 io.github._66HEX.Frame.Devel//devel "$GITHUB_WORKSPACE/script/media-worker.py" \
+          verify --target aarch64-unknown-linux-gnu --bin-dir /app/bin --lib-dir /app/lib --package-root /app
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
@@ -156,6 +194,14 @@ jobs:
           --require-hashes \
           --target target/dmgbuild \
           --requirement packaging/macos/dmgbuild-requirements.txt
+    - name: steps::restore_sdk_cache
+      id: sdk-cache
+      if: runner.os == 'macOS'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: target/media-sdk/archives
+        key: libav-macos-${{ runner.arch }}-${{ hashFiles('packaging/media/**', 'script/media-worker.py') }}
+        restore-keys: libav-macos-${{ runner.arch }}-
     - name: steps::install_cargo_bundle
       run: cargo install cargo-bundle --version 0.11.0 --locked
     - name: ./script/bundle-mac
@@ -174,7 +220,7 @@ jobs:
         name: Frame-x86_64.app.zip
         path: target/x86_64-apple-darwin/release/Frame-x86_64.app.zip
         if-no-files-found: error
-    timeout-minutes: 60
+    timeout-minutes: 150
   bundle_macos_aarch64:
     if: |-
       github.event_name == 'workflow_dispatch' ||
@@ -203,6 +249,14 @@ jobs:
           --require-hashes \
           --target target/dmgbuild \
           --requirement packaging/macos/dmgbuild-requirements.txt
+    - name: steps::restore_sdk_cache
+      id: sdk-cache
+      if: runner.os == 'macOS'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: target/media-sdk/archives
+        key: libav-macos-${{ runner.arch }}-${{ hashFiles('packaging/media/**', 'script/media-worker.py') }}
+        restore-keys: libav-macos-${{ runner.arch }}-
     - name: steps::install_cargo_bundle
       run: cargo install cargo-bundle --version 0.11.0 --locked
     - name: ./script/bundle-mac
@@ -221,7 +275,7 @@ jobs:
         name: Frame-aarch64.app.zip
         path: target/aarch64-apple-darwin/release/Frame-aarch64.app.zip
         if-no-files-found: error
-    timeout-minutes: 60
+    timeout-minutes: 150
   bundle_windows_x86_64:
     if: |-
       github.event_name == 'workflow_dispatch' ||
@@ -247,6 +301,14 @@ jobs:
     - name: ./script/bundle-windows.ps1
       shell: pwsh
       run: ./script/bundle-windows.ps1 -Architecture x86_64
+    - name: run_bundling::verify_installed_windows_package
+      shell: pwsh
+      run: |
+        $installed = Join-Path $env:RUNNER_TEMP 'Frame media package'
+        $argsList = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', ('/DIR="' + $installed + '"'))
+        $setup = Start-Process ./target/Frame-x86_64.exe -ArgumentList $argsList -PassThru -Wait
+        if ($setup.ExitCode -ne 0) { throw "Frame installer exited $($setup.ExitCode)" }
+        python script/media-worker.py verify --bin-dir $installed --lib-dir $installed --package-root $installed
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:

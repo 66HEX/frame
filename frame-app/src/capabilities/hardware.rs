@@ -338,7 +338,21 @@ fn probe_hardware_encoder_with_limits(
         }
         cache.generation
     };
-    runtime.command.args = probe_args(policy);
+    runtime.command.args =
+        crate::runtime_binaries::worker_subcommand(&runtime.command.program, "capabilities")
+            .map_or_else(
+                || probe_args(policy),
+                |operation| {
+                    [
+                        operation,
+                        "hardware",
+                        policy.encoder.name(),
+                        if policy.allow_software { "1" } else { "0" },
+                    ]
+                    .map(Into::into)
+                    .into()
+                },
+            );
     let input = probe_input();
     let report = match bounded_process::run(&runtime.command, &input, limits, &cancelled) {
         Ok(output) => classify_output(policy, &output, input.len()),
@@ -486,7 +500,7 @@ mod tests {
     #[test]
     #[ignore = "requires the bundled runtime and operational VideoToolbox hardware"]
     fn bundled_videotoolbox_encoders_complete_a_real_strict_probe() {
-        let executable = crate::runtime_binaries::ffmpeg_executable();
+        let executable = crate::runtime_binaries::media_worker_executable();
         let compiled =
             crate::capabilities::detect_available_encoders_with_executable(&executable).unwrap();
         for encoder in [

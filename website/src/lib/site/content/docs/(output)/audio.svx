@@ -16,6 +16,12 @@ Check the source audio tracks you want to export. Only selected tracks are inclu
 
 Review track selection after changing the output format. The container determines the supported audio codecs and track combinations.
 
+## Label audio tracks
+
+In **Audio**, enter a language and title for each selected track that the output container can label. For example, use `eng` and `Commentary` for an English commentary track. Choose **Default** on the track you want a player to select first. These settings also apply when copying the audio.
+
+Keep **Metadata** set to **Preserve** to write track languages and titles. The default-track setting is independent of the text fields. MP4, MOV and M4A need a default when audio is included. M4A stores the track language but does not store a separate title for each track.
+
 ## Choose an audio format
 
 Audio output formats include MP3, M4A, WAV, FLAC, and Opus. The available encoders also cover AAC, AC-3, ALAC, PCM, and transport-stream audio where supported.
@@ -39,6 +45,10 @@ Check the exported file at a normal listening level. Changing channels or gain c
   alt="Frame Output inspector with audio track and encoding settings."
   caption="Choose the audio tracks and encoding settings for the output."
 />
+
+## Set the sample rate
+
+Select an included audio track and choose **Sample rate** to resample it during export. For example, you can export a commentary track at 32 kHz and a music track at 48 kHz in one MKV. The available rates depend on the audio codec and container. Choose **Custom** to enter a rate in Hz when the format supports it. **Automatic** keeps the source rate when the encoder supports it. Opus files use a 48 kHz playback clock. Stream copy keeps the original samples and sample rate.
 
 ## Audio filters
 

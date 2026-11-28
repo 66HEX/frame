@@ -809,6 +809,9 @@ fn preview_low_res_filters(
 
 #[must_use]
 pub fn build_audio_filters(config: &ConversionConfig) -> Vec<String> {
+    if config.copies_audio() {
+        return Vec::new();
+    }
     build_audio_effect_filters(config)
 }
 
@@ -824,6 +827,7 @@ mod tests {
             video_codec: "libx264".to_string(),
             video_bitrate_mode: "crf".to_string(),
             video_bitrate: "5000".to_string(),
+            video_two_pass: false,
             audio_codec: "aac".to_string(),
             audio_bitrate: "192".to_string(),
             audio_bitrate_mode: "bitrate".to_string(),
@@ -835,6 +839,7 @@ mod tests {
             video_filters: crate::types::VideoFiltersConfig::default(),
             audio_filters: crate::types::AudioFiltersConfig::default(),
             selected_audio_tracks: vec![],
+            audio_track_overrides: std::collections::BTreeMap::new(),
             selected_subtitle_tracks: vec![],
             external_subtitle_tracks: vec![],
             subtitle_burn_path: None,

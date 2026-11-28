@@ -209,6 +209,8 @@ fn preview_runtime_key_tracks_visual_config_but_ignores_encoder_quality() {
                 channel_layout: Some("stereo".to_string()),
                 language: None,
                 label: None,
+                metadata_title: None,
+                is_default: false,
                 bitrate_kbps: None,
                 sample_rate: Some("48000".to_string()),
             }],
@@ -222,6 +224,11 @@ fn preview_runtime_key_tracks_visual_config_but_ignores_encoder_quality() {
 
     root.update_selected_config(|config| {
         config.crf = 18;
+        config.video_bitrate_mode = "bitrate".into();
+        config.video_two_pass = true;
+        let edit = config.audio_track_overrides.entry(1).or_default();
+        edit.title = Some("Commentary".into());
+        edit.sample_rate = Some(24_000);
         true
     });
     let quality_request = root

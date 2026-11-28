@@ -104,17 +104,18 @@ impl Window {
             .filter(|start| *start > self.origin)
     }
 
-    fn interval(&self) -> Result<String, ConversionError> {
-        let start = self.seek().map_or_else(String::new, seconds);
-        let end = self
-            .end
+    fn scan_end(&self) -> Result<Option<i64>, ConversionError> {
+        self.end
             .map(|end| {
                 end.checked_add(PACKET_MICROS)
-                    .map(seconds)
                     .ok_or_else(|| refused("the scan interval overflows"))
             })
-            .transpose()?
-            .unwrap_or_default();
+            .transpose()
+    }
+
+    fn interval(&self) -> Result<String, ConversionError> {
+        let start = self.seek().map_or_else(String::new, seconds);
+        let end = self.scan_end()?.map_or_else(String::new, seconds);
         Ok(format!("{start}%{end}"))
     }
 }
@@ -125,7 +126,7 @@ pub(super) fn check(
     executable: &str,
     cancelled: impl Fn() -> bool,
 ) -> Result<Option<OpusProof>, ConversionError> {
-    if task.config.processing_mode != "copy" || task.config.container != "opus" {
+    if !task.config.copies_audio() || task.config.container != "opus" {
         return Ok(None);
     }
     let selected: BTreeSet<_> = task
@@ -187,14 +188,41 @@ fn scan_track(
         return Err(refused("the timing check reached its time or output limit"));
     }
     let mut command = runtime.command.clone();
-    command.args = [
-        "-v".into(), "error".into(), "-select_streams".into(), index.to_string().into(),
-        "-read_intervals".into(), window.interval()?.into(),
-        "-show_packets".into(), "-show_streams".into(), "-show_format".into(),
-        "-show_entries".into(),
-        "packet=stream_index,pts,duration:stream=index,codec_name,time_base,start_pts:format=start_time".into(),
-        "-of".into(), "json=compact=1".into(), path.as_os_str().to_owned(),
-    ].into();
+    command.args = if let Some(probe) =
+        crate::runtime_binaries::worker_subcommand(&command.program, "probe")
+    {
+        vec![
+            probe.into(),
+            "opus-timing".into(),
+            index.to_string().into(),
+            window
+                .seek()
+                .map_or_else(String::new, |us| us.to_string())
+                .into(),
+            window
+                .scan_end()?
+                .map_or_else(String::new, |us| us.to_string())
+                .into(),
+            path.as_os_str().to_owned(),
+        ]
+    } else {
+        vec![
+            "-v".into(),
+            "error".into(),
+            "-select_streams".into(),
+            index.to_string().into(),
+            "-read_intervals".into(),
+            window.interval()?.into(),
+            "-show_packets".into(),
+            "-show_streams".into(),
+            "-show_format".into(),
+            "-show_entries".into(),
+            "packet=stream_index,pts,duration:stream=index,codec_name,time_base,start_pts:format=start_time".into(),
+            "-of".into(),
+            "json=compact=1".into(),
+            path.as_os_str().to_owned(),
+        ]
+    };
     let bytes = read_scan(
         &command,
         Limits {

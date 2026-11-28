@@ -37,6 +37,10 @@ pub(super) fn analyze_window(
     }
     let mut command = Command::new(executable);
     command
+        .args(crate::runtime_binaries::worker_subcommand(
+            std::path::Path::new(executable),
+            "preview",
+        ))
         .args(sample_args(request, window))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -73,7 +77,7 @@ pub(super) fn analyze_window(
     let status = status?;
     if !status.success() {
         return Err(AutoCropError::Failed(if captured.diagnostic.is_empty() {
-            format!("FFmpeg exited with {status}")
+            format!("The media worker exited with {status}")
         } else {
             captured.diagnostic
         }));

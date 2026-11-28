@@ -1,6 +1,7 @@
 //! Shared conversion, probing, and event payload types.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 pub const DEFAULT_MAX_CONCURRENCY: usize = 2;
 pub const VOLUME_EPSILON: f64 = 0.01;
@@ -236,6 +237,8 @@ pub struct AudioTrack {
     /// Genuine title/name metadata, without the display label's handler fallback.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata_title: Option<String>,
+    #[serde(default)]
+    pub is_default: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bitrate_kbps: Option<f64>,
     pub sample_rate: Option<String>,
@@ -248,6 +251,22 @@ pub struct SubtitleTrack {
     pub codec: String,
     pub language: Option<String>,
     pub label: Option<String>,
+}
+
+/// Explicit edits for a source audio stream. Missing fields inherit. An empty
+/// language or title removes that tag. Text is exported only in Preserve mode.
+#[derive(Debug, Serialize, Deserialize, Default, Clone, Eq, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct AudioTrackOverride {
+    /// Requested output Hz when audio is re-encoded; absent uses automatic negotiation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sample_rate: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_default: Option<bool>,
 }
 
 /// A sidecar subtitle file that should remain selectable in the exported media.
@@ -331,6 +350,8 @@ pub struct ConversionConfig {
     pub video_codec: String,
     pub video_bitrate_mode: String,
     pub video_bitrate: String,
+    #[serde(default)]
+    pub video_two_pass: bool,
     pub audio_codec: String,
     pub audio_bitrate: String,
     #[serde(default = "default_audio_bitrate_mode")]
@@ -349,6 +370,8 @@ pub struct ConversionConfig {
     #[serde(default)]
     pub audio_filters: AudioFiltersConfig,
     pub selected_audio_tracks: Vec<u32>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub audio_track_overrides: BTreeMap<u32, AudioTrackOverride>,
     pub selected_subtitle_tracks: Vec<u32>,
     #[serde(default)]
     pub external_subtitle_tracks: Vec<ExternalSubtitleTrack>,
@@ -420,6 +443,38 @@ pub struct ConversionConfig {
     pub gif_dither: String,
     #[serde(default = "default_gif_loop")]
     pub gif_loop: u16,
+}
+
+impl ConversionConfig {
+    /// Whether the selected video stream is passed through as encoded packets.
+    #[must_use]
+    pub fn copies_video(&self) -> bool {
+        matches!(self.processing_mode.trim(), "copy" | "copyVideo")
+    }
+
+    /// Whether every selected audio stream is passed through as encoded packets.
+    #[must_use]
+    pub fn copies_audio(&self) -> bool {
+        matches!(self.processing_mode.trim(), "copy" | "copyAudio")
+    }
+
+    pub fn set_video_copy(&mut self, copy: bool) {
+        self.set_stream_modes(copy, self.copies_audio());
+    }
+
+    pub fn set_audio_copy(&mut self, copy: bool) {
+        self.set_stream_modes(self.copies_video(), copy);
+    }
+
+    fn set_stream_modes(&mut self, video_copy: bool, audio_copy: bool) {
+        let mode = match (video_copy, audio_copy) {
+            (false, false) => "reencode",
+            (true, true) => "copy",
+            (true, false) => "copyVideo",
+            (false, true) => "copyAudio",
+        };
+        mode.clone_into(&mut self.processing_mode);
+    }
 }
 
 fn default_rotation() -> String {
@@ -561,10 +616,26 @@ pub enum MetadataMode {
     Replace,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct EncodingStats {
+    pub frame: Option<u64>,
+    pub fps: Option<f64>,
+    pub size_bytes: Option<u64>,
+    pub bitrate_kbps: Option<f64>,
+    pub speed: Option<f64>,
+    pub media_seconds: f64,
+    pub elapsed_seconds: f64,
+    pub eta_seconds: Option<f64>,
+    pub duration_seconds: Option<f64>,
+    pub pass: Option<u8>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ProgressPayload {
     pub id: String,
     pub progress: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stats: Option<EncodingStats>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -613,6 +684,8 @@ pub struct FfprobeProgram {
 
 #[derive(Deserialize)]
 pub struct FfprobeStream {
+    #[serde(default)]
+    pub disposition: FfprobeDisposition,
     pub sample_aspect_ratio: Option<String>,
     pub index: u32,
     pub codec_type: String,
@@ -636,6 +709,12 @@ pub struct FfprobeStream {
     pub ts_packetsize: Option<String>,
     #[serde(default)]
     pub side_data_list: Vec<FfprobeSideData>,
+}
+
+#[derive(Default, Deserialize)]
+pub struct FfprobeDisposition {
+    #[serde(default)]
+    pub default: i32,
 }
 
 #[derive(Deserialize)]
@@ -745,6 +824,32 @@ mod tests {
         assert!(config.external_subtitle_tracks.is_empty());
         assert_eq!(config.metadata.service_name, None);
         assert_eq!(config.metadata.service_provider, None);
+    }
+
+    #[test]
+    fn stream_modes_round_trip_and_changing_one_preserves_the_other() {
+        for (video, audio, saved) in [
+            (false, false, "reencode"),
+            (true, true, "copy"),
+            (false, true, "copyAudio"),
+            (true, false, "copyVideo"),
+        ] {
+            let mut config: ConversionConfig =
+                serde_json::from_value(minimal_config_json()).unwrap();
+            config.set_video_copy(video);
+            config.set_audio_copy(audio);
+            let json = serde_json::to_value(&config).unwrap();
+            assert_eq!(json["processingMode"], saved);
+            let mut restored: ConversionConfig = serde_json::from_value(json).unwrap();
+            assert_eq!(
+                (restored.copies_video(), restored.copies_audio()),
+                (video, audio)
+            );
+            restored.set_audio_copy(!audio);
+            assert_eq!(restored.copies_video(), video);
+            restored.set_video_copy(!video);
+            assert_eq!(restored.copies_audio(), !audio);
+        }
     }
 
     #[test]

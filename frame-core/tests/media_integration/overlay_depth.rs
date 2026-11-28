@@ -317,7 +317,7 @@ fn selected_rgb16_frames_should_use_precise_overlay_in_export_and_snapshot() -> 
     let mut command = plan.args;
     let sink = command.len() - 1;
     command.splice(sink..sink, ["-frames:v".into(), "1".into()]);
-    let preview = run_tool_output(&tools.ffmpeg, &command)?;
+    let preview = tools.native("preview", &command)?;
     assert_eq!(preview.len(), 8 * 4 * 4);
     assert_bytes_match(
         &preview,
@@ -374,7 +374,7 @@ fn check_first_dynamic_snapshot(
         let mut command = plan.args;
         let sink = command.len() - 1;
         command.splice(sink..sink, ["-frames:v".into(), "1".into()]);
-        let pixels = run_tool_output(&tools.ffmpeg, &command)?;
+        let pixels = tools.native("preview", &command)?;
         assert_bytes_match(
             &pixels,
             &decode(tools, &oracle, "bgra")?,
@@ -384,6 +384,148 @@ fn check_first_dynamic_snapshot(
             without_overlay = Some(pixels);
         } else if name == "zero" {
             assert_eq!(Some(pixels), without_overlay);
+        }
+    }
+    Ok(())
+}
+
+fn changing_raster_inputs(
+    tools: &Toolchain,
+    sandbox: &Sandbox,
+) -> TestResult<(PathBuf, PathBuf, PathBuf)> {
+    let mut sequence = Vec::new();
+    for (i, (width, height, rgb)) in [
+        (128, 96, [255, 0, 0]),
+        (160, 80, [0, 255, 0]),
+        (96, 64, [0, 0, 255]),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let path = write_png(
+            tools,
+            sandbox,
+            &format!("frame-{i}"),
+            (width, height),
+            "rgb24",
+            &rgb.repeat((width * height) as usize),
+        )?;
+        // Allow the fps and overlay filters to emit steady frames on both
+        // sides of each format change before their pending state is reset.
+        let encoded = fs::read(&path).map_err(|err| err.to_string())?;
+        for frame in i * 4..i * 4 + 4 {
+            sequence.extend_from_slice(&encoded);
+            fs::copy(&path, sandbox.path(&format!("primary-{frame}.png")))
+                .map_err(|err| err.to_string())?;
+        }
+    }
+    let variable_overlay = sandbox.path("sequence.png");
+    fs::write(&variable_overlay, sequence).map_err(|err| err.to_string())?;
+    let movie = sandbox.path("variable.mov");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-framerate",
+            "25",
+            "-i",
+            &path_arg(&sandbox.path("primary-%d.png")),
+            "-c:v",
+            "copy",
+            &path_arg(&movie),
+        ]),
+    )?;
+    let solid = sandbox.path("solid.mp4");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=black:s=128x96:r=25:d=0.5",
+            "-c:v",
+            "libx264",
+            &path_arg(&solid),
+        ]),
+    )?;
+    Ok((movie, solid, variable_overlay))
+}
+
+#[test]
+#[ignore = "requires the worker and reference media tools"]
+fn playback_reconfigures_a_changing_raster_and_overlay_without_losing_the_clip() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("changing_raster")?;
+    let (movie, solid, variable_overlay) = changing_raster_inputs(&tools, &sandbox)?;
+    for (input, overlay) in [
+        (&movie, sandbox.path("frame-2.png")),
+        (&solid, variable_overlay),
+    ] {
+        let mut config = video_config("mp4", "libx264", "aac");
+        config.overlay = Some(overlay_config(&overlay, 1.0, 0.25));
+        let options = PreviewFfmpegOptions {
+            start_seconds: 0.0,
+            end_seconds: Some(0.48),
+            source_width: Some(128),
+            source_height: Some(96),
+            source_is_palette: false,
+            source_sample_aspect_ratio: None,
+            source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+            preview_burn_clock: None,
+            max_width: 128,
+            max_height: 96,
+            fps: 25,
+            realtime: false,
+            precise_seek: true,
+            source_is_image: false,
+        };
+        let plan = build_ffmpeg_preview_args(&path_arg(input), &config, &options)
+            .map_err(|err| err.to_string())?;
+        let actual = tools.native("preview", &plan.args)?;
+        assert_eq!(actual.len(), 12 * plan.frame_bytes);
+        if input == &movie {
+            let expected = run_tool_output(&tools.ffmpeg, &plan.args)?;
+            assert_eq!(actual.len(), expected.len());
+            // When two demux threads reach a filter rebuild together, the
+            // reference can discard a different pending boundary picture.
+            // Compare every pixel of the steady frames in each source raster.
+            for index in [1, 5, 9] {
+                let frame = index * plan.frame_bytes..(index + 1) * plan.frame_bytes;
+                assert_bytes_match(
+                    &actual[frame.clone()],
+                    &expected[frame],
+                    &format!("changing primary raster, frame {index}"),
+                )?;
+            }
+        } else {
+            // The reference CLI can discard arbitrary pictures (even the
+            // entire output) when its threaded overlay input changes size.
+            // Render each still independently through the same Frame plan.
+            // The animation must show four exact copies of each result.
+            for phase in 0..3 {
+                let still = sandbox.path(&format!("frame-{phase}.png"));
+                config.overlay = Some(overlay_config(&still, 1.0, 0.25));
+                let still_options = PreviewFfmpegOptions {
+                    end_seconds: Some(0.04),
+                    ..options
+                };
+                let still_plan =
+                    build_ffmpeg_preview_args(&path_arg(input), &config, &still_options)
+                        .map_err(|err| err.to_string())?;
+                let expected = run_tool_output(&tools.ffmpeg, &still_plan.args)?;
+                assert_eq!(expected.len(), plan.frame_bytes);
+                for index in phase * 4..phase * 4 + 4 {
+                    let frame = index * plan.frame_bytes..(index + 1) * plan.frame_bytes;
+                    assert_bytes_match(
+                        &actual[frame],
+                        &expected,
+                        &format!("PNG overlay frame {index}"),
+                    )?;
+                }
+            }
         }
     }
     Ok(())

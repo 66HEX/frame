@@ -28,10 +28,22 @@ type TestResult<T = ()> = Result<T, String>;
 mod adpcm;
 #[path = "media_integration/audio_titles.rs"]
 mod audio_titles;
+#[path = "media_integration/cadence_clock.rs"]
+mod cadence_clock;
+#[path = "media_integration/decode_recovery.rs"]
+mod decode_recovery;
+#[path = "media_integration/effects.rs"]
+mod effects;
 #[path = "media_integration/gif_frames.rs"]
 mod gif_frames;
+#[path = "media_integration/mixed_modes.rs"]
+mod mixed_modes;
 #[path = "media_integration/overlay_depth.rs"]
 mod overlay_depth;
+#[path = "media_integration/registry.rs"]
+mod registry;
+#[path = "media_integration/sample_rates.rs"]
+mod sample_rates;
 #[path = "media_integration/subtitle_trim.rs"]
 mod subtitle_trim;
 #[path = "media_integration/tiff.rs"]
@@ -43,6 +55,7 @@ mod time_grammar;
 struct Toolchain {
     ffmpeg: PathBuf,
     ffprobe: PathBuf,
+    worker: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -67,9 +80,51 @@ struct Sandbox {
 
 impl Toolchain {
     fn discover() -> TestResult<Self> {
+        Self::discover_tools(true)
+    }
+
+    fn discover_tools(require_worker: bool) -> TestResult<Self> {
         let ffmpeg = discover_tool("ffmpeg", "FRAME_TEST_FFMPEG")?;
         let ffprobe = discover_tool("ffprobe", "FRAME_TEST_FFPROBE")?;
-        Ok(Self { ffmpeg, ffprobe })
+        if !require_worker {
+            return Ok(Self {
+                ffmpeg,
+                ffprobe,
+                worker: None,
+            });
+        }
+        let worker = match env::var_os("FRAME_TEST_MEDIA_WORKER") {
+            Some(path) => PathBuf::from(path),
+            None => env::current_exe()
+                .map_err(|e| e.to_string())?
+                .parent()
+                .and_then(Path::parent)
+                .ok_or("test binary has no profile directory")?
+                .join(format!("frame-media{}", env::consts::EXE_SUFFIX)),
+        };
+        if !worker.is_file() {
+            return Err(format!(
+                "Build frame-media first or set FRAME_TEST_MEDIA_WORKER (looked for {})",
+                worker.display()
+            ));
+        }
+        Ok(Self {
+            ffmpeg,
+            ffprobe,
+            worker: Some(worker),
+        })
+    }
+
+    fn native(&self, operation: &str, args: &[String]) -> TestResult<Vec<u8>> {
+        let mut request = Vec::with_capacity(args.len() + 1);
+        request.push(operation.to_string());
+        request.extend_from_slice(args);
+        run_tool_output(
+            self.worker
+                .as_ref()
+                .ok_or("No native worker for a historical CLI comparison")?,
+            &request,
+        )
     }
 }
 
@@ -488,12 +543,13 @@ fn transport_stream_combined_processing_graph_should_preserve_existing_features(
 }
 
 #[test]
-#[ignore = "requires FFmpeg/FFprobe and FRAME_TEST_PGS_FIXTURE pointing to a .sup file"]
+#[ignore = "requires FFmpeg/FFprobe fixture tools; run with --ignored"]
 fn pgs_sidecar_should_copy_to_m2ts_and_transcode_to_dvb_for_m2t() -> TestResult {
-    let Some(pgs_fixture) = env::var_os("FRAME_TEST_PGS_FIXTURE").map(PathBuf::from) else {
-        eprintln!("skipping PGS test: FRAME_TEST_PGS_FIXTURE is not set");
-        return Ok(());
-    };
+    // A synthetic 8x8 white bitmap followed by a clear display set at one second.
+    let pgs_fixture = env::var_os("FRAME_TEST_PGS_FIXTURE").map_or_else(
+        || Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/caption.sup"),
+        PathBuf::from,
+    );
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("pgs_transport_stream")?;
     let input = sandbox.path("source.mp4");
@@ -621,7 +677,8 @@ fn hevc_mkv_vflip_reencode_should_write_hevc_video() -> TestResult {
 }
 
 fn assert_hevc_mkv_reencode(flip_vertical: bool) -> TestResult {
-    let tools = Toolchain::discover()?;
+    let historical = env::var_os("FRAME_TEST_HISTORICAL_HEVC").is_some();
+    let tools = Toolchain::discover_tools(!historical)?;
     let sandbox = Sandbox::new("hevc_mkv_reencode")?;
     let input = sandbox.path("source.mp4");
 
@@ -635,7 +692,14 @@ fn assert_hevc_mkv_reencode(flip_vertical: bool) -> TestResult {
     let output = sandbox.path(&format!("output-vflip-{flip_vertical}.mkv"));
     let mut config = video_config("mkv", "libx265", "aac");
     config.flip_vertical = flip_vertical;
-    convert(&tools, &input, &output, &config)?;
+    if historical {
+        let metadata = probe_media(&tools, &input)?;
+        let args = build_ffmpeg_args(&path_arg(&input), &path_arg(&output), &config, &metadata)
+            .map_err(|error| error.to_string())?;
+        run_tool(&tools.ffmpeg, &args)?;
+    } else {
+        convert(&tools, &input, &output, &config)?;
+    }
 
     let metadata = probe_media(&tools, &output)?;
     assert_eq!(metadata.video_codec.as_deref(), Some("hevc"));
@@ -660,6 +724,10 @@ fn hevc_videotoolbox_mp4_mov_reencode_should_write_hvc1_video_and_aac_audio() ->
 
 fn assert_hevc_mp4_mov_tags(encoder: &str) -> TestResult {
     let tools = Toolchain::discover()?;
+    if encoder.ends_with("_videotoolbox") && !registry::hardware_encoder_available(&tools, encoder)?
+    {
+        return Ok(());
+    }
     let sandbox = Sandbox::new(&format!("hevc_mp4_mov_{encoder}"))?;
     let input = sandbox.path("source.mp4");
     generate_h264_aac_source(&tools, &input, 1.0, 640, 360)?;
@@ -668,6 +736,9 @@ fn assert_hevc_mp4_mov_tags(encoder: &str) -> TestResult {
         for pixel_format in ["yuv420p", "yuv420p10le"] {
             let output = sandbox.path(&format!("output-{pixel_format}.{container}"));
             let mut config = video_config(container, encoder, "aac");
+            if encoder.ends_with("_videotoolbox") {
+                config.video_bitrate_mode = "bitrate".into();
+            }
             config.selected_audio_tracks = vec![1];
             config.pixel_format = pixel_format.to_string();
             convert(&tools, &input, &output, &config)?;
@@ -1107,7 +1178,8 @@ fn prores_should_ignore_unused_quality_drafts_and_choose_profile_from_pixels() -
         let probe = probe_media(&tools, &input)?;
         let command = build_ffmpeg_args(&path_arg(&input), &path_arg(&output), &config, &probe)
             .map_err(|error| error.to_string())?;
-        let result = Command::new(&tools.ffmpeg)
+        let result = Command::new(tools.worker.as_ref().ok_or("missing worker")?)
+            .arg("convert")
             .args(&command)
             .output()
             .map_err(|error| error.to_string())?;
@@ -1311,7 +1383,7 @@ fn odd_custom_and_crop_dimensions_should_match_export_and_preview() -> TestResul
                 output_index..output_index,
                 ["-frames:v".to_string(), "1".to_string()],
             );
-            let pixels = run_tool_output(&tools.ffmpeg, &preview_args)?;
+            let pixels = tools.native("preview", &preview_args)?;
             assert_eq!(
                 pixels.len(),
                 plan.frame_bytes,
@@ -2957,8 +3029,8 @@ fn bounded_fast_preview_should_match_complete_source_frames_and_chirp_samples() 
     let audio_source_plan =
         build_ffmpeg_preview_audio_args(&path_arg(&input), &config, &audio_options)
             .map_err(|error| error.to_string())?;
-    let source_frames = run_tool_output(&tools.ffmpeg, &video_source_plan.args)?;
-    let source_samples = run_tool_output(&tools.ffmpeg, &audio_source_plan.args)?;
+    let source_frames = tools.native("preview", &video_source_plan.args)?;
+    let source_samples = tools.native("preview", &audio_source_plan.args)?;
     let frame_bytes = video_source_plan.frame_bytes;
     let video_end = 300 * frame_bytes;
     let audio_end = 10 * 48_000 * 2 * 4;
@@ -2980,7 +3052,7 @@ fn bounded_fast_preview_should_match_complete_source_frames_and_chirp_samples() 
                 },
             )
             .map_err(|error| error.to_string())?;
-            let frames = run_tool_output(&tools.ffmpeg, &video.args)?;
+            let frames = tools.native("preview", &video.args)?;
             assert_eq!(
                 frames.len(),
                 video_end - video_start,
@@ -3001,7 +3073,7 @@ fn bounded_fast_preview_should_match_complete_source_frames_and_chirp_samples() 
                 },
             )
             .map_err(|error| error.to_string())?;
-            let samples = run_tool_output(&tools.ffmpeg, &audio.args)?;
+            let samples = tools.native("preview", &audio.args)?;
             assert_eq!(
                 samples.len(),
                 audio_end - audio_start,
@@ -3066,7 +3138,7 @@ fn preview_subtitle_burn_should_use_source_time_after_seek() -> TestResult {
         let insert_at = args.len().saturating_sub(1);
         args.insert(insert_at, "-frames:v".to_string());
         args.insert(insert_at + 1, "1".to_string());
-        let output = run_tool_output(&tools.ffmpeg, &args)?;
+        let output = tools.native("preview", &args)?;
         if output.len() < plan.frame_bytes {
             return Err(format!(
                 "preview frame was too short: got {}, expected at least {}",
@@ -3146,7 +3218,7 @@ fn display_matrix_rotation_should_produce_portrait_preview_frame() -> TestResult
     let output_index = preview_args.len().saturating_sub(1);
     preview_args.insert(output_index, "-frames:v".to_string());
     preview_args.insert(output_index + 1, "1".to_string());
-    let frame = run_tool_output(&tools.ffmpeg, &preview_args)?;
+    let frame = tools.native("preview", &preview_args)?;
 
     assert_eq!(
         (
@@ -3172,10 +3244,15 @@ fn convert(
     let input = path_arg(input);
     let output = path_arg(output);
     validate_task_input(&input, config).map_err(|error| error.to_string())?;
-    let probe = probe_media(tools, Path::new(&input))?;
+    let metadata = tools.native("probe", &["metadata".into(), input.clone()])?;
+    let probe = parse_ffprobe_stdout(
+        &input,
+        String::from_utf8(metadata).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
     let args =
         build_ffmpeg_args(&input, &output, config, &probe).map_err(|error| error.to_string())?;
-    run_tool(&tools.ffmpeg, &args)?;
+    tools.native("convert", &args)?;
 
     let output_path = Path::new(&output);
     if !output_path.is_file() {
@@ -3216,6 +3293,7 @@ fn base_config(container: &str, video_codec: &str) -> ConversionConfig {
         video_codec: video_codec.to_string(),
         video_bitrate_mode: "crf".to_string(),
         video_bitrate: "5000".to_string(),
+        video_two_pass: false,
         audio_codec: "aac".to_string(),
         audio_bitrate: "96".to_string(),
         audio_bitrate_mode: "bitrate".to_string(),
@@ -3227,6 +3305,7 @@ fn base_config(container: &str, video_codec: &str) -> ConversionConfig {
         video_filters: frame_core::types::VideoFiltersConfig::default(),
         audio_filters: frame_core::types::AudioFiltersConfig::default(),
         selected_audio_tracks: Vec::new(),
+        audio_track_overrides: std::collections::BTreeMap::new(),
         selected_subtitle_tracks: Vec::new(),
         external_subtitle_tracks: Vec::new(),
         subtitle_burn_path: None,
@@ -3565,6 +3644,29 @@ fn generate_audio_source(tools: &Toolchain, output: &Path) -> TestResult {
     )
 }
 
+fn packets(tools: &Toolchain, path: &Path, selector: &str) -> TestResult<serde_json::Value> {
+    let bytes = run_tool_output(
+        &tools.ffprobe,
+        &args(&[
+            "-v",
+            "error",
+            "-select_streams",
+            selector,
+            "-show_packets",
+            "-show_data_hash",
+            "sha256",
+            "-show_entries",
+            "packet=pts,dts,duration,size,data_hash",
+            "-of",
+            "json",
+            &path_arg(path),
+        ]),
+    )?;
+    let json: serde_json::Value =
+        serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+    Ok(json["packets"].clone())
+}
+
 fn probe_media(tools: &Toolchain, path: &Path) -> Result<ProbeMetadata, String> {
     let probe_args = ffprobe_json_args(&path_arg(path));
     let stdout = run_tool_output(&tools.ffprobe, &probe_args)?;
@@ -3753,6 +3855,7 @@ fn bundled_tool_candidates(tool: &str) -> Vec<PathBuf> {
         ("macos", "aarch64") => &["aarch64-apple-darwin"],
         ("macos", "x86_64") => &["x86_64-apple-darwin"],
         ("linux", "x86_64") => &["x86_64-unknown-linux-gnu"],
+        ("linux", "aarch64") => &["aarch64-unknown-linux-gnu"],
         ("windows", "x86_64") => &["x86_64-pc-windows-msvc.exe"],
         _ => &[],
     };

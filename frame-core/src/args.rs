@@ -22,7 +22,7 @@ use crate::filters::{
     FrameRateEofAction, VisualFilterContext, VisualFilterProfile, build_audio_filters,
     build_visual_filter_chain_with_context, build_visual_filter_complex_with_context, has_overlay,
 };
-use crate::input_map::{embedded_subtitle_action, resolve_reencode_main_input_map};
+use crate::input_map::{embedded_subtitle_action, resolve_main_input_map};
 use crate::media_filters::validate_media_filters;
 use crate::media_rules::{
     SubtitleStreamAction as SubtitleAction, all_containers, container_supports_audio,
@@ -36,17 +36,13 @@ use crate::types::{
 };
 use crate::utils::{get_hwaccel_args, is_audio_only_container};
 
-fn is_copy_mode(config: &ConversionConfig) -> bool {
-    config.processing_mode == "copy"
-}
-
 /// Returns the configured video encoder only when this task actually uses it.
 #[must_use]
 pub fn effective_video_encoder<'a>(
     config: &'a ConversionConfig,
     probe: &ProbeMetadata,
 ) -> Option<&'a str> {
-    if is_copy_mode(config)
+    if config.copies_video()
         || is_audio_only_container(&config.container)
         || is_image_container(&config.container)
         || config.container.eq_ignore_ascii_case("gif")
@@ -104,11 +100,28 @@ fn validate_audio_encoding_tracks(
     probe: &ProbeMetadata,
 ) -> Result<(), ConversionError> {
     validate_audio_track_count(config)?;
-    if is_copy_mode(config) || !container_supports_audio(&config.container) {
+    if config.copies_audio() || !container_supports_audio(&config.container) {
         return Ok(());
     }
     for track in collect_selected_audio_tracks(config, probe)? {
         let source_channels = track.channels.parse::<u16>().ok();
+        if let Some(rate) = config
+            .audio_track_overrides
+            .get(&track.index)
+            .and_then(|edit| edit.sample_rate)
+            && let Some(reason) = crate::audio_rules::audio_sample_rate_encoding_error(
+                &config.container,
+                &config.audio_codec,
+                rate,
+                &config.audio_bitrate,
+                effective_audio_channels(&config.audio_channels, source_channels),
+            )
+        {
+            return Err(ConversionError::InvalidInput(format!(
+                "Audio track #{}: {reason}",
+                track.index
+            )));
+        }
         if config.audio_codec == "libopus" {
             let channels = effective_audio_channels(&config.audio_channels, source_channels);
             let layout = (config.audio_channels == "original")
@@ -344,25 +357,73 @@ fn add_subtitle_action_arg(args: &mut Vec<String>, output_index: usize, action: 
     );
 }
 
-fn add_audio_title_metadata(
+fn validate_audio_track_metadata(config: &ConversionConfig) -> Result<(), ConversionError> {
+    crate::audio_rules::audio_track_metadata_error(
+        &config.container,
+        &config.selected_audio_tracks,
+        &config.audio_track_overrides,
+        config.metadata.mode == MetadataMode::Preserve,
+    )
+    .map_or(Ok(()), |reason| Err(ConversionError::InvalidInput(reason)))
+}
+
+fn add_audio_track_metadata(
     args: &mut Vec<String>,
     config: &ConversionConfig,
     tracks: &[&AudioTrack],
-) {
-    if config.metadata.mode != MetadataMode::Preserve
-        || !(config.container.eq_ignore_ascii_case("mp4")
-            || config.container.eq_ignore_ascii_case("mov"))
-    {
-        return;
-    }
-    for (output_index, track) in tracks.iter().enumerate() {
-        if let Some(title) = &track.metadata_title {
+) -> Result<(), ConversionError> {
+    let support = crate::media_rules::audio_track_metadata_support(&config.container);
+    let dispositions = crate::audio_rules::audio_track_default_actions(
+        &config.container,
+        &config.selected_audio_tracks,
+        &config.audio_track_overrides,
+        |source| {
+            tracks
+                .iter()
+                .any(|track| track.index == source && track.is_default)
+        },
+    )
+    .map_err(ConversionError::InvalidInput)?;
+    let preserve = config.metadata.mode == MetadataMode::Preserve;
+    let mov_title = config.container.eq_ignore_ascii_case("mp4")
+        || config.container.eq_ignore_ascii_case("mov");
+    for (ordinal, (track, disposition)) in tracks.iter().zip(dispositions).enumerate() {
+        let edit = config.audio_track_overrides.get(&track.index);
+        let mut metadata = |key: &str, value: &str| {
+            args.extend([format!("-metadata:s:a:{ordinal}"), format!("{key}={value}")]);
+        };
+        if preserve && support.language {
+            if let Some(value) = edit.and_then(|e| e.language.as_deref()) {
+                let language =
+                    crate::audio_rules::audio_track_language_value(&config.container, value)
+                        .map_err(ConversionError::InvalidInput)?;
+                metadata("language", &language);
+            } else if is_transport_stream_container(&config.container)
+                && let Some(language) = &track.language
+            {
+                // The service metadata policy disables implicit stream-tag copying.
+                metadata("language", language);
+            }
+        }
+        if preserve && support.title {
+            if let Some(title) = edit.and_then(|e| e.title.as_deref()) {
+                // QuickTime exposes the genuine track title as "name" on readback.
+                // Remove the inherited alias so replacing/clearing a title cannot
+                // carry the old one into Matroska as a second tag.
+                metadata("name", "");
+                metadata("title", title);
+            } else if mov_title && let Some(title) = &track.metadata_title {
+                metadata("title", title);
+            }
+        }
+        if let Some(default) = disposition {
             args.extend([
-                format!("-metadata:s:a:{output_index}"),
-                format!("title={title}"),
+                format!("-disposition:a:{ordinal}"),
+                if default { "+default" } else { "-default" }.into(),
             ]);
         }
     }
+    Ok(())
 }
 
 fn add_track_maps<T>(args: &mut Vec<String>, tracks: &[&T], index: impl Fn(&T) -> u32) {
@@ -477,44 +538,36 @@ pub fn validate_stream_copy_compatibility(
     config: &ConversionConfig,
     probe: &ProbeMetadata,
 ) -> Result<(), ConversionError> {
-    if !is_copy_mode(config) {
+    if !config.copies_audio() && !config.copies_video() {
         return Ok(());
     }
     validate_audio_track_count(config)?;
 
     let is_audio_only = is_audio_only_container(&config.container);
-
-    if is_audio_only {
-        let selected_audio = collect_selected_audio_tracks(config, probe)?;
-        if selected_audio.is_empty() {
+    if config.copies_video() && !is_audio_only {
+        let video_codec = probe.video_codec.as_deref().ok_or_else(|| {
+            ConversionError::InvalidInput(
+                "Source has no video stream; choose an audio container for stream copy".to_string(),
+            )
+        })?;
+        if !is_video_stream_codec_allowed(&config.container, video_codec) {
+            return Err(ConversionError::InvalidInput(format!(
+                "Video codec '{}' is incompatible with container '{}'",
+                video_codec, config.container
+            )));
+        }
+    }
+    if config.copies_audio() && container_supports_audio(&config.container) {
+        let selected = collect_selected_audio_tracks(config, probe)?;
+        if is_audio_only && selected.is_empty() {
             return Err(ConversionError::InvalidInput(
                 "Select at least one audio track for an audio-only output".to_string(),
             ));
         }
-        for track in selected_audio {
-            validate_audio_copy_track(&config.container, probe, track)?;
-        }
-        return Ok(());
-    }
-
-    let video_codec = probe.video_codec.as_deref().ok_or_else(|| {
-        ConversionError::InvalidInput(
-            "Source has no video stream; choose an audio container for stream copy".to_string(),
-        )
-    })?;
-    if !is_video_stream_codec_allowed(&config.container, video_codec) {
-        return Err(ConversionError::InvalidInput(format!(
-            "Video codec '{}' is incompatible with container '{}'",
-            video_codec, config.container
-        )));
-    }
-
-    if container_supports_audio(&config.container) {
-        for track in collect_selected_audio_tracks(config, probe)? {
+        for track in selected {
             validate_audio_copy_track(&config.container, probe, track)?;
         }
     }
-
     if container_supports_subtitles(&config.container) {
         for track in collect_selected_subtitle_tracks(config, probe)? {
             if embedded_subtitle_action(&config.container, &track.codec).is_err() {
@@ -556,10 +609,6 @@ pub enum GifFramePolicy {
 ///
 /// # Errors
 /// Returns the same validation errors as [`build_ffmpeg_args`].
-#[expect(
-    clippy::too_many_lines,
-    reason = "FFmpeg command assembly stays in one place to keep ordering guarantees explicit"
-)]
 pub fn build_ffmpeg_args_with_gif_policy(
     input: &str,
     output: &str,
@@ -567,14 +616,43 @@ pub fn build_ffmpeg_args_with_gif_policy(
     probe: &ProbeMetadata,
     gif_policy: GifFramePolicy,
 ) -> Result<Vec<String>, ConversionError> {
+    build_output_args(
+        input,
+        output,
+        config,
+        probe,
+        OutputPurpose::Export(gif_policy),
+    )
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum OutputPurpose {
+    Export(GifFramePolicy),
+    ObserveCopiedAudio,
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "Media command assembly stays in one place to keep mapping and option ordering explicit"
+)]
+fn build_output_args(
+    input: &str,
+    output: &str,
+    config: &ConversionConfig,
+    probe: &ProbeMetadata,
+    purpose: OutputPurpose,
+) -> Result<Vec<String>, ConversionError> {
     validate_audio_encoding_tracks(config, probe)?;
+    validate_audio_track_metadata(config)?;
     let trim = OutputTrim::from_config(config)?;
     let subtitle_trim = SubtitleTrimPlan::for_window(config, &trim);
     let mut filter_context = source_filter_context(probe);
     let mut args = Vec::new();
+    let has_overlay_input = has_overlay(config) && !config.copies_video();
 
     // Hardware decode acceleration (must be before -i)
     if config.hw_decode
+        && purpose != OutputPurpose::ObserveCopiedAudio
         && let Some(encoder) = effective_video_encoder(config, probe)
     {
         args.extend(get_hwaccel_args(encoder));
@@ -585,14 +663,12 @@ pub fn build_ffmpeg_args_with_gif_policy(
     args.push("-i".to_string());
     args.push(input.to_string());
 
-    if has_overlay(config)
-        && let Some(overlay) = &config.overlay
-    {
+    if has_overlay_input && let Some(overlay) = &config.overlay {
         args.push("-i".to_string());
         args.push(overlay.path.clone());
     }
 
-    let first_external_subtitle_input = 1 + usize::from(has_overlay(config));
+    let first_external_subtitle_input = 1 + usize::from(has_overlay_input);
     add_external_subtitle_inputs(&mut args, config, &trim);
 
     trim.append_output_args(&mut args);
@@ -603,84 +679,16 @@ pub fn build_ffmpeg_args_with_gif_policy(
     let is_video_only = is_video_only_container(&config.container);
     let is_image_output = is_image_container(&config.container);
     let is_gif_output = config.container.eq_ignore_ascii_case("gif");
-    let use_overlay = has_overlay(config) && !is_audio_only && !is_gif_output;
-    if is_copy_mode(config) {
-        validate_stream_copy_compatibility(config, probe)?;
-
-        if !is_audio_only {
-            args.push("-map".to_string());
-            args.push(
-                probe
-                    .video_stream_index
-                    .map_or_else(|| "0:v:0?".to_string(), |index| format!("0:{index}")),
-            );
-        }
-
-        if container_supports_audio(&config.container) {
-            let audio_tracks = collect_selected_audio_tracks(config, probe)?;
-            add_track_maps(&mut args, &audio_tracks, |track| track.index);
-            add_audio_title_metadata(&mut args, config, &audio_tracks);
-            for (output_index, track) in audio_tracks.iter().enumerate() {
-                if config.container.eq_ignore_ascii_case("mov") && track.codec == "g723_1" {
-                    // G.723.1 has 240 samples per packet. Demuxed streams can
-                    // lose this value, causing MOV's edit list to omit the tail.
-                    args.extend([format!("-frame_size:a:{output_index}"), "240".to_string()]);
-                }
-                if config.container.eq_ignore_ascii_case("mkv") && track.codec == "dfpwm" {
-                    // Demuxers can omit the keyframe flag for DFPWM packets;
-                    // otherwise stream copy silently emits an empty track.
-                    args.push(format!("-copyinkf:a:{output_index}"));
-                }
-                if let Some(tag) =
-                    crate::media_rules::audio_stream_copy_tag(&config.container, &track.codec)
-                {
-                    args.extend([format!("-tag:a:{output_index}"), tag.to_string()]);
-                }
-            }
-            if audio_tracks.is_empty() {
-                args.push("-an".to_string());
-            }
-        }
-
-        if container_supports_subtitles(&config.container) {
-            let subtitle_tracks = collect_selected_subtitle_tracks(config, probe)?;
-            add_track_maps(&mut args, &subtitle_tracks, |track| track.index);
-            add_external_subtitle_maps(&mut args, config, first_external_subtitle_input);
-
-            args.push("-c".to_string());
-            args.push("copy".to_string());
-            add_subtitle_output_actions(
-                &mut args,
-                &config.container,
-                config.metadata.mode == MetadataMode::Preserve,
-                &subtitle_tracks,
-                &config.external_subtitle_tracks,
-            )?;
-            add_external_subtitle_output_args(&mut args, config, subtitle_tracks.len(), false);
-            if let Some(plan) = &subtitle_trim {
-                plan.append_args(&mut args);
-            }
-        } else {
-            args.push("-c".to_string());
-            args.push("copy".to_string());
-        }
-        args.push("-dn".to_string());
-        if config.container.eq_ignore_ascii_case("mkv")
-            && probe.video_codec.as_deref() == Some("rawvideo")
-        {
-            // Matroska needs its VFW representation for untagged raw RGB.
-            // This option also preserves the already supported tagged YUV path.
-            args.extend(["-allow_raw_vfw".to_string(), "1".to_string()]);
-        }
-        add_container_output_args(&mut args, &config.container);
-        args.push("-n".to_string());
-        args.push(output.to_string());
-        return Ok(args);
+    let use_overlay = has_overlay_input && !is_audio_only && !is_gif_output;
+    validate_stream_copy_compatibility(config, probe)?;
+    let copy_both = config.copies_video() && config.copies_audio();
+    if copy_both {
+        args.extend(["-c".to_owned(), "copy".to_owned()]);
     }
 
     // These exact lists feed both FFmpeg's -map options and the main-input
     // timestamp clock. Separate overlay/sidecar inputs never enter this set.
-    let mapped = resolve_reencode_main_input_map(
+    let mapped = resolve_main_input_map(
         config,
         &probe
             .audio_tracks
@@ -695,7 +703,7 @@ pub fn build_ffmpeg_args_with_gif_policy(
     )?;
     let mapped_audio = collect_audio_tracks(&mapped.audio, probe)?;
     let mapped_subtitles = collect_subtitle_tracks(&mapped.subtitles, probe)?;
-    if !is_audio_only && crate::filters::has_subtitle_burn(config) {
+    if !config.copies_video() && !is_audio_only && crate::filters::has_subtitle_burn(config) {
         configure_subtitle_clock(
             config,
             probe,
@@ -716,10 +724,11 @@ pub fn build_ffmpeg_args_with_gif_policy(
         }
         add_track_maps(&mut args, &audio_tracks, |track| track.index);
 
-        add_audio_codec_args(&mut args, config);
+        add_audio_track_metadata(&mut args, config, &audio_tracks)?;
+        add_output_audio_codec(&mut args, config, &audio_tracks);
     } else if is_video_only && is_gif_output {
         args.push("-filter_complex".to_string());
-        let recover = gif_policy == GifFramePolicy::ConfirmedMinimumFrame
+        let recover = purpose == OutputPurpose::Export(GifFramePolicy::ConfirmedMinimumFrame)
             && is_gif_minimum_frame_candidate(config);
         args.push(build_gif_filter_complex_with_eof(
             config,
@@ -782,61 +791,38 @@ pub fn build_ffmpeg_args_with_gif_policy(
         args.push("-update".to_string());
         args.push("1".to_string());
     } else {
-        add_video_codec_args(&mut args, config);
-        // Stock x265 builds can crash with automatic SIMD on narrow frames.
-        // SSE2 passed all Frame presets with stock FFmpeg 8.1.2 and 9.0.2:
-        // https://github.com/66HEX/frame/actions/runs/43091762760
-        // Use the final padded raster so wider exports retain automatic SIMD.
-        if cfg!(all(
-            target_arch = "x86_64",
-            any(target_os = "linux", target_os = "windows")
-        )) && config.video_codec == "libx265"
-            && let Some((width, height)) = filter_context.source_dimensions
-            && output_dimensions(config, width, height, probe.pixel_format.as_deref())
-                .is_some_and(|(width, _)| width < 64)
-        {
-            args.extend(["-x265-params".to_string(), "asm=sse2".to_string()]);
-        }
-        if has_custom_pixel_format(config) {
-            args.push("-pix_fmt".to_string());
-            args.push(config.pixel_format.trim().to_string());
-        }
-
-        if use_overlay {
-            args.push("-filter_complex".to_string());
-            args.push(build_visual_filter_complex_with_context(
-                config,
-                VisualFilterProfile::ExportVideo,
-                filter_context,
-            ));
-        } else {
-            let video_filters = build_visual_filter_chain_with_context(
-                config,
-                VisualFilterProfile::ExportVideo,
-                filter_context,
+        if config.copies_video() {
+            args.push("-map".to_string());
+            args.push(
+                probe
+                    .video_stream_index
+                    .map_or_else(|| "0:v:0?".to_owned(), |i| format!("0:{i}")),
             );
-            if !video_filters.is_empty() {
-                args.push("-vf".to_string());
-                args.push(video_filters.join(","));
+            if !copy_both {
+                args.extend(["-c:v".to_string(), "copy".to_string()]);
             }
-        }
-
-        add_fps_args(&mut args, config);
-        args.push("-map".to_string());
-        args.push(if use_overlay {
-            "[vout]".to_string()
+            if config.container.eq_ignore_ascii_case("mkv")
+                && probe.video_codec.as_deref() == Some("rawvideo")
+            {
+                // Matroska uses its VFW representation for untagged raw RGB.
+                args.extend(["-allow_raw_vfw".to_string(), "1".to_string()]);
+            }
+        } else if purpose == OutputPurpose::ObserveCopiedAudio {
+            // Keep the same main-input stream and output ordinal as the filtered video map.
+            // Hashing source packets avoids encoding video during the bounded audio proof.
+            args.extend(["-map", "0:v:0", "-c:v", "copy"].map(str::to_owned));
         } else {
-            "0:v:0".to_string()
-        });
+            add_encoded_video(&mut args, config, probe, filter_context, use_overlay);
+        }
 
         let audio_tracks = mapped_audio;
         add_track_maps(&mut args, &audio_tracks, |track| track.index);
-        add_audio_title_metadata(&mut args, config, &audio_tracks);
+        add_audio_track_metadata(&mut args, config, &audio_tracks)?;
 
         if audio_tracks.is_empty() {
             args.push("-an".to_string());
         } else {
-            add_audio_codec_args(&mut args, config);
+            add_output_audio_codec(&mut args, config, &audio_tracks);
         }
 
         let mut subtitle_output_count = 0;
@@ -861,17 +847,29 @@ pub fn build_ffmpeg_args_with_gif_policy(
         }
     }
 
-    if !is_video_only && !is_image_output && !config.selected_audio_tracks.is_empty() {
+    if !config.copies_audio()
+        && !is_video_only
+        && !is_image_output
+        && !config.selected_audio_tracks.is_empty()
+    {
         for (output_index, track) in collect_selected_audio_tracks(config, probe)?
             .iter()
             .enumerate()
         {
-            if mp3_requires_mp4_resampling(
-                &config.container,
-                &config.audio_codec,
-                track.sample_rate.as_deref(),
-            ) {
-                args.extend([format!("-ar:a:{output_index}"), "16000".to_string()]);
+            let requested = config
+                .audio_track_overrides
+                .get(&track.index)
+                .and_then(|edit| edit.sample_rate);
+            let rate = requested.or_else(|| {
+                mp3_requires_mp4_resampling(
+                    &config.container,
+                    &config.audio_codec,
+                    track.sample_rate.as_deref(),
+                )
+                .then_some(16000)
+            });
+            if let Some(rate) = rate {
+                args.extend([format!("-ar:a:{output_index}"), rate.to_string()]);
             }
         }
         let audio_filters = build_audio_filters(config);
@@ -887,6 +885,95 @@ pub fn build_ffmpeg_args_with_gif_policy(
     args.push(output.to_string());
 
     Ok(args)
+}
+
+fn add_encoded_video(
+    args: &mut Vec<String>,
+    config: &ConversionConfig,
+    probe: &ProbeMetadata,
+    filter_context: VisualFilterContext,
+    use_overlay: bool,
+) {
+    add_video_codec_args(args, config);
+    if config.video_two_pass
+        && crate::codec::supports_video_two_pass(&config.video_codec, &config.video_bitrate_mode)
+        && effective_video_encoder(config, probe).is_some()
+    {
+        args.extend(["-frame_two_pass".into(), "1".into()]);
+    }
+    // Stock x265 builds can crash with automatic SIMD on narrow frames.
+    // This also affects the Intel macOS library build. Use the final
+    // padded raster so wider exports retain automatic SIMD.
+    if cfg!(target_arch = "x86_64")
+        && config.video_codec == "libx265"
+        && let Some((width, height)) = filter_context.source_dimensions
+        && output_dimensions(config, width, height, probe.pixel_format.as_deref())
+            .is_some_and(|(width, _)| width < 64)
+    {
+        args.extend(["-x265-params".to_string(), "asm=sse2".to_string()]);
+    }
+    if has_custom_pixel_format(config) {
+        args.push("-pix_fmt".to_string());
+        args.push(config.pixel_format.trim().to_string());
+    }
+
+    if use_overlay {
+        args.push("-filter_complex".to_string());
+        args.push(build_visual_filter_complex_with_context(
+            config,
+            VisualFilterProfile::ExportVideo,
+            filter_context,
+        ));
+    } else {
+        let video_filters = build_visual_filter_chain_with_context(
+            config,
+            VisualFilterProfile::ExportVideo,
+            filter_context,
+        );
+        if !video_filters.is_empty() {
+            args.push("-vf".to_string());
+            args.push(video_filters.join(","));
+        }
+    }
+
+    add_fps_args(args, config);
+    args.push("-map".to_string());
+    args.push(if use_overlay {
+        "[vout]".to_string()
+    } else {
+        "0:v:0".to_string()
+    });
+}
+
+fn add_output_audio_codec(
+    args: &mut Vec<String>,
+    config: &ConversionConfig,
+    audio_tracks: &[&AudioTrack],
+) {
+    if !config.copies_audio() {
+        add_audio_codec_args(args, config);
+        return;
+    }
+    if !config.copies_video() {
+        args.extend(["-c:a".to_string(), "copy".to_string()]);
+    }
+    for (output_index, track) in audio_tracks.iter().enumerate() {
+        if config.container.eq_ignore_ascii_case("mov") && track.codec == "g723_1" {
+            // G.723.1 has 240 samples per packet. Demuxed streams can
+            // lose this value, causing MOV's edit list to omit the tail.
+            args.extend([format!("-frame_size:a:{output_index}"), "240".to_string()]);
+        }
+        if config.container.eq_ignore_ascii_case("mkv") && track.codec == "dfpwm" {
+            // Demuxers can omit the keyframe flag for DFPWM packets;
+            // otherwise stream copy silently emits an empty track.
+            args.push(format!("-copyinkf:a:{output_index}"));
+        }
+        if let Some(tag) =
+            crate::media_rules::audio_stream_copy_tag(&config.container, &track.codec)
+        {
+            args.extend([format!("-tag:a:{output_index}"), tag.to_string()]);
+        }
+    }
 }
 
 fn add_container_output_args(args: &mut Vec<String>, container: &str) {
@@ -1007,7 +1094,7 @@ fn configure_subtitle_clock(
 #[must_use]
 pub fn is_gif_minimum_frame_candidate(config: &ConversionConfig) -> bool {
     config.container.eq_ignore_ascii_case("gif")
-        && !is_copy_mode(config)
+        && !config.copies_video()
         && config.fps != "original"
 }
 
@@ -1221,9 +1308,33 @@ pub fn validate_task_input(
     }
     validate_audio_track_count(config)?;
 
+    if !config.copies_audio() && container_supports_audio(&config.container) {
+        for index in &config.selected_audio_tracks {
+            if let Some(rate) = config
+                .audio_track_overrides
+                .get(index)
+                .and_then(|edit| edit.sample_rate)
+                && let Some(reason) = crate::audio_rules::audio_sample_rate_encoding_error(
+                    &config.container,
+                    &config.audio_codec,
+                    rate,
+                    &config.audio_bitrate,
+                    effective_audio_channels(&config.audio_channels, None),
+                )
+            {
+                return Err(ConversionError::InvalidInput(format!(
+                    "Audio track #{index}: {reason}"
+                )));
+            }
+        }
+    }
+    validate_audio_track_metadata(config)?;
     let processing_mode = config.processing_mode.trim();
 
-    if processing_mode != "reencode" && processing_mode != "copy" {
+    if !matches!(
+        processing_mode,
+        "reencode" | "copy" | "copyVideo" | "copyAudio"
+    ) {
         return Err(ConversionError::InvalidInput(format!(
             "Invalid processing mode: {processing_mode}"
         )));
@@ -1270,11 +1381,10 @@ pub fn validate_task_input(
             }
         }
     }
-    let is_copy_mode = processing_mode == "copy";
 
     OutputTrim::from_config(config)?;
 
-    if !is_copy_mode && config.resolution == "custom" {
+    if !config.copies_video() && config.resolution == "custom" {
         let w_str = config.custom_width.as_deref().unwrap_or("-1");
         let h_str = config.custom_height.as_deref().unwrap_or("-1");
 
@@ -1297,7 +1407,7 @@ pub fn validate_task_input(
         }
     }
 
-    if !is_copy_mode
+    if !config.copies_video()
         && !is_audio_only_container(&config.container)
         && !is_video_only_container(&config.container)
         && !is_image_container(&config.container)
@@ -1321,7 +1431,7 @@ pub fn validate_task_input(
     let is_video_only = is_video_only_container(&config.container);
     let is_image_output = is_image_container(&config.container);
     let supports_audio = container_supports_audio(&config.container);
-    if !is_copy_mode
+    if !config.copies_video()
         && !is_audio_only
         && !is_video_codec_allowed(&config.container, &config.video_codec)
     {
@@ -1331,7 +1441,7 @@ pub fn validate_task_input(
         )));
     }
 
-    if !is_copy_mode
+    if !config.copies_audio()
         && supports_audio
         && !is_audio_codec_allowed(&config.container, &config.audio_codec)
     {
@@ -1341,7 +1451,7 @@ pub fn validate_task_input(
         )));
     }
 
-    if !is_copy_mode && supports_audio {
+    if !config.copies_audio() && supports_audio {
         let lossless_audio = ["flac", "alac", "pcm_s16le", "pcm_bluray"];
         let is_lossless = lossless_audio.contains(&config.audio_codec.as_str());
         match config.audio_bitrate_mode.as_str() {
@@ -1441,7 +1551,7 @@ pub fn validate_task_input(
         }
     }
 
-    if !is_copy_mode
+    if !config.copies_video()
         && has_custom_pixel_format(config)
         && !is_video_pixel_format_allowed(
             &config.container,
@@ -1455,7 +1565,7 @@ pub fn validate_task_input(
         )));
     }
 
-    if is_copy_mode {
+    if config.copies_video() {
         if is_video_only || is_image_output {
             return Err(ConversionError::InvalidInput(
                 "Stream copy mode is not available for image/video-only containers".to_string(),
@@ -1484,18 +1594,6 @@ pub fn validate_task_input(
             ));
         }
 
-        if (config.audio_volume - 100.0).abs() > VOLUME_EPSILON {
-            return Err(ConversionError::InvalidInput(
-                "Audio volume adjustment requires re-encoding".to_string(),
-            ));
-        }
-
-        if config.audio_normalize {
-            return Err(ConversionError::InvalidInput(
-                "Audio normalization requires re-encoding".to_string(),
-            ));
-        }
-
         if config.rotation != "0" || config.flip_horizontal || config.flip_vertical {
             return Err(ConversionError::InvalidInput(
                 "Video transforms require re-encoding".to_string(),
@@ -1517,6 +1615,20 @@ pub fn validate_task_input(
         if config.hw_decode {
             return Err(ConversionError::InvalidInput(
                 "Hardware decoding is unavailable in stream copy mode".to_string(),
+            ));
+        }
+    }
+
+    if config.copies_audio() {
+        if (config.audio_volume - 100.0).abs() > VOLUME_EPSILON {
+            return Err(ConversionError::InvalidInput(
+                "Audio volume adjustment requires re-encoding".to_string(),
+            ));
+        }
+
+        if config.audio_normalize {
+            return Err(ConversionError::InvalidInput(
+                "Audio normalization requires re-encoding".to_string(),
             ));
         }
     }
@@ -1632,6 +1744,8 @@ mod tests {
 
     mod alac_observer;
     mod audio_titles;
+    mod mixed_modes;
+    mod sample_rates;
     use crate::filters::EVEN_DIMENSIONS_FILTER;
     use crate::types::OverlayConfig;
     use std::{
@@ -1905,6 +2019,7 @@ mod tests {
             video_codec: video_codec.to_string(),
             video_bitrate_mode: "crf".to_string(),
             video_bitrate: "5000".to_string(),
+            video_two_pass: false,
             audio_codec: "aac".to_string(),
             audio_bitrate: "128".to_string(),
             audio_bitrate_mode: "bitrate".to_string(),
@@ -1916,6 +2031,7 @@ mod tests {
             video_filters: crate::types::VideoFiltersConfig::default(),
             audio_filters: crate::types::AudioFiltersConfig::default(),
             selected_audio_tracks: vec![],
+            audio_track_overrides: std::collections::BTreeMap::new(),
             selected_subtitle_tracks: vec![],
             external_subtitle_tracks: vec![],
             subtitle_burn_path: None,
@@ -2008,6 +2124,44 @@ mod tests {
             probe.audio_tracks[1].codec_tag = tag;
             assert!(build_ffmpeg_args("input.mov", "output.mkv", &config, &probe).is_ok());
         }
+    }
+
+    #[test]
+    fn two_pass_requires_an_encoded_video_and_a_supported_bitrate_mode() {
+        let probe = sample_probe();
+        for (container, codec, supported) in [
+            ("mp4", "libx264", true),
+            ("mov", "libx265", true),
+            ("webm", "vp9", true),
+            ("mp4", "libsvtav1", false),
+            ("mp4", "h264_nvenc", false),
+            ("mov", "prores", false),
+        ] {
+            let mut config = sample_config(container, codec);
+            config.selected_audio_tracks.clear();
+            for (mode, enabled, processing) in [
+                ("bitrate", true, "reencode"),
+                ("bitrate", true, "copyAudio"),
+                ("bitrate", false, "reencode"),
+                ("crf", true, "reencode"),
+            ] {
+                config.video_bitrate_mode = mode.into();
+                config.video_two_pass = enabled;
+                config.processing_mode = processing.into();
+                let plan = build_ffmpeg_args("source.mkv", "result", &config, &probe).unwrap();
+                assert_eq!(
+                    args_contains_pair(&plan, "-frame_two_pass", "1"),
+                    supported && mode == "bitrate" && enabled,
+                    "{container}, {codec}, {mode}, {processing}"
+                );
+            }
+        }
+        let mut config = sample_config("mp4", "libx264");
+        config.video_two_pass = true;
+        config.video_bitrate_mode = "bitrate".into();
+        config.set_video_copy(true);
+        let plan = build_ffmpeg_args("source.mkv", "result.mp4", &config, &probe).unwrap();
+        assert!(!plan.iter().any(|arg| arg == "-frame_two_pass"));
     }
 
     #[test]
@@ -2858,11 +3012,9 @@ mod tests {
 
     #[test]
     fn x265_sse2_uses_the_final_padded_width() {
-        let supported_platform = cfg!(all(
-            target_arch = "x86_64",
-            any(target_os = "linux", target_os = "windows")
-        ));
+        let supported_platform = cfg!(target_arch = "x86_64");
         for (width, height, rotation, crop_width, canvas_width, narrow) in [
+            (48, 32, "0", None, None, true),
             (62, 96, "0", None, None, true),
             (63, 96, "0", None, None, false),
             (96, 48, "90", None, None, true),

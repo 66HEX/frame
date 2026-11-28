@@ -1,3 +1,7 @@
+mod sample_rate;
+mod tracks;
+pub(in crate::app) use tracks::TrackEditor;
+
 use crate::app::components::{
     FrameOption, frame_boolean_field, frame_option_field, frame_select_field,
 };
@@ -13,11 +17,10 @@ use crate::app::inspector::shared::{
 use crate::app::primitives::color;
 use crate::app::root::FrameRoot;
 use crate::settings::{
-    ConversionConfig, ProcessingMode, SourceMetadata, apply_audio_bitrate_mode,
-    apply_audio_channels, apply_audio_codec, apply_audio_quality, apply_opus_vbr,
-    audio_channel_options, audio_codec_options, audio_codec_supports_vbr, audio_quality_range,
-    audio_settings_error, audio_track_options, mp2_original_channels_are_unsupported,
-    toggle_audio_track_selection,
+    ConversionConfig, SourceMetadata, apply_audio_bitrate_mode, apply_audio_channels,
+    apply_audio_codec, apply_audio_quality, apply_opus_vbr, audio_channel_options,
+    audio_codec_options, audio_codec_supports_vbr, audio_quality_range, audio_settings_hint,
+    audio_track_options, mp2_original_channels_are_unsupported, toggle_audio_track_selection,
 };
 use crate::theme;
 use frame_core::capabilities::AvailableEncoders;
@@ -34,6 +37,7 @@ pub(in crate::app) fn settings_audio_tab(
     settings_disabled: bool,
     available_encoders: &AvailableEncoders,
     audio_bitrate_focus: Option<&FocusHandle>,
+    editor: TrackEditor<'_>,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -46,7 +50,7 @@ pub(in crate::app) fn settings_audio_tab(
         window,
         cx,
     );
-    if config.processing_mode == ProcessingMode::Copy {
+    if config.processing_mode.copies_audio() {
         encoding = encoding.child(settings_hint_text(
             "Stream copy keeps source audio settings.",
             palette,
@@ -57,7 +61,7 @@ pub(in crate::app) fn settings_audio_tab(
             palette,
         ));
     }
-    if let Some(reason) = audio_settings_error(config, metadata) {
+    if let Some(reason) = audio_settings_hint(config, metadata) {
         encoding = encoding.child(settings_hint_text(&reason, palette));
     }
     let content = crate::app::components::frame_field_group()
@@ -96,7 +100,17 @@ pub(in crate::app) fn settings_audio_tab(
         list = list.child(settings_audio_track_button(&option, palette, window, cx));
     }
 
-    content.child(settings_field("Source tracks", palette).child(list))
+    let tracks = settings_field("Source tracks", palette).child(list);
+    content.child(tracks::track_editor(
+        tracks,
+        editor,
+        config,
+        metadata,
+        !settings_disabled,
+        palette,
+        window,
+        cx,
+    ))
 }
 
 pub(in crate::app) fn settings_audio_channels_grid(
@@ -176,7 +190,7 @@ fn settings_audio_encoding_controls(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let controls_disabled = settings_disabled || config.processing_mode == ProcessingMode::Copy;
+    let controls_disabled = settings_disabled || config.processing_mode.copies_audio();
     let is_lossless = is_lossless_audio_codec(&config.audio_codec);
     let show_vbr_toggle = !is_lossless && audio_codec_supports_vbr(&config.audio_codec);
     let is_vbr = show_vbr_toggle && config.audio_bitrate_mode == "vbr";
@@ -549,10 +563,7 @@ pub(in crate::app) fn settings_audio_track_button(
     crate::app::inspector::shared::settings_track_choice(
         format!("audio-track-{index}"),
         format!("{} · {}", option.index_label, option.codec),
-        option.copy_error.map_or_else(
-            || format!("{} · {}", option.detail, option.bitrate),
-            str::to_string,
-        ),
+        option.description(),
         option.is_selected,
         !option.is_disabled,
         move |root, _, cx| {

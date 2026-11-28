@@ -177,6 +177,11 @@ mod visual_fixture_env {
             ("preview-trim", VisualFixture::PreviewTrim),
             ("settings-audio", VisualFixture::SettingsAudio),
             (
+                "settings-audio-sample-rate",
+                VisualFixture::SettingsAudioSampleRate,
+            ),
+            ("settings-audio-tracks", VisualFixture::SettingsAudioTracks),
+            (
                 "settings-audio-filters",
                 VisualFixture::SettingsAudioFilters,
             ),
@@ -198,6 +203,10 @@ mod visual_fixture_env {
             ("update-available", VisualFixture::UpdateAvailable),
             ("workspace-audio", VisualFixture::WorkspaceAudio),
             ("workspace-empty", VisualFixture::WorkspaceEmpty),
+            (
+                "workspace-encoding-stats",
+                VisualFixture::WorkspaceEncodingStats,
+            ),
             ("workspace-image", VisualFixture::WorkspaceImage),
             ("workspace-large-queue", VisualFixture::WorkspaceLargeQueue),
         ];

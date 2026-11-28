@@ -51,6 +51,8 @@ pub struct AudioTrack {
     pub channel_layout: Option<String>,
     pub language: Option<String>,
     pub label: Option<String>,
+    pub metadata_title: Option<String>,
+    pub is_default: bool,
     pub bitrate_kbps: Option<f64>,
     pub sample_rate: Option<String>,
 }
@@ -116,6 +118,11 @@ pub struct SourceMetadata {
 }
 
 impl SourceMetadata {
+    #[must_use]
+    pub fn audio_track(&self, index: u32) -> Option<&AudioTrack> {
+        self.audio_tracks.iter().find(|track| track.index == index)
+    }
+
     #[must_use]
     pub fn source_kind(&self) -> SourceKind {
         self.media_kind.unwrap_or_else(|| {

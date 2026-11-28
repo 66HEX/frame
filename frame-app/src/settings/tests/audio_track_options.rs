@@ -57,6 +57,11 @@ fn formats_track_bitrate_as_trailing_metadata() {
     );
 
     assert_eq!(options[0].bitrate, "192 kb/s");
+    assert_eq!(
+        options[0].description(),
+        "2 channels • eng • Main · 192 kb/s"
+    );
+    assert_eq!(options[1].description(), "6 channels");
 }
 
 #[test]
@@ -189,4 +194,127 @@ fn selected_adpcm_copy_error_matches_container_and_readiness_without_changing_se
             .copy_error
             .is_none()
     );
+}
+
+#[test]
+fn source_audio_overrides_survive_reordering_and_deselection_and_drop_missing_sources() {
+    use frame_core::types::AudioTrackOverride;
+    let metadata = metadata_with_tracks();
+    let mut config: ConversionConfig =
+        serde_json::from_str(r#"{"container":"mkv","selectedAudioTracks":[2,1,2]}"#).unwrap();
+    assert!(config.audio_track_overrides.is_empty());
+    let override_for = |title: &str| AudioTrackOverride {
+        title: Some(title.into()),
+        ..Default::default()
+    };
+    config.audio_track_overrides = [
+        (1, override_for("")),
+        (2, override_for("Main")),
+        (44, override_for("Gone")),
+    ]
+    .into();
+    normalize_output_config(&mut config, Some(&metadata));
+    assert_eq!(config.selected_audio_tracks, [2, 1, 2]);
+    assert!(!config.audio_track_overrides.contains_key(&44));
+    assert!(toggle_audio_track_selection(&mut config, 2));
+    normalize_output_config(&mut config, Some(&metadata));
+    assert_eq!(config.selected_audio_tracks, [1]);
+    assert!(toggle_audio_track_selection(&mut config, 2));
+    let task = crate::conversion_runner::core_config_from_gpui(&config);
+    assert_eq!(task.audio_track_overrides[&1].title.as_deref(), Some(""));
+    assert_eq!(
+        task.audio_track_overrides[&2].title.as_deref(),
+        Some("Main")
+    );
+}
+
+#[test]
+fn validates_only_exported_audio_tags_and_projects_default_for_the_selected_container() {
+    let mut metadata = metadata_with_tracks();
+    metadata.audio_tracks[0].is_default = true;
+    let mut config = ConversionConfig {
+        container: "mp4".into(),
+        selected_audio_tracks: vec![2, 1, 2],
+        ..ConversionConfig::default()
+    };
+    let source_default = &metadata.audio_tracks[0];
+    let other = &metadata.audio_tracks[1];
+    assert!(audio_track_is_default(&config, &metadata, source_default));
+    assert!(!audio_track_is_default(&config, &metadata, other));
+    assert!(apply_audio_track_default(&mut config, 1, false));
+    assert!(audio_track_is_default(&config, &metadata, other));
+    assert!(apply_audio_track_default(&mut config, 2, false));
+    for container in ["mp4", "mov", "m4a"] {
+        config.container = container.into();
+        assert!(audio_settings_hint(&config, Some(&metadata)).is_none());
+    }
+    config.container = "mp4".into();
+    assert!(
+        audio_settings_error(&config, Some(&metadata))
+            .unwrap()
+            .contains("default")
+    );
+    config.audio_track_overrides.entry(1).or_default().language = Some("English".into());
+    assert!(
+        audio_settings_hint(&config, Some(&metadata))
+            .unwrap()
+            .contains("language")
+    );
+    assert!(apply_audio_track_default(&mut config, 2, true));
+    assert!(
+        audio_settings_error(&config, Some(&metadata))
+            .unwrap()
+            .contains("language")
+    );
+    let edit = config.audio_track_overrides.get_mut(&1).unwrap();
+    edit.language = Some("eng".into());
+    edit.title = Some("bad\0title".into());
+    assert!(
+        audio_settings_error(&config, Some(&metadata))
+            .unwrap()
+            .contains("title")
+    );
+    config.metadata.mode = MetadataMode::Clean;
+    assert!(audio_settings_error(&config, Some(&metadata)).is_none());
+    config.metadata.mode = MetadataMode::Preserve;
+    config.selected_audio_tracks = vec![2];
+    assert!(audio_settings_error(&config, Some(&metadata)).is_none());
+}
+
+#[test]
+fn sample_rate_overrides_remain_bound_to_selected_encoded_audio_across_mode_and_codec_changes() {
+    let mut config = ConversionConfig {
+        container: "mkv".into(),
+        audio_codec: "pcm_s16le".into(),
+        selected_audio_tracks: vec![2, 1, 2],
+        ..ConversionConfig::default()
+    };
+    assert!(apply_audio_sample_rate(&mut config, 2, Some(44_056)));
+    assert!(apply_audio_sample_rate(&mut config, 1, Some(48_000)));
+    assert!(!apply_audio_sample_rate(&mut config, 99, Some(44_100)));
+    let metadata = metadata_with_tracks();
+    assert!(audio_settings_error(&config, Some(&metadata)).is_none());
+    config.processing_mode = ProcessingMode::CopyAudio;
+    assert!(!apply_audio_sample_rate(&mut config, 2, None));
+    assert!(audio_settings_error(&config, Some(&metadata)).is_none());
+    config.processing_mode = ProcessingMode::CopyVideo;
+    apply_audio_codec(&mut config, "aac");
+    assert!(
+        audio_settings_error(&config, Some(&metadata))
+            .unwrap()
+            .contains("#2")
+    );
+    toggle_audio_track_selection(&mut config, 2);
+    assert!(audio_settings_error(&config, Some(&metadata)).is_none());
+    toggle_audio_track_selection(&mut config, 2);
+    assert_eq!(config.audio_track_overrides[&2].sample_rate, Some(44_056));
+    assert!(apply_audio_sample_rate(&mut config, 2, None));
+    assert!(!config.audio_track_overrides.contains_key(&2));
+    config.audio_track_overrides.get_mut(&1).unwrap().title = Some("Main".into());
+    assert!(apply_audio_sample_rate(&mut config, 1, None));
+    assert_eq!(
+        config.audio_track_overrides[&1].title.as_deref(),
+        Some("Main")
+    );
+    assert!(audio_settings_error(&config, Some(&metadata)).is_none());
 }

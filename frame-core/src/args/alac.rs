@@ -1,6 +1,7 @@
 use super::{
-    build_ffmpeg_args, collect_selected_audio_tracks, collect_selected_subtitle_tracks,
-    container_supports_subtitles, has_overlay, is_audio_only_container, is_copy_mode,
+    OutputPurpose, build_ffmpeg_args, build_output_args, collect_selected_audio_tracks,
+    collect_selected_subtitle_tracks, container_supports_subtitles, has_overlay,
+    is_audio_only_container,
 };
 use crate::alac_copy::{AlacOutputMap, AlacRepairPlan, ObservationError, ParsedCopyManifest};
 use crate::error::ConversionError;
@@ -18,6 +19,7 @@ pub struct CopyAudioOutput {
 #[derive(Clone, Debug)]
 pub struct AlacCopyObserver {
     ordinary: Vec<String>,
+    observation: Option<Vec<String>>,
     audio: Vec<CopyAudioOutput>,
     stream_types: Vec<&'static str>,
     dependencies: Vec<String>,
@@ -69,7 +71,7 @@ impl AlacCopyObserver {
         Ok(())
     }
 
-    /// Preserves the validated command, changing only its known final sink.
+    /// Preserves the validated stream map and hashes packets in a framehash sink.
     ///
     /// The execution layer attaches a retained OS-path completion sidecar.
     ///
@@ -83,7 +85,8 @@ impl AlacCopyObserver {
             .into_iter()
             .map(str::to_owned)
             .collect();
-        args.extend_from_slice(&self.ordinary[..self.ordinary.len() - 2]);
+        let plan = self.observation.as_ref().unwrap_or(&self.ordinary);
+        args.extend_from_slice(&plan[..plan.len() - 2]);
         self.append_repairs(&mut args, repairs)?;
         args.extend(
             [
@@ -151,7 +154,7 @@ pub fn build_alac_copy_observer(
     probe: &ProbeMetadata,
 ) -> Result<Option<AlacCopyObserver>, ConversionError> {
     let ordinary = build_ffmpeg_args(input, output, config, probe)?;
-    if !is_copy_mode(config)
+    if !config.copies_audio()
         || !["mov", "mp4", "m4a"]
             .iter()
             .any(|container| config.container.eq_ignore_ascii_case(container))
@@ -195,10 +198,19 @@ pub fn build_alac_copy_observer(
         stream_types.extend(std::iter::repeat_n("subtitle", count));
     }
     let mut dependencies = vec![input.to_owned()];
-    if has_overlay(config)
+    if !config.copies_video()
+        && has_overlay(config)
         && let Some(overlay) = &config.overlay
     {
         dependencies.push(overlay.path.clone());
+    }
+    if !config.copies_video()
+        && let Some(burn) = config
+            .subtitle_burn_path
+            .as_ref()
+            .filter(|path| !path.is_empty())
+    {
+        dependencies.push(burn.clone());
     }
     dependencies.extend(
         config
@@ -206,8 +218,20 @@ pub fn build_alac_copy_observer(
             .iter()
             .map(|track| track.path.clone()),
     );
+    let observation = if !config.copies_video() && !is_audio_only_container(&config.container) {
+        Some(build_output_args(
+            input,
+            output,
+            config,
+            probe,
+            OutputPurpose::ObserveCopiedAudio,
+        )?)
+    } else {
+        None
+    };
     Ok(Some(AlacCopyObserver {
         ordinary,
+        observation,
         audio,
         stream_types,
         dependencies,

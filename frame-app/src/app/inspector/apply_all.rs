@@ -6,7 +6,7 @@ use crate::app::primitives::{ButtonVariant, color};
 use crate::app::root::FrameRoot;
 use crate::file_queue::FileItem;
 use crate::settings::{
-    ConversionConfig, PresetDefinition, ProcessingMode, SourceKind, SourceMetadata, apply_preset,
+    ConversionConfig, PresetDefinition, SourceKind, SourceMetadata, apply_preset,
     audio_settings_error, container_supports_audio, create_custom_preset, is_audio_only_container,
     is_audio_stream_codec_allowed_for_container, is_container_compatible_for_stream_copy,
     is_gif_container, is_image_container, is_video_stream_codec_allowed_for_container,
@@ -139,27 +139,31 @@ impl<'a> CandidatePolicy<'a> {
         {
             return false;
         }
-        let effective_copy = self.donor.processing_mode == ProcessingMode::Copy
-            && kind != SourceKind::Image
-            && self.kind != OutputKind::Gif;
-        if !effective_copy {
+        let mode = self.donor.processing_mode;
+        if (!mode.copies_video() && !mode.copies_audio())
+            || kind == SourceKind::Image
+            || self.kind == OutputKind::Gif
+        {
             return true;
         }
         if self.kind == OutputKind::Image {
-            return false;
+            return !mode.copies_video();
         }
         if self.kind == OutputKind::Audio {
-            if target.selected_audio_tracks.is_empty() {
+            if mode.copies_audio() && target.selected_audio_tracks.is_empty() {
                 return false;
             }
-        } else if !metadata.video_codec.as_deref().is_some_and(|codec| {
-            self.video_verdicts.allowed(codec, || {
-                is_video_stream_codec_allowed_for_container(container, codec)
+        } else if mode.copies_video()
+            && !metadata.video_codec.as_deref().is_some_and(|codec| {
+                self.video_verdicts.allowed(codec, || {
+                    is_video_stream_codec_allowed_for_container(container, codec)
+                })
             })
-        }) {
+        {
             return false;
         }
-        !keeps_audio
+        !mode.copies_audio()
+            || !keeps_audio
             || metadata
                 .audio_tracks
                 .iter()

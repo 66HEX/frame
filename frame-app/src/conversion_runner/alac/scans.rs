@@ -16,6 +16,20 @@ pub(super) enum Scan {
 }
 
 impl Scan {
+    pub fn runtime_args(&self, executable: &Path, path: &Path) -> Vec<OsString> {
+        let Some(probe) = crate::runtime_binaries::worker_subcommand(executable, "probe") else {
+            return self.args(path);
+        };
+        let mut args: Vec<OsString> = vec![probe.into()];
+        match self {
+            Self::Source(index) => args.extend(["alac-source".into(), index.to_string().into()]),
+            Self::Physical => args.push("physical-audio".into()),
+            Self::Normal(index) => args.extend(["alac-output".into(), index.to_string().into()]),
+        }
+        args.push(path.as_os_str().to_owned());
+        args
+    }
+
     pub fn args(&self, path: &Path) -> Vec<OsString> {
         let mut args: Vec<OsString> = ["-v", "error"].map(Into::into).into();
         match self {

@@ -1,9 +1,11 @@
+mod stats;
+
 use super::completion::CompletionFile;
 use super::controller::ConversionProcessController;
 use super::output_paths::disambiguate_output_paths;
 use super::{PublicationDecision, StagedOutput, publish_staged_output};
 use crate::capabilities::{HardwareEncoder, HardwareProbePolicy, probe_hardware_encoder};
-use crate::runtime_binaries::{ffmpeg_executable, ffprobe_executable};
+use crate::runtime_binaries::media_worker_executable;
 use frame_core::args::{
     GifFramePolicy, build_alac_copy_observer, build_ffmpeg_args, build_ffmpeg_args_with_gif_policy,
     build_output_path, effective_video_encoder, validate_task_input,
@@ -123,7 +125,7 @@ fn run_prepared_conversion_task_with_control(
     validate_task_input(&task.file_path, &task.config)?;
     let Some(probe) = probe_conversion_source(
         &task.file_path,
-        &ffprobe_executable(),
+        &media_worker_executable(),
         &task.id,
         controller,
         emit,
@@ -138,7 +140,7 @@ fn run_prepared_conversion_task_with_control(
         task.output_name.as_deref(),
     );
     let ordinary_args = build_ffmpeg_args(&task.file_path, &output_path, &task.config, &probe)?;
-    let executable = ffmpeg_executable();
+    let executable = media_worker_executable();
     if !super::stabilization::check_with_control(
         &task.config,
         &executable,
@@ -151,15 +153,7 @@ fn run_prepared_conversion_task_with_control(
     if let Some(observer) =
         build_alac_copy_observer(&task.file_path, &output_path, &task.config, &probe)?
     {
-        // This scoped branch is full Copy to MOV/MP4/M4A; GIF and hardware
-        // encoding checks are dormant, but selectable subtitle BSFs still apply.
-        if !super::subtitles::check_subtitle_trim_with_control(
-            &task.config,
-            &executable,
-            &task.id,
-            controller,
-            emit,
-        )? {
+        if !check_export_capabilities(task, &probe, &executable, controller, emit)? {
             return Ok(());
         }
         return super::alac::run(
@@ -167,7 +161,7 @@ fn run_prepared_conversion_task_with_control(
             &output_path,
             &observer,
             &executable,
-            &ffprobe_executable(),
+            &media_worker_executable(),
             controller,
             emit,
         );
@@ -175,7 +169,7 @@ fn run_prepared_conversion_task_with_control(
     let opus_proof = if crate::runtime_environment::is_flatpak() {
         None
     } else {
-        let result = super::opus::check(task, &probe, &ffprobe_executable(), || {
+        let result = super::opus::check(task, &probe, &media_worker_executable(), || {
             controller.is_cancelled(&task.id)
         });
         if finish_preflight_cancellation(&task.id, controller, emit)? {
@@ -197,17 +191,7 @@ fn run_prepared_conversion_task_with_control(
     };
     prepared.opus_proof = opus_proof;
 
-    if !super::subtitles::check_subtitle_trim_with_control(
-        &task.config,
-        &executable,
-        &task.id,
-        controller,
-        emit,
-    )? {
-        return Ok(());
-    }
-
-    if !check_hardware_encoder(task, &probe, &executable, controller, emit)? {
+    if !check_export_capabilities(task, &probe, &executable, controller, emit)? {
         return Ok(());
     }
 
@@ -390,7 +374,7 @@ fn run_final_conversion_with_publication(
         )?;
         completion.verify().map_err(|reason| {
             ConversionError::Worker(format!(
-                "FFmpeg did not confirm that the export finished: {reason}. Check the conversion log."
+                "The media worker could not confirm the export finished. {reason}. Check the conversion log."
             ))
         })
     })();
@@ -507,6 +491,10 @@ fn finish_staged_conversion(
 fn final_command(executable: &str, args: &[String], progress_path: &std::path::Path) -> Command {
     let mut command = Command::new(executable);
     command
+        .args(crate::runtime_binaries::worker_subcommand(
+            std::path::Path::new(executable),
+            "convert",
+        ))
         .arg("-progress")
         .arg(progress_path)
         .args(args)
@@ -535,6 +523,13 @@ pub(super) fn run_final_child_observed(
     was_cancelled: &mut bool,
     started: &mut bool,
 ) -> Result<(), ConversionError> {
+    let pass_directory = super::pass_directory::for_worker(
+        std::path::Path::new(command.get_program()),
+        command.get_args(),
+    )?;
+    if let Some(directory) = &pass_directory {
+        command.env(super::pass_directory::ENVIRONMENT, directory.path());
+    }
     let mut child = crate::process_launch::spawn(command).map_err(ConversionError::Io)?;
     *started = true;
     let started_cancelled = match controller.register_started_process(&task.id, child.id()) {
@@ -559,10 +554,10 @@ pub(super) fn run_final_child_observed(
         child.stderr.take().map_or_else(
             || {
                 Err(ConversionError::Worker(
-                    "ffmpeg stderr was not captured".to_string(),
+                    "Media worker error output was unavailable".to_string(),
                 ))
             },
-            |mut stderr| stream_ffmpeg_stderr(&mut stderr, task, emit),
+            |mut stderr| stream_ffmpeg_stderr(&mut stderr, task, controller, emit),
         )
     };
     let status = child.wait().map_err(ConversionError::Io);
@@ -576,7 +571,7 @@ pub(super) fn run_final_child_observed(
         Ok(())
     } else {
         Err(ConversionError::Worker(format!(
-            "ffmpeg exited with status {status}"
+            "The media worker exited with status {status}"
         )))
     }
 }
@@ -611,6 +606,25 @@ fn finish_final_conversion(
     outcome.result?;
     emit(ConversionEvent::completed(task.id.clone(), output_path));
     Ok(())
+}
+
+fn check_export_capabilities(
+    task: &ConversionTask,
+    probe: &ProbeMetadata,
+    executable: &str,
+    controller: &ConversionProcessController,
+    emit: &mut impl FnMut(ConversionEvent),
+) -> Result<bool, ConversionError> {
+    if !super::subtitles::check_subtitle_trim_with_control(
+        &task.config,
+        executable,
+        &task.id,
+        controller,
+        emit,
+    )? {
+        return Ok(false);
+    }
+    check_hardware_encoder(task, probe, executable, controller, emit)
 }
 
 fn check_hardware_encoder(
@@ -810,69 +824,47 @@ fn finish_preflight_cancellation(
 fn stream_ffmpeg_stderr(
     stderr: &mut impl Read,
     task: &ConversionTask,
+    controller: &ConversionProcessController,
     emit: &mut impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
     let mut buffer = [0_u8; 4096];
     let mut pending = String::new();
     let mut total_duration = None;
     let expected_duration = expected_duration_seconds(&task.config);
-
+    let mut stats = stats::WorkerProgress::default();
+    let mut handle_line = |line: &str| {
+        if line.is_empty() {
+            return;
+        }
+        emit(ConversionEvent::log(task.id.clone(), line));
+        if let Some((progress, sample)) = stats.read(line, || controller.encoding_elapsed(&task.id))
+        {
+            emit(ConversionEvent::Progress(
+                frame_core::types::ProgressPayload {
+                    id: task.id.clone(),
+                    progress,
+                    stats: Some(sample),
+                },
+            ));
+        } else if let Some(progress) =
+            ffmpeg_progress_from_line(line, expected_duration, &mut total_duration)
+        {
+            emit(ConversionEvent::progress(task.id.clone(), progress));
+        }
+    };
     loop {
         let read = stderr.read(&mut buffer).map_err(ConversionError::Io)?;
         if read == 0 {
             break;
         }
-
         pending.push_str(&String::from_utf8_lossy(&buffer[..read]));
-        drain_ffmpeg_segments(
-            &mut pending,
-            task,
-            expected_duration,
-            &mut total_duration,
-            emit,
-        );
-    }
-
-    if !pending.trim().is_empty() {
-        handle_ffmpeg_line(
-            pending.trim(),
-            task,
-            expected_duration,
-            &mut total_duration,
-            emit,
-        );
-    }
-
-    Ok(())
-}
-
-fn drain_ffmpeg_segments(
-    pending: &mut String,
-    task: &ConversionTask,
-    expected_duration: f64,
-    total_duration: &mut Option<f64>,
-    emit: &mut impl FnMut(ConversionEvent),
-) {
-    while let Some(separator_index) = pending.find(['\r', '\n']) {
-        let segment = pending[..separator_index].trim().to_string();
-        pending.drain(..=separator_index);
-        if !segment.is_empty() {
-            handle_ffmpeg_line(&segment, task, expected_duration, total_duration, emit);
+        while let Some(separator) = pending.find(['\r', '\n']) {
+            handle_line(pending[..separator].trim());
+            pending.drain(..=separator);
         }
     }
-}
-
-fn handle_ffmpeg_line(
-    line: &str,
-    task: &ConversionTask,
-    expected_duration: f64,
-    total_duration: &mut Option<f64>,
-    emit: &mut impl FnMut(ConversionEvent),
-) {
-    emit(ConversionEvent::log(task.id.clone(), line));
-    if let Some(progress) = ffmpeg_progress_from_line(line, expected_duration, total_duration) {
-        emit(ConversionEvent::progress(task.id.clone(), progress));
-    }
+    handle_line(pending.trim());
+    Ok(())
 }
 
 pub(super) fn expected_duration_seconds(config: &CoreConversionConfig) -> f64 {

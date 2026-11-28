@@ -50,6 +50,7 @@ const ACTIONLINT_VERSION: &str = "1.7.12";
 const ACTIONLINT_LINUX_X86_64_SHA256: &str =
     "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8";
 
+const ACTION_CACHE_SHA: &str = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9";
 const ACTION_CHECKOUT_SHA: &str = "3d3c42e5aac5ba805825da76410c181273ba90b1";
 const ACTION_UPLOAD_ARTIFACT_SHA: &str = "cf430e030ddbb5b0abf93d22962f4752f3646cd9";
 const ACTION_DOWNLOAD_ARTIFACT_SHA: &str = "9000827ccba6bdab643e8b6fd33ac0654aef8333";
@@ -151,7 +152,7 @@ Commands:
   bundle linux      Build the Linux tarball package
   bundle linux --all Build Linux tarball, AppImage, and Flatpak test packages
   bundle windows    Build the Windows Inno Setup installer
-  setup-ffmpeg      Download FFmpeg and FFprobe runtime binaries
+  setup-ffmpeg      Download FFmpeg and FFprobe reference tools for tests
   update-manifest   Generate a signed-update manifest from release artifacts
   sign-update-manifest Sign update-manifest.json with FRAME_UPDATE_SIGNING_KEY
   flathub-sources   Create Flathub source and cargo-vendor release archives
@@ -163,7 +164,39 @@ Commands:
     );
 }
 
+fn build_media_worker(args: &[String]) -> Result<()> {
+    let mut command = vec![
+        "build".to_string(),
+        "--package".to_string(),
+        "frame-media".to_string(),
+    ];
+    let mut args = args.iter().take_while(|arg| arg.as_str() != "--");
+    while let Some(arg) = args.next() {
+        let flag = arg.split('=').next().unwrap_or(arg);
+        if [
+            "--release",
+            "--locked",
+            "--offline",
+            "--frozen",
+            "--target",
+            "--target-dir",
+            "--profile",
+        ]
+        .contains(&flag)
+        {
+            command.push(arg.clone());
+            if ["--target", "--target-dir", "--profile"].contains(&arg.as_str())
+                && let Some(value) = args.next()
+            {
+                command.push(value.clone());
+            }
+        }
+    }
+    run_command_path("cargo", &command)
+}
+
 fn run_frame_app(args: Vec<String>) -> Result<()> {
+    build_media_worker(&args)?;
     let mut cargo_args = vec![
         "run".to_string(),
         "--manifest-path".to_string(),
@@ -174,6 +207,7 @@ fn run_frame_app(args: Vec<String>) -> Result<()> {
 }
 
 fn build_frame_app(args: Vec<String>) -> Result<()> {
+    build_media_worker(&args)?;
     let mut cargo_args = vec![
         "build".to_string(),
         "--manifest-path".to_string(),
@@ -202,63 +236,12 @@ fn bundle(args: &[String]) -> Result<()> {
 }
 
 const WINDOWS_BUNDLE_HOST_ERROR: &str = "Windows bundles must be built on Windows.";
-const WINDOWS_PREPARED_FFMPEG_FLAG: &str = "-SkipSetupFfmpeg";
 
 fn bundle_windows(args: &[&str]) -> Result<()> {
     if !cfg!(target_os = "windows") {
         return Err(XtaskError::Usage(WINDOWS_BUNDLE_HOST_ERROR.to_string()));
     }
-    // bundle-windows.ps1 only supports x86_64 hosts; let it report unsupported
-    // platforms and architectures before touching the binary cache.
-    let prepare_ffmpeg = cfg!(target_arch = "x86_64") && windows_bundle_should_prepare_ffmpeg(args);
-    if prepare_ffmpeg {
-        setup_ffmpeg(&[
-            "--platform".to_string(),
-            "win32".to_string(),
-            "--arch".to_string(),
-            "x86_64".to_string(),
-        ])?;
-    }
-    let script_args = windows_bundle_script_args(args, prepare_ffmpeg);
-    run_script("./script/bundle-windows.ps1", &script_args)
-}
-
-fn windows_bundle_should_prepare_ffmpeg(args: &[&str]) -> bool {
-    let skip = args.iter().any(|arg| {
-        ["-PackageOnly", "-Help", "-h", WINDOWS_PREPARED_FFMPEG_FLAG]
-            .iter()
-            .any(|flag| arg.eq_ignore_ascii_case(flag))
-    });
-    if skip {
-        return false;
-    }
-    windows_bundle_architecture(args).is_none_or(|arch| arch.eq_ignore_ascii_case("x86_64"))
-}
-
-fn windows_bundle_architecture<'a>(args: &[&'a str]) -> Option<&'a str> {
-    for (index, arg) in args.iter().enumerate() {
-        let (name, inline) = match arg.split_once(':') {
-            Some((name, value)) => (name, Some(value)),
-            None => (*arg, None),
-        };
-        if name.eq_ignore_ascii_case("-Architecture") || name.eq_ignore_ascii_case("-a") {
-            let value = inline.or_else(|| args.get(index + 1).copied());
-            // The script reports a dangling switch; don't prepare binaries for it.
-            return Some(value.unwrap_or(""));
-        }
-    }
-    None
-}
-
-fn windows_bundle_script_args<'a>(args: &[&'a str], prepared: bool) -> Vec<&'a str> {
-    let mut script_args = args.to_vec();
-    let already_forwarded = script_args
-        .iter()
-        .any(|arg| arg.eq_ignore_ascii_case(WINDOWS_PREPARED_FFMPEG_FLAG));
-    if prepared && !already_forwarded {
-        script_args.push(WINDOWS_PREPARED_FFMPEG_FLAG);
-    }
-    script_args
+    run_script("./script/bundle-windows.ps1", args)
 }
 
 fn setup_ffmpeg(args: &[String]) -> Result<()> {
@@ -680,16 +663,7 @@ fn flathub_sources(args: &[String]) -> Result<()> {
         vendor_dir.join("cargo-config.toml"),
         normalized_vendor_config,
     )?;
-    run_command_path(
-        "tar",
-        &[
-            "-czf".to_string(),
-            path_to_string_lossy(&vendor_archive),
-            "-C".to_string(),
-            path_to_string_lossy(&vendor_dir),
-            ".".to_string(),
-        ],
-    )?;
+    archive_flathub_vendor(&vendor_dir, &vendor_archive)?;
 
     let source_sha256 = file_sha256_hex(&source_archive)?;
     let vendor_sha256 = file_sha256_hex(&vendor_archive)?;
@@ -711,6 +685,27 @@ fn flathub_sources(args: &[String]) -> Result<()> {
     println!("Wrote {}", source_archive.display());
     println!("Wrote {}", vendor_archive.display());
     println!("Wrote {}", checksums_path.display());
+    Ok(())
+}
+
+fn archive_flathub_vendor(directory: &Path, archive: &Path) -> Result<()> {
+    // bsdtar on macOS otherwise emits binary AppleDouble files next to XML
+    // inputs. Linux build scripts then attempt to parse them as source files.
+    let status = Command::new("tar")
+        .env("COPYFILE_DISABLE", "1")
+        .arg("--exclude=._*")
+        .arg("-czf")
+        .arg(archive)
+        .arg("-C")
+        .arg(directory)
+        .arg(".")
+        .status()?;
+    if !status.success() {
+        return Err(XtaskError::CommandFailed {
+            program: "tar".into(),
+            status,
+        });
+    }
     Ok(())
 }
 
@@ -1394,8 +1389,9 @@ const fn host_arch() -> &'static str {
 }
 
 fn ci() -> Result<()> {
-    const MANIFESTS: [&str; 5] = [
+    const MANIFESTS: [&str; 6] = [
         "frame-core/Cargo.toml",
+        "frame-media/Cargo.toml",
         "frame-app/Cargo.toml",
         "frame-updater/Cargo.toml",
         "tooling/manifest-signer/Cargo.toml",
@@ -1880,6 +1876,7 @@ fn run_command_capture(program: &str, args: &[String]) -> Result<String> {
 
 fn render_workflow(template: &str) -> String {
     let replacements = [
+        ("__RESTORE_MEDIA_SDK_CACHE__", RESTORE_MEDIA_SDK_CACHE),
         ("__RUST_VERSION__", RUST_VERSION),
         ("__CARGO_BUNDLE_VERSION__", CARGO_BUNDLE_VERSION),
         ("__CARGO_DENY_VERSION__", CARGO_DENY_VERSION),
@@ -1938,6 +1935,14 @@ fn pin_workflow_tools(workflow: &mut String) {
 
 fn pin_workflow_actions(workflow: &mut String) {
     let action_replacements = [
+        (
+            "actions/cache/restore@v6.1.0",
+            format!("actions/cache/restore@{ACTION_CACHE_SHA} # v6.1.0"),
+        ),
+        (
+            "actions/cache/save@v6.1.0",
+            format!("actions/cache/save@{ACTION_CACHE_SHA} # v6.1.0"),
+        ),
         (
             "actions/checkout@v4",
             format!("actions/checkout@{ACTION_CHECKOUT_SHA} # v7.0.1"),
@@ -2059,12 +2064,23 @@ __UBUNTU_ARCHIVE_SELECTION__
         .replace("__UBUNTU_ARCHIVE_SUBSTITUTIONS__", UBUNTU_ARCHIVE_SUBSTITUTIONS)
 }
 
-fn ci_workflow() -> String {
-    render_workflow(
-        &r"# Generated from xtask::workflows::ci
+const CI_WORKFLOW_TEMPLATE: &str = r"# Generated from xtask::workflows::ci
 # Rebuild with `cargo xtask workflows`.
 name: ci
 on:
+  workflow_dispatch:
+    inputs:
+      native_media_runner:
+        description: Run full CI or only the native media tests on one runner
+        type: choice
+        default: full
+        options:
+          - full
+          - ubuntu-22.04
+          - ubuntu-22.04-arm
+          - macos-15
+          - macos-26-intel
+          - windows-2022
   pull_request:
   push:
     branches:
@@ -2072,10 +2088,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ inputs.native_media_runner && inputs.native_media_runner != 'full' && inputs.native_media_runner || github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
   cargo_xtask_ci:
+    if: (inputs.native_media_runner || 'full') == 'full'
     name: cargo xtask ci
     runs-on: ubuntu-22.04
     steps:
@@ -2086,6 +2103,7 @@ jobs:
     - name: steps::setup_rust
       run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
 __CI_LINUX_SETUP__
+__CI_WORKER_TESTS__
     - name: security::validate_workflow_syntax
       run: |
         mkdir -p target/actionlint
@@ -2117,10 +2135,9 @@ __CI_LINUX_SETUP__
     - name: ci::run_documented_gate
       run: cargo xtask ci
 __CI_MEDIA_TESTS__
-    - name: ci::test_conversion_runner
-      run: cargo test --locked -p frame-app conversion_runner::tests -- --ignored --test-threads=1
-    timeout-minutes: 60
+    timeout-minutes: 150
   cargo_check_macos:
+    if: (inputs.native_media_runner || 'full') == 'full'
     name: cargo check macos
     runs-on: macos-15
     steps:
@@ -2130,11 +2147,14 @@ __CI_MEDIA_TESTS__
         persist-credentials: false
     - name: steps::setup_rust
       run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
+__CI_WORKER_TESTS__
     - name: ci::check_macos
       run: cargo check --manifest-path frame-app/Cargo.toml --locked
 __CI_MEDIA_TESTS__
-    timeout-minutes: 60
+__CI_MAC_CRASH_REPORTS__
+    timeout-minutes: 150
   cargo_check_windows:
+    if: (inputs.native_media_runner || 'full') == 'full'
     name: cargo check windows
     runs-on: windows-2022
     steps:
@@ -2144,6 +2164,7 @@ __CI_MEDIA_TESTS__
         persist-credentials: false
     - name: steps::setup_rust
       run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
+__CI_WORKER_TESTS__
     - name: ci::check_windows
       run: cargo check --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --locked
     - name: ci::build_windows_release
@@ -2154,18 +2175,141 @@ __CI_MEDIA_TESTS__
     - name: ci::test_windows_process_launch
       run: 'cargo test --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --release --locked --lib process_launch::windows_tests:: -- --test-threads=1'
 __CI_MEDIA_TESTS__
-    timeout-minutes: 60
-"
-        .replace("__CI_LINUX_SETUP__", &linux_ci_setup_step())
-        .replace("__CI_MEDIA_TESTS__", ci_media_test_steps()),
+    timeout-minutes: 150
+  media_other_architectures:
+    if: (inputs.native_media_runner || 'full') == 'full'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04-arm, macos-26-intel]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v7.0.0
+      with:
+        persist-credentials: false
+    - name: steps::setup_rust
+      run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
+__CI_OTHER_LINUX_SETUP__
+__CI_WORKER_TESTS__
+__CI_MEDIA_TESTS__
+__CI_MAC_CRASH_REPORTS__
+    timeout-minutes: 150
+  native_media:
+    if: github.event_name == 'workflow_dispatch' && inputs.native_media_runner && inputs.native_media_runner != 'full'
+    runs-on: ${{ inputs.native_media_runner }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v7.0.0
+    - name: steps::setup_rust
+      run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
+__CI_OTHER_LINUX_SETUP__
+__CI_NATIVE_WORKER_TESTS__
+__CI_MEDIA_INTEGRATION__
+__CI_MAC_CRASH_REPORTS__
+    timeout-minutes: 150
+  flathub_package:
+    if: (inputs.native_media_runner || 'full') == 'full'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v7.0.0
+      with:
+        persist-credentials: false
+    - name: steps::setup_rust
+      run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
+    - name: ci::setup_flathub
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y flatpak flatpak-builder
+        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        flatpak install --user --no-related -y --noninteractive flathub \
+          org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08 \
+          org.freedesktop.Sdk.Extension.rust-stable//25.08 org.freedesktop.Platform.codecs-extra//25.08-extra
+    - name: ci::build_and_test_flathub_package
+      run: dbus-run-session -- python3 script/test-flathub-package.py
+    timeout-minutes: 120
+";
+
+fn ci_workflow() -> String {
+    render_workflow(
+        &CI_WORKFLOW_TEMPLATE
+            .replace("__CI_WORKER_TESTS__", CI_WORKER_TESTS)
+            .replace("__CI_NATIVE_WORKER_TESTS__", CI_NATIVE_WORKER_TESTS)
+            .replace("__CI_MAC_CRASH_REPORTS__", CI_MAC_CRASH_REPORTS)
+            .replace("__CI_LINUX_SETUP__", &linux_ci_setup_step())
+            .replace(
+                "__CI_OTHER_LINUX_SETUP__",
+                &linux_ci_setup_step().replace(
+                    "      run: |",
+                    "      if: runner.os == 'Linux'\n      run: |",
+                ),
+            )
+            .replace("__CI_MEDIA_TESTS__", ci_media_test_steps())
+            .replace("__CI_MEDIA_INTEGRATION__", CI_MEDIA_INTEGRATION),
     )
 }
 
-const fn ci_media_test_steps() -> &'static str {
-    "    - name: ci::setup_ffmpeg
+const RESTORE_MEDIA_SDK_CACHE: &str = "    - name: steps::restore_sdk_cache
+      id: sdk-cache
+      if: runner.os == 'macOS'
+      uses: actions/cache/restore@v6.1.0
+      with:
+        path: target/media-sdk/archives
+        key: libav-macos-${{ runner.arch }}-${{ hashFiles('packaging/media/**', 'script/media-worker.py') }}
+        restore-keys: libav-macos-${{ runner.arch }}-";
+
+const CI_NATIVE_WORKER_TESTS: &str = "__RESTORE_MEDIA_SDK_CACHE__
+    - name: ci::setup_media_sdk
+      run: python script/media-worker.py setup-ci
+    - name: ci::save_sdk_cache
+      if: runner.os == 'macOS' && steps.sdk-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6.1.0
+      with:
+        path: target/media-sdk/archives
+        key: ${{ steps.sdk-cache.outputs.cache-primary-key }}
+    - name: ci::build_media_worker
+      run: cargo build --locked --package frame-media
+    - name: ci::test_media_worker
+      run: cargo test --locked --package frame-media";
+
+const CI_WORKER_TESTS: &str = "__CI_NATIVE_WORKER_TESTS__
+    - name: ci::build_app_qa
+      run: cargo build --locked --package frame-app --features qa-harness --bin frame-qa
+    - name: ci::test_worker_packaging
+      env:
+        FRAME_TEST_QA_RELOCATION: '1'
+      run: python -B -m unittest discover -s script/tests -p test_media_worker.py -v";
+
+const CI_MAC_CRASH_REPORTS: &str = "    - name: ci::upload_worker_crash_reports
+      if: failure() && runner.os == 'macOS'
+      uses: actions/upload-artifact@v7.0.1
+      with:
+        name: frame-media-crashes-${{ runner.arch }}-attempt-${{ github.run_attempt }}
+        path: |
+          ~/Library/Logs/DiagnosticReports/frame-media*.ips
+          ~/Library/Logs/DiagnosticReports/frame-media*.crash
+        if-no-files-found: warn";
+
+const CI_MEDIA_INTEGRATION: &str = "    - name: ci::setup_ffmpeg
       run: cargo xtask setup-ffmpeg
     - name: ci::test_media_conversions
-      run: cargo test --locked -p frame-core --test media_integration -- --ignored --test-threads=1"
+      run: cargo test --locked -p frame-core --test media_integration -- --ignored --test-threads=1";
+
+const fn ci_media_test_steps() -> &'static str {
+    "__CI_MEDIA_INTEGRATION__
+    - name: ci::test_app
+      run: cargo test --locked -p frame-app --lib -- --test-threads=1
+    - name: ci::test_conversion_runner
+      run: cargo test --locked -p frame-app --lib conversion_runner -- --ignored --test-threads=1
+    - name: ci::test_frame_export
+      run: cargo test --locked -p frame-app --lib frame_export -- --ignored --test-threads=1
+    - name: ci::test_app_package_pipeline
+      run: cargo test --locked -p frame-app --features qa-harness --test qa_harness -- --include-ignored --test-threads=1"
 }
 
 fn hevc_comparison_workflow() -> String {
@@ -2429,8 +2573,8 @@ const fn setup_dmgbuild_step() -> &'static str {
 
 fn linux_job(arch: &str, runner: &str) -> String {
     let appimagetool_arch = arch;
-    let linux_packages = "clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync";
-    let bundle_args = "--tarball --appimage";
+    let linux_packages = "clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync flatpak flatpak-builder";
+    let bundle_args = "--all";
     let timeout_minutes = 90;
 
     format!(
@@ -2446,6 +2590,8 @@ fn linux_job(arch: &str, runner: &str) -> String {
       run: |
         sudo apt-get update
         sudo apt-get install -y {linux_packages}
+        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        flatpak install --user --no-related -y --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
     - name: steps::setup_appimagetool
       run: |
         curl --fail --location --proto '=https' --tlsv1.2 --output /tmp/appimagetool.AppImage https://github.com/AppImage/appimagetool/releases/download/__APPIMAGETOOL_VERSION__/appimagetool-{appimagetool_arch}.AppImage
@@ -2454,7 +2600,7 @@ fn linux_job(arch: &str, runner: &str) -> String {
     - name: ./script/bundle-linux
       env:
         APPIMAGETOOL: /tmp/appimagetool.AppImage
-      run: ./script/bundle-linux {bundle_args}
+      run: dbus-run-session -- ./script/bundle-linux {bundle_args}
     - name: run_bundling::verify_appimage_update_information
       shell: bash
       run: |
@@ -2462,6 +2608,23 @@ fn linux_job(arch: &str, runner: &str) -> String {
         actual="$(target/release/Frame-{arch}.AppImage --appimage-updateinformation)"
         test "$actual" = "$expected"
         test -s target/release/Frame-{arch}.AppImage.zsync
+    - name: run_bundling::verify_extracted_linux_packages
+      shell: bash
+      run: |
+        output="$GITHUB_WORKSPACE/target/release"
+        cd "$RUNNER_TEMP"
+        tar -xzf "$output/frame-linux-{arch}.tar.gz"
+        "$output/Frame-{arch}.AppImage" --appimage-extract >/dev/null
+        for root in frame.app squashfs-root/usr; do
+          python3 "$GITHUB_WORKSPACE/script/media-worker.py" verify --bin-dir "$root/bin" --lib-dir "$root/lib" --package-root "$root"
+        done
+    - name: run_bundling::verify_installed_devel_flatpak
+      shell: bash
+      run: |
+        flatpak install --user --noninteractive -y target/release/Frame-{arch}.flatpak
+        dbus-run-session -- flatpak run --user --filesystem="$GITHUB_WORKSPACE/script:ro" --env=PATH= \
+          --command=/usr/bin/python3 io.github._66HEX.Frame.Devel//devel "$GITHUB_WORKSPACE/script/media-worker.py" \
+          verify --target {arch}-unknown-linux-gnu --bin-dir /app/bin --lib-dir /app/lib --package-root /app
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@v7.0.1
       with:
@@ -2503,7 +2666,8 @@ fn macos_job(arch: &str, target: &str, runner: &str) -> String {
     env:
       CARGO_INCREMENTAL: 0
     steps:
-{checkout}{rust}{dmgbuild}    - name: steps::install_cargo_bundle
+{checkout}{rust}{dmgbuild}__RESTORE_MEDIA_SDK_CACHE__
+    - name: steps::install_cargo_bundle
       run: cargo install cargo-bundle --version __CARGO_BUNDLE_VERSION__ --locked
     - name: ./script/bundle-mac
       env:
@@ -2521,7 +2685,7 @@ fn macos_job(arch: &str, target: &str, runner: &str) -> String {
         name: Frame-{arch}.app.zip
         path: target/{target}/release/Frame-{arch}.app.zip
         if-no-files-found: error
-    timeout-minutes: 60
+    timeout-minutes: 150
 ",
         if_expression = bundle_if_expression(),
         checkout = checkout_step(),
@@ -2532,7 +2696,7 @@ fn macos_job(arch: &str, target: &str, runner: &str) -> String {
 
 fn windows_job(arch: &str, runner: &str) -> String {
     format!(
-        r"  bundle_windows_{arch}:
+        r#"  bundle_windows_{arch}:
     if: |-
 {if_expression}
     runs-on: {runner}
@@ -2546,6 +2710,14 @@ fn windows_job(arch: &str, runner: &str) -> String {
     - name: ./script/bundle-windows.ps1
       shell: pwsh
       run: ./script/bundle-windows.ps1 -Architecture {arch}
+    - name: run_bundling::verify_installed_windows_package
+      shell: pwsh
+      run: |
+        $installed = Join-Path $env:RUNNER_TEMP 'Frame media package'
+        $argsList = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', ('/DIR="' + $installed + '"'))
+        $setup = Start-Process ./target/Frame-{arch}.exe -ArgumentList $argsList -PassThru -Wait
+        if ($setup.ExitCode -ne 0) {{ throw "Frame installer exited $($setup.ExitCode)" }}
+        python script/media-worker.py verify --bin-dir $installed --lib-dir $installed --package-root $installed
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@v7.0.1
       with:
@@ -2553,7 +2725,7 @@ fn windows_job(arch: &str, runner: &str) -> String {
         path: target/Frame-{arch}.exe
         if-no-files-found: error
     timeout-minutes: 60
-",
+"#,
         if_expression = bundle_if_expression(),
         checkout = checkout_step(),
         rust = setup_rust_step(),
@@ -2806,6 +2978,7 @@ jobs:
       run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
     - name: steps::setup_rust
       uses: dtolnay/rust-toolchain@stable
+__RESTORE_MEDIA_SDK_CACHE__
     - name: steps::install_cargo_bundle
       run: cargo install cargo-bundle --locked
     - name: release::build_macos_x86_64_unsigned
@@ -2824,7 +2997,7 @@ jobs:
         path: target/Frame-x86_64-unsigned.app.zip
         if-no-files-found: error
         retention-days: 3
-    timeout-minutes: 90
+    timeout-minutes: 150
 
   package_macos_x86_64:
     runs-on: macos-26-intel
@@ -2892,6 +3065,7 @@ jobs:
       run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
     - name: steps::setup_rust
       uses: dtolnay/rust-toolchain@stable
+__RESTORE_MEDIA_SDK_CACHE__
     - name: steps::install_cargo_bundle
       run: cargo install cargo-bundle --locked
     - name: release::build_macos_aarch64_unsigned
@@ -2910,7 +3084,7 @@ jobs:
         path: target/Frame-aarch64-unsigned.app.zip
         if-no-files-found: error
         retention-days: 3
-    timeout-minutes: 90
+    timeout-minutes: 150
 
   package_macos_aarch64:
     runs-on: macos-26
@@ -3680,6 +3854,11 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
           perl -0pi -e 's/version = "[^"]+";/version = "$ENV{VERSION}";/' "$package_path"
           perl -0pi -e 's/hash = "[^"]+";/hash = lib.fakeHash;/' "$package_path"
           perl -0pi -e 's/cargoHash = "[^"]+";/cargoHash = lib.fakeHash;/' "$package_path"
+          # Preserve downstream changes, including nixfmt's shared cargoFlags list.
+          perl -0pi -e 's/(cargo(?:Build|Test)?Flags\s*=\s*\[[^\]]*?"frame-app")(?![^\]]*"frame-media")/$1 "--package" "frame-media"/gs' "$package_path"
+          perl -0pi -e 's/(\bbuildInputs\s*=\s*\[)(?![^\]]*\bffmpeg\b)/$1 ffmpeg/gs' "$package_path"
+          sed -i '/--prefix PATH : [$]{lib.makeBinPath \[ ffmpeg \]}/d; /--set FRAME_USE_SYSTEM_MEDIA_TOOLS 1/d' "$package_path"
+          grep -q '"frame-media"' "$package_path"
         else
           mkdir -p "$(dirname "$package_path")"
           cat > "$package_path" <<'EOF'
@@ -3715,8 +3894,8 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
           };
 
           cargoHash = lib.fakeHash;
-          cargoBuildFlags = [ "--package" "frame-app" ];
-          cargoTestFlags = [ "--package" "frame-app" ];
+          cargoBuildFlags = [ "--package" "frame-app" "--package" "frame-media" ];
+          cargoTestFlags = [ "--package" "frame-app" "--package" "frame-media" ];
 
           nativeBuildInputs = [
             makeWrapper
@@ -3724,6 +3903,7 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
           ];
 
           buildInputs = [
+            ffmpeg
             alsa-lib
             fontconfig
             freetype
@@ -3757,8 +3937,6 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
 
           postFixup = ''
             wrapProgram $out/bin/frame \
-              --prefix PATH : ${lib.makeBinPath [ ffmpeg ]} \
-              --set FRAME_USE_SYSTEM_MEDIA_TOOLS 1 \
               --set FRAME_UPDATE_EXPLANATION \
                 'This Nixpkgs build is managed by Nix. Install updates through your Nix profile, flake, or NixOS configuration.'
           '';
@@ -3820,6 +3998,10 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
         nix-build -A "$NIXPKGS_PACKAGE"
         nix-shell -I nixpkgs="$PWD" -p nixfmt-rfc-style --run "nixfmt $package_path maintainers/maintainer-list.nix"
         nix-build -A "$NIXPKGS_PACKAGE"
+        source_dir="$(nix-build --no-out-link -A "$NIXPKGS_PACKAGE.src")"
+        media_libs="$(nix-build --no-out-link -A ffmpeg.lib)"
+        python3 "$source_dir/script/media-worker.py" verify --target x86_64-unknown-linux-gnu \
+          --package-root result --bin-dir result/bin --lib-dir "$media_libs/lib"
         nix-build lib/tests/maintainers.nix
 
         git config user.name "github-actions[bot]"
@@ -3859,7 +4041,12 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
         path: nixpkgs
     - name: release::build_nixpkgs_aarch64
       working-directory: nixpkgs
-      run: nix-build -A "$NIXPKGS_PACKAGE"
+      run: |
+        nix-build -A "$NIXPKGS_PACKAGE"
+        source_dir="$(nix-build --no-out-link -A "$NIXPKGS_PACKAGE.src")"
+        media_libs="$(nix-build --no-out-link -A ffmpeg.lib)"
+        python3 "$source_dir/script/media-worker.py" verify --target aarch64-unknown-linux-gnu \
+          --package-root result --bin-dir result/bin --lib-dir "$media_libs/lib"
     timeout-minutes: 90
 
   publish_nixpkgs:
@@ -4474,6 +4661,40 @@ mod tests {
     }
 
     #[test]
+    fn flathub_vendor_archive_keeps_xml_without_appledouble_metadata() {
+        let temp = tempfile::tempdir().unwrap();
+        let vendor = temp.path().join("vendor");
+        fs::create_dir(&vendor).unwrap();
+        let xml = vendor.join("interface.xml");
+        fs::write(&xml, "<node/>").unwrap();
+        fs::write(vendor.join("._other.xml"), [0xff]).unwrap();
+        #[cfg(target_os = "macos")]
+        assert!(
+            Command::new("xattr")
+                .args(["-w", "org.frame.test", "metadata"])
+                .arg(&xml)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let archive = temp.path().join("vendor.tar.gz");
+        archive_flathub_vendor(&vendor, &archive).unwrap();
+        let listing = Command::new("tar")
+            .arg("-tzf")
+            .arg(archive)
+            .output()
+            .unwrap();
+        assert!(listing.status.success());
+        let entries = String::from_utf8(listing.stdout).unwrap();
+        assert!(
+            entries
+                .lines()
+                .any(|entry| entry.ends_with("interface.xml"))
+        );
+        assert!(!entries.lines().any(|entry| entry.contains("._")));
+    }
+
+    #[test]
     fn release_workflow_publishes_flathub_source_archives() {
         let workflow = release_workflow();
 
@@ -4506,6 +4727,9 @@ mod tests {
         assert!(workflow.contains("needs: [prepare_release, publish_release]"));
         assert!(workflow.contains("runs-on: ubuntu-22.04-arm"));
         assert!(workflow.contains("release::build_nixpkgs_aarch64"));
+        for target in ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"] {
+            assert!(workflow.contains(&format!("media-worker.py\" verify --target {target}")));
+        }
         assert!(workflow.contains("- validate_nixpkgs_aarch64"));
         assert!(workflow.contains("NIXPKGS_GITHUB_TOKEN"));
         assert!(workflow.contains("NIXPKGS_UPSTREAM: NixOS/nixpkgs"));
@@ -4756,6 +4980,24 @@ mod tests {
     }
 
     #[test]
+    fn diagnostic_dispatch_uses_the_native_suite_without_building_the_gui() {
+        let workflow = ci_workflow();
+        let job = workflow_job(&workflow, "native_media");
+        for required in [
+            "python script/media-worker.py setup-ci",
+            "cargo test --locked --package frame-media",
+            "cargo xtask setup-ffmpeg",
+            "--test media_integration -- --ignored --test-threads=1",
+            "DiagnosticReports/frame-media*.ips",
+            "DiagnosticReports/frame-media*.crash",
+        ] {
+            assert!(job.contains(required), "missing {required}");
+        }
+        assert!(!job.contains("frame-app"));
+        assert!(job.contains("runs-on: ${{ inputs.native_media_runner }}"));
+    }
+
+    #[test]
     fn dependabot_groups_the_windows_rs_dependency_family() {
         let config = include_str!("../../../.github/dependabot.yml");
         let windows_group = config
@@ -4832,11 +5074,13 @@ mod tests {
     }
 
     #[test]
-    fn flathub_template_uses_runtime_media_tools_without_bundled_binaries() {
+    fn flathub_template_builds_the_worker_against_runtime_libraries() {
         let template = include_str!("../../../packaging/flathub/io.github._66HEX.Frame.yml.in");
 
         assert!(template.contains("install -Dm755 target/release/frame /app/bin/frame"));
-        assert!(template.contains("--env=FRAME_USE_SYSTEM_MEDIA_TOOLS=1"));
+        assert!(
+            template.contains("install -Dm755 target/release/frame-media /app/bin/frame-media")
+        );
         assert!(template.contains("packaging/flathub/io.github._66HEX.Frame.desktop"));
         assert!(template.contains("packaging/flathub/io.github._66HEX.Frame.metainfo.xml"));
         assert!(!template.contains("desktop-file-edit"));
@@ -4934,84 +5178,6 @@ mod tests {
         assert!(!workflow.contains(":linux-aarch64:linux_appimage"));
         assert!(!workflow.contains(":linux-x86_64:flatpak"));
         assert!(!workflow.contains(":linux-aarch64:flatpak"));
-    }
-
-    #[test]
-    fn windows_bundle_appends_prepared_ffmpeg_flag() {
-        let args = ["-Install", "-Architecture", "x86_64"];
-
-        let script_args = windows_bundle_script_args(&args, true);
-
-        assert_eq!(
-            script_args,
-            vec![
-                "-Install",
-                "-Architecture",
-                "x86_64",
-                WINDOWS_PREPARED_FFMPEG_FLAG
-            ]
-        );
-        assert_eq!(windows_bundle_script_args(&args, false), args.to_vec());
-    }
-
-    #[test]
-    fn windows_bundle_args_do_not_duplicate_skip_flag() {
-        let args = ["-skipsetupffmpeg", "-Install"];
-
-        let script_args = windows_bundle_script_args(&args, true);
-        let occurrences = script_args
-            .iter()
-            .filter(|arg| arg.eq_ignore_ascii_case(WINDOWS_PREPARED_FFMPEG_FLAG))
-            .count();
-
-        assert_eq!(occurrences, 1);
-        assert_eq!(script_args, args.to_vec());
-    }
-
-    #[test]
-    fn windows_bundle_skips_ffmpeg_for_help_and_package_only() {
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-PackageOnly"]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-packageonly"]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-Help"]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-help"]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-h"]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&[
-            "-Architecture",
-            "x86_64",
-            "-h"
-        ]));
-        assert!(windows_bundle_should_prepare_ffmpeg(&[]));
-        assert!(windows_bundle_should_prepare_ffmpeg(&["-Install"]));
-        assert!(windows_bundle_should_prepare_ffmpeg(&[
-            "-Architecture",
-            "x86_64"
-        ]));
-    }
-
-    #[test]
-    fn windows_bundle_respects_architecture_and_manual_skip() {
-        assert!(windows_bundle_should_prepare_ffmpeg(&[
-            "-Architecture",
-            "x86_64"
-        ]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&[
-            "-Architecture",
-            "arm64"
-        ]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-a", "arm64"]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&[
-            "-Architecture:arm64"
-        ]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-a:arm64"]));
-        assert!(windows_bundle_should_prepare_ffmpeg(&[
-            "-Architecture:x86_64"
-        ]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-Architecture"]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-SkipSetupFfmpeg"]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&[
-            "-skipsetupffmpeg",
-            "-Install"
-        ]));
     }
 
     #[test]

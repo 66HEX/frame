@@ -2019,6 +2019,7 @@ dependencies = [
  "smallvec",
  "smol",
  "sysinfo",
+ "tempfile",
  "thiserror 2.0.21",
  "windows 0.62.2",
 ]
@@ -2041,6 +2042,17 @@ dependencies = [
  "base64 0.23.1",
  "ed25519-dalek",
  "zeroize",
+]
+
+[[package]]
+name = "frame-media"
+version = "0.35.0"
+dependencies = [
+ "cc",
+ "frame-core",
+ "pkg-config",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

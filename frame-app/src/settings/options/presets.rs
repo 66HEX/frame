@@ -191,6 +191,7 @@ fn preset_settings(config: &ConversionConfig) -> ConversionConfig {
     let mut settings = config.clone();
     // These bindings belong to each source; every other setting belongs to the preset.
     settings.selected_audio_tracks.clear();
+    settings.audio_track_overrides.clear();
     settings.selected_subtitle_tracks.clear();
     settings.external_subtitle_tracks.clear();
     settings.subtitle_burn_path = None;

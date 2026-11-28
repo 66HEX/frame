@@ -181,7 +181,7 @@ pub fn resolve_preview_burn_clock(
     available_audio: &[u32],
     available_subtitles: &[(u32, &str)],
 ) -> Option<PreviewBurnClock> {
-    if config.processing_mode == "copy"
+    if config.copies_video()
         || crate::utils::is_audio_only_container(&config.container)
         || !crate::filters::has_subtitle_burn(config)
     {

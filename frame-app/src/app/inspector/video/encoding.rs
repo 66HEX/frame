@@ -12,8 +12,8 @@ use crate::capabilities::{HardwareCapabilities, HardwareEncoder};
 use crate::settings::{
     ConversionConfig, apply_hw_decode, apply_nvenc_spatial_aq, apply_nvenc_temporal_aq,
     apply_pixel_format, apply_video_bitrate_mode, apply_video_encoder_choice, apply_video_preset,
-    apply_videotoolbox_allow_sw, is_hardware_video_codec, video_codec_options,
-    video_pixel_format_options, video_preset_options,
+    apply_video_two_pass, apply_videotoolbox_allow_sw, is_hardware_video_codec,
+    video_codec_options, video_pixel_format_options, video_preset_options,
 };
 use crate::theme;
 use frame_core::capabilities::AvailableEncoders;
@@ -315,6 +315,27 @@ pub(super) fn settings_video_quality_section(
         );
     }
 
+    if config.video_two_pass_available() {
+        section = section.child(settings_video_checkbox_row(
+            "video-two-pass",
+            "Two-pass encoding",
+            "Analyze the video first to distribute the target bitrate across scenes.",
+            config.video_two_pass,
+            settings_disabled,
+            palette,
+            window,
+            cx,
+            move |root, _, _, cx| {
+                if !settings_disabled
+                    && root.update_selected_config(|config| {
+                        apply_video_two_pass(config, !config.video_two_pass)
+                    })
+                {
+                    cx.notify();
+                }
+            },
+        ));
+    }
     section
 }
 

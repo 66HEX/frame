@@ -45,9 +45,15 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "{#ResourcesDir}\Frame.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#ResourcesDir}\frame-media.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ResourcesDir}\frame-update-helper.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#ResourcesDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "{#ResourcesDir}\binaries\*"; DestDir: "{app}\binaries"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#ResourcesDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#ResourcesDir}\frame-media.LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+
+[InstallDelete]
+Type: files; Name: "{app}\binaries\ffmpeg-x86_64-pc-windows-msvc.exe"
+Type: files; Name: "{app}\binaries\ffprobe-x86_64-pc-windows-msvc.exe"
+Type: dirifempty; Name: "{app}\binaries"
 
 [Icons]
 Name: "{autoprograms}\Frame"; Filename: "{app}\Frame.exe"

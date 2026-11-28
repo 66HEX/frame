@@ -12,8 +12,8 @@ use crate::preview_engine::{
     PreviewSessionConfig, PreviewSourceKind as EnginePreviewSourceKind,
 };
 use crate::settings::{
-    AudioFiltersConfig, ConversionConfig, CropSettings, FilterValue, OverlaySettings,
-    ProcessingMode, SourceKind, SourceMetadata, VideoFiltersConfig,
+    AudioFiltersConfig, ConversionConfig, CropSettings, FilterValue, OverlaySettings, SourceKind,
+    SourceMetadata, VideoFiltersConfig,
 };
 use crate::source_metadata::{MetadataStatus, SourceMetadataEntry};
 use gpui::{Bounds, Pixels};
@@ -175,14 +175,14 @@ pub(super) fn preview_visual_hash(
     let mut state = DefaultHasher::new();
     frame_core::dimensions::output_raster_policy(
         &config.container,
-        config.processing_mode == ProcessingMode::Copy,
+        config.processing_mode.copies_video(),
     )
     .hash(&mut state);
-    let tiff_output = config.processing_mode != ProcessingMode::Copy
-        && config.container.eq_ignore_ascii_case("tiff");
+    let tiff_output =
+        !config.processing_mode.copies_video() && config.container.eq_ignore_ascii_case("tiff");
     tiff_output.hash(&mut state);
     (tiff_output && source_is_palette).hash(&mut state);
-    let precise_overlay = config.processing_mode != ProcessingMode::Copy
+    let precise_overlay = !config.processing_mode.copies_video()
         && config.overlay.as_ref().is_some_and(|overlay| {
             overlay.enabled
                 && !overlay.path.trim().is_empty()
@@ -203,7 +203,7 @@ pub(super) fn preview_visual_hash(
     config.fps.hash(&mut state);
     hash_crop(config.crop.as_ref(), &mut state);
     config.subtitle_burn_path.hash(&mut state);
-    if config.processing_mode != ProcessingMode::Copy
+    if !config.processing_mode.copies_video()
         && config
             .subtitle_burn_path
             .as_deref()

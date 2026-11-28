@@ -141,12 +141,15 @@ Frame's application code retains its normal debug settings.
 | `settings-video-vp9` | VP9 WebM with speed 3 and CRF 0 | Native speeds 0–5 and the Best quality endpoint. |
 | `settings-video-hardware` | Unavailable selected NVENC; unavailable strict VideoToolbox and available software fallback | Preserved selection, explicit hardware policy captions and the fixed-width Check again action. Open Video encoder to inspect both policies. |
 | `settings-audio` | Audio settings tab with an audio source and tracks | Audio codec controls, VBR quality, channel selection, volume and normalize controls, track selection rows, and audio-only source treatment. |
+| `settings-audio-tracks` | MKV with two selected audio tracks | Edit track language and title, switch the default track, and check the editor in stream copy mode. |
+| `settings-audio-sample-rate` | 48 kHz source track set to export as 44.1 kHz PCM/WAV | Check the source rate, output rate selector and custom rate input. |
 | `settings-images` | Image settings tab with a selected PNG source | Image output controls, custom image dimensions, image-source metadata, and non-video settings visibility. |
 | `settings-metadata` | Metadata tab with source tags and output metadata drafts | Source metadata presentation, editable metadata fields, long value wrapping, and tag/value alignment. |
 | `settings-subtitles` | Subtitles tab with selectable sidecars, source tracks, and burn-in styling | External subtitle rows and metadata editor, default/forced states, source track rows, burn-in file state, font controls, color swatches, outline color, position controls, and selected track state. |
 | `settings-subtitles-popover` | Subtitles tab with the font color picker open | Color picker popover placement, swatch state, HSV draft color, popover layering, and focus treatment inside the settings panel. |
 | `settings-presets` | Presets tab with a custom preset draft | Preset list rendering, custom preset row, draft preset name, action buttons, and preset form spacing. |
 | `update-available` | Update dialog with release notes and a platform asset | Update dialog layout, release notes markdown rendering, scroll behavior, close animation, footer actions, and platform-specific asset copy. |
+| `workspace-encoding-stats` | Selected queue entry at 64% of a video export | Open **Show encoding statistics** in the row to check the dialog, then close it and compare the queue and preview bounds. |
 | `workspace-empty` | Empty workspace | Welcome/import screen, empty queue layout, primary and secondary import actions, and first-run visual balance. |
 | `workspace-audio` | Workspace with a selected audio source | Queue row for audio media, audio metadata display, preview controls hidden for audio-only sources, and audio conversion defaults. |
 | `workspace-image` | Workspace with a selected image source | Queue row for image media, image metadata display, image preview state, and image conversion defaults. |

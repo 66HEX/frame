@@ -57,7 +57,7 @@ pub use options::{
     VideoPresetOption,
 };
 pub use presets::{PresetDefinition, PresetOption};
-pub use processing::ProcessingMode;
+pub use processing::{ProcessingMode, ProcessingStream};
 pub use source::{
     AudioTrack, SourceInfoRow, SourceInfoSection, SourceKind, SourceMetadata, SourceTags,
     SourceTrackSection, SubtitleTrack,

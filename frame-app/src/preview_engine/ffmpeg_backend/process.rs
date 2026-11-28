@@ -14,7 +14,7 @@ use crate::preview_engine::ffmpeg_backend::decode::{
 use crate::preview_engine::frame_store::LatestFrameStore;
 use crate::preview_engine::metrics::{PreviewRuntimeMetricsStore, log_preview_runtime_metrics};
 use crate::preview_engine::types::{PreviewDimensions, PreviewSessionConfig, PreviewSourceKind};
-use crate::runtime_binaries::ffmpeg_executable;
+use crate::runtime_binaries::media_worker_executable;
 use gpui::{ImageId, RenderImage};
 use std::collections::VecDeque;
 use std::io::Read;
@@ -503,7 +503,7 @@ pub(in crate::preview_engine) fn start_ffmpeg_preview_process(
     metrics: PreviewRuntimeMetricsStore,
     cancelled: Arc<AtomicBool>,
 ) -> Result<(RunningPreviewProcess, PreviewDimensions, f64), PreviewEngineError> {
-    let executable = ffmpeg_executable();
+    let executable = media_worker_executable();
     let mut process = RunningPreviewProcess::new(config.clone(), frame_store, metrics, executable)?;
     process.cancelled = cancelled;
     let dimensions = if matches!(

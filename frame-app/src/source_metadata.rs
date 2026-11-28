@@ -1,7 +1,7 @@
-//! Source metadata state and ffprobe integration for the GPUI app.
+//! Source metadata state and bounded media inspection for the GPUI app.
 
 use crate::file_queue::FileQueue;
-use crate::runtime_binaries::ffprobe_executable;
+use crate::runtime_binaries::media_worker_executable;
 use crate::settings::{AudioTrack, SourceKind, SourceMetadata, SourceTags, SubtitleTrack};
 use frame_core::error::ConversionError;
 use frame_core::types::{FfprobeTags, ProbeMetadata};
@@ -133,6 +133,8 @@ pub fn source_metadata_from_probe(probe: ProbeMetadata) -> SourceMetadata {
                 channel_layout: track.channel_layout,
                 language: track.language,
                 label: track.label,
+                metadata_title: track.metadata_title,
+                is_default: track.is_default,
                 bitrate_kbps: track.bitrate_kbps,
                 sample_rate: track.sample_rate,
             })
@@ -157,11 +159,11 @@ pub fn source_metadata_from_probe(probe: ProbeMetadata) -> SourceMetadata {
     }
 }
 
-/// Probes source metadata with the bundled ffprobe executable.
+/// Reads source metadata with the configured media worker.
 ///
 /// # Errors
 ///
-/// Returns an error when ffprobe cannot be executed, exits unsuccessfully, or
+/// Returns an error when the worker cannot be executed, exits unsuccessfully, or
 /// exceeds the probe time or output limit, or emits invalid metadata.
 pub fn probe_source_metadata(file_path: &str) -> Result<SourceMetadata, ConversionError> {
     probe_source_metadata_cancellable(file_path, &|| false)
@@ -171,10 +173,14 @@ pub(crate) fn probe_source_metadata_cancellable(
     file_path: &str,
     cancelled: &dyn Fn() -> bool,
 ) -> Result<SourceMetadata, ConversionError> {
-    probe_source_metadata_with_executable_cancellable(file_path, &ffprobe_executable(), cancelled)
+    probe_source_metadata_with_executable_cancellable(
+        file_path,
+        &media_worker_executable(),
+        cancelled,
+    )
 }
 
-/// Probes source metadata with a specific ffprobe executable.
+/// Reads source metadata with a specific media inspection executable.
 ///
 /// # Errors
 ///
@@ -280,6 +286,7 @@ mod tests {
                     language: Some("eng".to_string()),
                     label: Some("Main".to_string()),
                     metadata_title: Some("Genuine source title".to_string()),
+                    is_default: true,
                     bitrate_kbps: Some(192.0),
                     sample_rate: Some("48000".to_string()),
                 }],
@@ -292,6 +299,11 @@ mod tests {
             );
             assert_eq!(metadata.audio_tracks[0].codec_tag, Some(0x6134_706d));
             assert_eq!(metadata.audio_tracks[0].label.as_deref(), Some("Main"));
+            assert_eq!(
+                metadata.audio_tracks[0].metadata_title.as_deref(),
+                Some("Genuine source title")
+            );
+            assert!(metadata.audio_tracks[0].is_default);
             assert_eq!(metadata.audio_tracks[0].channels.as_deref(), Some("2"));
             assert_eq!(
                 metadata.audio_tracks[0].channel_layout.as_deref(),

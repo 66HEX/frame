@@ -21,6 +21,7 @@ impl FrameRoot {
                 .file_queue
                 .selected_file()
                 .map_or_else(String::new, |file| file.output_name.clone()),
+            FrameTextInputKind::AudioSampleRate => self.audio_sample_rate_input_value(),
             FrameTextInputKind::AudioBitrate => self
                 .file_queue
                 .selected_file()
@@ -76,6 +77,9 @@ impl FrameRoot {
                     })
                 })
                 .unwrap_or_default(),
+            FrameTextInputKind::AudioTrackLanguage | FrameTextInputKind::AudioTrackTitle => {
+                self.audio_track_input_value(kind).unwrap_or_default()
+            }
             FrameTextInputKind::PresetName => self.settings_ui.preset_name_draft.clone(),
             FrameTextInputKind::ExternalSubtitleLanguage
             | FrameTextInputKind::ExternalSubtitleTitle => self
@@ -109,6 +113,9 @@ impl FrameRoot {
         candidate: &str,
     ) -> Option<String> {
         match kind {
+            FrameTextInputKind::AudioTrackLanguage | FrameTextInputKind::AudioTrackTitle => {
+                self.write_audio_track_input(kind, candidate)
+            }
             FrameTextInputKind::CropWidth | FrameTextInputKind::CropHeight => {
                 if self.text_input_disabled(kind) || !self.preview_ui.crop_mode {
                     return None;
@@ -142,6 +149,7 @@ impl FrameRoot {
                 self.file_queue.set_selected_output_name_from_input(&next);
                 Some(next)
             }
+            FrameTextInputKind::AudioSampleRate => self.write_audio_sample_rate_input(candidate),
             FrameTextInputKind::AudioBitrate => {
                 if self.file_queue.selected_file_locked() {
                     return None;

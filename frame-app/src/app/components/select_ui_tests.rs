@@ -1,6 +1,7 @@
 use crate::VisualFixture;
 use crate::app::{FrameRoot, SettingsSubtitleMode};
 use crate::appearance::{ColorTheme, ScalePreset};
+use crate::settings::ProcessingMode;
 use gpui::{Entity, Modifiers, TestAppContext, VisualTestContext, px, size};
 
 struct SelectCase {
@@ -465,40 +466,30 @@ fn selecting_the_current_font_or_size_still_closes_the_menu() {
 fn processing_tabs_activate_on_arrow_focus_and_wrap() {
     let case = SelectCase {
         fixture: VisualFixture::SettingsOutput,
-        trigger: "output-mode-reencode",
+        trigger: "output-video-mode-reencode",
         panel: "unused",
     };
     let mut app = TestAppContext::single();
     let (root, cx) = select_window(&mut app, &case, ColorTheme::Dark, ScalePreset::Percent100);
     click(cx, case.trigger);
-    let original = root.read_with(cx, |root, _| {
-        root.selected_config().unwrap().processing_mode
-    });
+    let mode = |cx: &mut VisualTestContext| {
+        root.read_with(cx, |root, _| {
+            root.selected_config().unwrap().processing_mode
+        })
+    };
+    assert_eq!(mode(cx), ProcessingMode::Reencode);
     press(cx, "right");
-    assert_ne!(
-        root.read_with(cx, |root, _| root
-            .selected_config()
-            .unwrap()
-            .processing_mode),
-        original
-    );
+    assert_eq!(mode(cx), ProcessingMode::CopyVideo);
     press(cx, "enter");
-    assert_ne!(
-        root.read_with(cx, |root, _| root
-            .selected_config()
-            .unwrap()
-            .processing_mode),
-        original
-    );
+    assert_eq!(mode(cx), ProcessingMode::CopyVideo);
     press(cx, "right");
-    press(cx, "enter");
-    assert_eq!(
-        root.read_with(cx, |root, _| root
-            .selected_config()
-            .unwrap()
-            .processing_mode),
-        original
-    );
+    assert_eq!(mode(cx), ProcessingMode::Reencode);
+    click(cx, "output-audio-mode-copy");
+    assert_eq!(mode(cx), ProcessingMode::CopyAudio);
+    click(cx, "output-video-mode-copy");
+    assert_eq!(mode(cx), ProcessingMode::Copy);
+    click(cx, "output-audio-mode-reencode");
+    assert_eq!(mode(cx), ProcessingMode::CopyVideo);
 }
 
 #[test]
@@ -842,4 +833,292 @@ fn opus_bitrate_and_vbr_controls_support_keyboard_and_copy_in_both_themes_and_sc
             );
         }
     }
+}
+
+#[test]
+fn two_pass_checkbox_follows_target_bitrate_and_rejects_incompatible_video_modes() {
+    let case = SelectCase {
+        fixture: VisualFixture::SettingsVideo,
+        trigger: "video-bitrate-mode-bitrate",
+        panel: "video-two-pass",
+    };
+    let mut app = TestAppContext::single();
+    let (root, cx) = select_window(&mut app, &case, ColorTheme::Dark, ScalePreset::Percent100);
+    assert!(cx.debug_bounds(case.panel).is_none());
+    click(cx, case.trigger);
+    click(cx, case.panel);
+    assert!(root.read_with(cx, |root, _| root.selected_config().unwrap().video_two_pass));
+    click(cx, "video-bitrate-mode-crf");
+    assert!(cx.debug_bounds(case.panel).is_none());
+    click(cx, case.trigger);
+    assert!(!root.read_with(cx, |root, _| root.selected_config().unwrap().video_two_pass));
+    click(cx, "video-two-pass-indicator");
+    assert!(root.read_with(cx, |root, _| root.selected_config().unwrap().video_two_pass));
+    click(cx, "video-encoder-select");
+    click(cx, "video-codec-libsvtav1");
+    assert!(cx.debug_bounds(case.panel).is_none());
+    assert!(!root.read_with(cx, |root, _| root.selected_config().unwrap().video_two_pass));
+}
+
+#[test]
+fn native_clipboard_shortcuts_edit_the_focused_text_field() {
+    use crate::app::input::FrameTextInputKind::AudioTrackTitle;
+    let case = SelectCase {
+        fixture: VisualFixture::SettingsAudioTracks,
+        trigger: "audio-metadata-track",
+        panel: "audio-track-title",
+    };
+    let [select_all, copy, cut, paste] = if cfg!(target_os = "macos") {
+        ["cmd-a", "cmd-c", "cmd-x", "cmd-v"]
+    } else {
+        ["ctrl-a", "ctrl-c", "ctrl-x", "ctrl-v"]
+    };
+    let mut app = TestAppContext::single();
+    let (root, cx) = select_window(&mut app, &case, ColorTheme::Dark, ScalePreset::Percent100);
+    let title = |cx: &mut VisualTestContext| {
+        root.read_with(cx, |root, _| root.text_input_value(AudioTrackTitle))
+    };
+
+    click(cx, case.panel);
+    press(cx, select_all);
+    press(cx, copy);
+    cx.simulate_input("Narration");
+    draw(cx);
+    assert_eq!(title(cx), "Narration");
+    press(cx, select_all);
+    press(cx, paste);
+    assert_eq!(title(cx), "Main mix");
+    press(cx, select_all);
+    press(cx, cut);
+    assert_eq!(title(cx), "");
+    press(cx, paste);
+    assert_eq!(title(cx), "Main mix");
+    cx.update(|_, cx| {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string(
+            "Main\r\nEnglish\rFrench\nPolish".into(),
+        ));
+    });
+    press(cx, select_all);
+    press(cx, paste);
+    assert_eq!(title(cx), "Main English French Polish");
+}
+
+#[test]
+fn audio_track_editor_keeps_edits_bound_to_the_source_track_when_switching_focus() {
+    use crate::app::input::FrameTextInputKind::{AudioTrackLanguage, AudioTrackTitle};
+    use crate::settings::ProcessingMode;
+    let case = SelectCase {
+        fixture: VisualFixture::SettingsAudioTracks,
+        trigger: "audio-metadata-track",
+        panel: "audio-track-title",
+    };
+    let mut app = TestAppContext::single();
+    let (root, cx) = select_window(&mut app, &case, ColorTheme::Dark, ScalePreset::Percent100);
+    let select_all = if cfg!(target_os = "macos") {
+        "cmd-a"
+    } else {
+        "ctrl-a"
+    };
+    assert_eq!(
+        root.read_with(cx, |root, _| root.text_input_value(AudioTrackTitle)),
+        "Main mix"
+    );
+    click(cx, case.panel);
+    press(cx, select_all);
+    cx.simulate_input("Score");
+    draw(cx);
+    click(cx, case.trigger);
+    click(cx, "audio-metadata-track-2");
+    assert_eq!(
+        root.read_with(cx, |root, _| root.text_input_value(AudioTrackTitle)),
+        "Director commentary"
+    );
+    assert_eq!(
+        root.read_with(cx, |root, _| root.text_input_value(AudioTrackLanguage)),
+        "pol"
+    );
+    click(cx, "audio-track-language");
+    press(cx, select_all);
+    press(cx, "backspace");
+    click(cx, "audio-track-default-true");
+    root.read_with(cx, |root, _| {
+        let config = root.selected_config().unwrap();
+        assert_eq!(
+            config.audio_track_overrides[&1].title.as_deref(),
+            Some("Score")
+        );
+        assert_eq!(
+            config.audio_track_overrides[&2].language.as_deref(),
+            Some("")
+        );
+        assert_eq!(config.audio_track_overrides[&2].is_default, Some(true));
+        assert_eq!(config.audio_track_overrides[&2].title, None);
+    });
+    root.update(cx, |root, cx| {
+        root.update_selected_config(|config| {
+            config.processing_mode = ProcessingMode::Reencode;
+            true
+        });
+        cx.notify();
+    });
+    draw(cx);
+    click(cx, case.trigger);
+    click(cx, "audio-metadata-track-1");
+    assert_eq!(
+        root.read_with(cx, |root, _| root.text_input_value(AudioTrackTitle)),
+        "Score"
+    );
+    click(cx, "audio-track-default-true");
+    assert_eq!(
+        root.read_with(cx, |root, _| root
+            .selected_config()
+            .unwrap()
+            .audio_track_overrides[&2]
+            .is_default),
+        Some(false)
+    );
+}
+
+#[test]
+fn changing_files_while_editing_audio_never_redirects_pending_input_to_another_source() {
+    use crate::app::input::FrameTextInputKind::AudioTrackTitle;
+    use crate::file_queue::FileItem;
+    let case = SelectCase {
+        fixture: VisualFixture::SettingsAudioTracks,
+        trigger: "audio-metadata-track",
+        panel: "audio-track-title",
+    };
+    let mut app = TestAppContext::single();
+    let (root, cx) = select_window(&mut app, &case, ColorTheme::Dark, ScalePreset::Percent100);
+    click(cx, case.panel);
+    root.update(cx, |root, cx| {
+        let mut source = root.selected_source_metadata().unwrap();
+        source.audio_tracks[0].metadata_title = Some("Second file".into());
+        let mut file = FileItem::from_path("other", "/tmp/second.mkv", 10);
+        file.config.container = "mkv".into();
+        file.config.selected_audio_tracks = vec![1];
+        root.file_queue.add_file(file);
+        root.source_metadata.mark_ready("other", source);
+        assert!(root.file_queue.select_existing_file("other"));
+        assert!(
+            root.write_text_input_value(AudioTrackTitle, "stale")
+                .is_none()
+        );
+        cx.notify();
+    });
+    draw(cx);
+    root.read_with(cx, |root, _| {
+        assert_eq!(root.text_input_value(AudioTrackTitle), "Second file");
+        assert_ne!(root.text_input_ui.active, Some(AudioTrackTitle));
+        assert!(
+            root.selected_config()
+                .unwrap()
+                .audio_track_overrides
+                .is_empty()
+        );
+    });
+    assert!(cx.debug_bounds(case.trigger).is_none());
+}
+
+#[test]
+fn sample_rate_select_supports_custom_pcm_and_keyboard_presets_without_metadata_fields() {
+    use crate::app::input::FrameTextInputKind::AudioSampleRate;
+    let case = SelectCase {
+        fixture: VisualFixture::SettingsAudioSampleRate,
+        trigger: "audio-track-sample-rate",
+        panel: "audio-track-sample-rate-options",
+    };
+    let mut app = TestAppContext::single();
+    let (root, cx) = select_window(&mut app, &case, ColorTheme::Dark, ScalePreset::Percent100);
+    let select_all = if cfg!(target_os = "macos") {
+        "cmd-a"
+    } else {
+        "ctrl-a"
+    };
+    let selected = |cx: &mut VisualTestContext| {
+        root.read_with(cx, |root, _| {
+            root.selected_config()
+                .unwrap()
+                .audio_track_overrides
+                .get(&0)
+                .and_then(|edit| edit.sample_rate)
+        })
+    };
+    assert!(cx.debug_bounds("audio-track-language").is_none());
+    assert_eq!(selected(cx), Some(44_100));
+    click(cx, case.trigger);
+    press(cx, "c");
+    press(cx, "enter");
+    assert!(cx.debug_bounds("audio-track-custom-rate").is_some());
+    press(cx, "tab");
+    press(cx, select_all);
+    cx.simulate_input("0");
+    draw(cx);
+    assert!(root.read_with(cx, |root, _| {
+        crate::settings::audio_settings_error(
+            root.selected_config().unwrap(),
+            root.selected_source_metadata().as_ref(),
+        )
+        .is_some_and(|reason| reason.contains("0 Hz"))
+    }));
+    press(cx, select_all);
+    cx.simulate_input("44056");
+    draw(cx);
+    assert_eq!(selected(cx), Some(44_056));
+    assert_eq!(
+        root.read_with(cx, |root, _| root.text_input_value(AudioSampleRate)),
+        "44056"
+    );
+    click(cx, case.trigger);
+    press(cx, "a");
+    press(cx, "enter");
+    assert!(cx.debug_bounds("audio-track-custom-rate").is_none());
+    assert_eq!(selected(cx), None);
+    click(cx, case.trigger);
+    press(cx, "4");
+    press(cx, "8");
+    press(cx, "enter");
+    assert_eq!(selected(cx), Some(48_000));
+}
+
+#[test]
+fn sample_rate_editor_is_scoped_to_the_selected_source_and_audio_processing_mode() {
+    use crate::settings::ProcessingMode;
+    let case = SelectCase {
+        fixture: VisualFixture::SettingsAudioTracks,
+        trigger: "audio-track-sample-rate",
+        panel: "audio-track-sample-rate-options",
+    };
+    let mut app = TestAppContext::single();
+    let (root, cx) = select_window(&mut app, &case, ColorTheme::Dark, ScalePreset::Percent100);
+    click(cx, case.trigger);
+    assert!(
+        cx.debug_bounds(case.panel).is_none(),
+        "copy audio keeps its source frequency"
+    );
+    root.update(cx, |root, cx| {
+        root.update_selected_config(|config| {
+            config.processing_mode = ProcessingMode::CopyVideo;
+            config.audio_codec = "aac".into();
+            true
+        });
+        cx.notify();
+    });
+    draw(cx);
+    click(cx, case.trigger);
+    press(cx, "4");
+    press(cx, "4");
+    press(cx, "1");
+    press(cx, "enter");
+    click(cx, "audio-metadata-track");
+    click(cx, "audio-metadata-track-2");
+    click(cx, case.trigger);
+    press(cx, "4");
+    press(cx, "8");
+    press(cx, "enter");
+    root.read_with(cx, |root, _| {
+        let config = root.selected_config().unwrap();
+        assert_eq!(config.audio_track_overrides[&1].sample_rate, Some(44_100));
+        assert_eq!(config.audio_track_overrides[&2].sample_rate, Some(48_000));
+    });
 }

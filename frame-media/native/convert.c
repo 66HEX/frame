@@ -1,0 +1,556 @@
+#include "convert.h"
+#include <libavutil/intreadwrite.h>
+#include <libavutil/eval.h>
+#include <math.h>
+
+static int log_level(const char *name) {
+    if (!name || !strcmp(name, "info"))
+        return AV_LOG_INFO;
+    if (!strcmp(name, "error"))
+        return AV_LOG_ERROR;
+    if (!strcmp(name, "quiet"))
+        return AV_LOG_QUIET;
+    if (!strcmp(name, "warning"))
+        return AV_LOG_WARNING;
+    return AV_LOG_INFO;
+}
+
+static int set_metadata(AVDictionary **dict, const char *pair) {
+    const char *sep = strchr(pair, '=');
+    if (!sep || sep == pair)
+        return AVERROR(EINVAL);
+    char *key = av_strndup(pair, (size_t)(sep - pair));
+    if (!key)
+        return AVERROR(ENOMEM);
+    return av_dict_set(dict, key, sep[1] ? sep + 1 : NULL, AV_DICT_DONT_STRDUP_KEY);
+}
+
+static int input_for_map(ConvertTrack *t, const ConvertPlan *p, const char *map) {
+    if (map[0] == '[') {
+        if (!frame_plan_opt(p, "filter_complex"))
+            return AVERROR(EINVAL);
+        map = "0:v:0";
+    }
+    char *end;
+    long source = strtol(map, &end, 10);
+    if (end == map || *end != ':' || source < 0 || source >= p->sources_len)
+        return AVERROR(EINVAL);
+    t->input_num = (int)source;
+    t->source = &p->sources[source];
+    int err;
+    if (!t->source->input) {
+        err = avformat_open_input(&t->source->input, t->source->path, NULL, NULL);
+        if (err < 0 || (err = avformat_find_stream_info(t->source->input, NULL)) < 0)
+            return err;
+    }
+    t->input = t->source->input;
+    const char *selector = end + 1;
+    for (unsigned i = 0; i < t->input->nb_streams; ++i) {
+        AVStream *stream = t->input->streams[i];
+        size_t length = strlen(selector);
+        char *spec =
+            av_strndup(selector, length && selector[length - 1] == '?' ? length - 1 : length);
+        if (!spec)
+            return AVERROR(ENOMEM);
+        err = avformat_match_stream_specifier(t->input, stream, spec);
+        av_free(spec);
+        if (err < 0)
+            return err;
+        if (err > 0) {
+            t->src = stream;
+            break;
+        }
+    }
+    if (!t->src)
+        return AVERROR_STREAM_NOT_FOUND;
+    switch (t->src->codecpar->codec_type) {
+    case AVMEDIA_TYPE_VIDEO:
+        t->kind = 'v';
+        break;
+    case AVMEDIA_TYPE_AUDIO:
+        t->kind = 'a';
+        break;
+    case AVMEDIA_TYPE_SUBTITLE:
+        t->kind = 's';
+        break;
+    default:
+        return AVERROR(EINVAL);
+    }
+    int *mapped = av_realloc_array(t->source->mapped, t->source->mapped_count + 1, sizeof(*mapped));
+    if (!mapped)
+        return AVERROR(ENOMEM);
+    t->source->mapped = mapped;
+    t->source->mapped[t->source->mapped_count++] = t->src->index;
+    return 0;
+}
+
+static int configure_track(const ConvertPlan *p, ConvertTrack *t, AVFormatContext *out) {
+    t->source->origin_us =
+        frame_clock_origin(t->input, t->source->mapped, t->source->mapped_count, t->source->seek);
+    t->origin = av_rescale_q(t->source->origin_us, AV_TIME_BASE_Q, t->src->time_base);
+    t->duration =
+        p->duration < 0 ? -1 : av_rescale_q(p->duration, AV_TIME_BASE_Q, t->src->time_base);
+    t->strict = frame_plan_opt(p, "xerror") != NULL;
+    t->next = av_packet_alloc();
+    t->raw = av_packet_alloc();
+    t->filtered_input = av_packet_alloc();
+    t->dst = avformat_new_stream(out, NULL);
+    if (!t->next || !t->raw || !t->filtered_input || !t->dst)
+        return AVERROR(ENOMEM);
+    const char *codec = frame_track_opt(p, t, "c");
+    if (!codec)
+        return AVERROR_ENCODER_NOT_FOUND;
+    const char *limit = frame_track_opt(p, t, "frames");
+    t->frame_limit = limit ? strtoll(limit, NULL, 10) : -1;
+    int err;
+    if (!strcmp(codec, "copy")) {
+        if ((err = avcodec_parameters_copy(t->dst->codecpar, t->src->codecpar)) < 0)
+            return err;
+        const AVCodecParameters *par = t->src->codecpar;
+        unsigned default_tag;
+        if (out->oformat->codec_tag &&
+            av_codec_get_id(out->oformat->codec_tag, par->codec_tag) != par->codec_id &&
+            av_codec_get_tag2(out->oformat->codec_tag, par->codec_id, &default_tag))
+            t->dst->codecpar->codec_tag = 0;
+        t->dst->time_base = t->packet_tb = t->src->time_base;
+        t->dst->avg_frame_rate = t->src->avg_frame_rate;
+        t->dst->sample_aspect_ratio = t->src->sample_aspect_ratio;
+        const char *size = frame_track_opt(p, t, "frame_size");
+        if (size)
+            t->dst->codecpar->frame_size = atoi(size);
+        t->seen_key = frame_track_opt(p, t, "copyinkf") != NULL;
+    } else if ((err = frame_prepare_encoder(p, t, out, codec)) < 0)
+        return err;
+    const char *tag = frame_track_opt(p, t, "tag");
+    if (tag) {
+        if (!strncmp(tag, "0x", 2))
+            t->dst->codecpar->codec_tag = (uint32_t)strtoul(tag, NULL, 0);
+        else if (strlen(tag) == 4)
+            t->dst->codecpar->codec_tag = AV_RL32(tag);
+        else
+            return AVERROR(EINVAL);
+    }
+    const char *bsf = frame_track_opt(p, t, "bsf");
+    if (bsf) {
+        if ((err = av_bsf_list_parse_str(bsf, &t->bsf)) < 0 ||
+            (err = avcodec_parameters_copy(t->bsf->par_in, t->dst->codecpar)) < 0)
+            return err;
+        t->bsf->time_base_in = t->packet_tb;
+        if ((err = av_bsf_init(t->bsf)) < 0 ||
+            (err = avcodec_parameters_copy(t->dst->codecpar, t->bsf->par_out)) < 0)
+            return err;
+        t->dst->time_base = t->bsf->time_base_out;
+    }
+    if (!frame_plan_opt(p, "map_metadata") &&
+        (err = av_dict_copy(&t->dst->metadata, t->src->metadata, 0)) < 0)
+        return err;
+    t->dst->disposition = t->src->disposition;
+    for (int i = 0; i < p->options_len; i++) {
+        Option opt = p->options[i];
+        if (frame_option_matches(opt.name, "metadata:s", t)) {
+            if ((err = set_metadata(&t->dst->metadata, opt.value)) < 0)
+                return err;
+        } else if (frame_option_matches(opt.name, "disposition", t)) {
+            if (!strcmp(opt.value, "+default"))
+                t->dst->disposition |= AV_DISPOSITION_DEFAULT;
+            else if (!strcmp(opt.value, "-default"))
+                t->dst->disposition &= ~AV_DISPOSITION_DEFAULT;
+            else if (!strcmp(opt.value, "default+forced"))
+                t->dst->disposition = AV_DISPOSITION_DEFAULT | AV_DISPOSITION_FORCED;
+            else if (!strcmp(opt.value, "0"))
+                t->dst->disposition = 0;
+            else if ((err = av_disposition_from_string(opt.value)) < 0)
+                return err;
+            else
+                t->dst->disposition = err;
+        }
+    }
+    return 0;
+}
+
+static int copy_chapters(const ConvertPlan *p, const AVFormatContext *input, AVFormatContext *out) {
+    if (!input->nb_chapters)
+        return 0;
+    out->chapters = av_calloc(input->nb_chapters, sizeof(*out->chapters));
+    if (!out->chapters)
+        return AVERROR(ENOMEM);
+    for (unsigned i = 0; i < input->nb_chapters; i++) {
+        const AVChapter *src = input->chapters[i];
+        int64_t seek = av_rescale_q(p->sources[0].seek, AV_TIME_BASE_Q, src->time_base);
+        int64_t start = av_sat_sub64(src->start, seek), end = av_sat_sub64(src->end, seek);
+        if (p->duration >= 0)
+            end = FFMIN(end, av_rescale_q(p->duration, AV_TIME_BASE_Q, src->time_base));
+        if (end <= FFMAX(0, start))
+            continue;
+        AVChapter *dst = av_mallocz(sizeof(*dst));
+        if (!dst)
+            return AVERROR(ENOMEM);
+        out->chapters[out->nb_chapters++] = dst;
+        dst->id = src->id;
+        dst->time_base = src->time_base;
+        dst->start = FFMAX(0, start);
+        dst->end = end;
+        int err =
+            frame_plan_opt(p, "map_metadata") ? 0 : av_dict_copy(&dst->metadata, src->metadata, 0);
+        if (err < 0)
+            return err;
+    }
+    return 0;
+}
+
+/* A human-selected default always wins. Otherwise players should start with
+ * the first eligible mapped stream when several tracks share a media type. */
+static void set_implicit_defaults(const ConvertPlan *p, ConvertTrack *tracks, int count) {
+    int counts[AVMEDIA_TYPE_NB] = {0};
+    AVStream *first[AVMEDIA_TYPE_NB] = {0};
+    int marked[AVMEDIA_TYPE_NB] = {0};
+    int audio_default_edited = 0;
+    for (int i = 0; i < count; ++i) {
+        if (frame_track_opt(p, &tracks[i], "disposition")) {
+            if (tracks[i].kind != 'a')
+                return;
+            audio_default_edited = 1;
+        }
+        AVStream *stream = tracks[i].dst;
+        enum AVMediaType type = stream->codecpar->codec_type;
+        counts[type]++;
+        marked[type] |= stream->disposition & AV_DISPOSITION_DEFAULT;
+        if (!first[type] && !(stream->disposition & AV_DISPOSITION_ATTACHED_PIC))
+            first[type] = stream;
+    }
+    for (int type = 0; type < AVMEDIA_TYPE_NB; ++type)
+        if (!(type == AVMEDIA_TYPE_AUDIO && audio_default_edited) && counts[type] > 1 && first[type] && !marked[type])
+            first[type]->disposition |= AV_DISPOSITION_DEFAULT;
+}
+
+static int setup_muxer(const ConvertPlan *p, AVFormatContext *out, ConvertTrack *tracks, int count,
+                       void *io, AVIOContext **pb) {
+    int err = 0;
+    AVFormatContext *primary = NULL;
+    for (int i = 0; i < count; ++i)
+        if (tracks[i].input_num == 0) {
+            primary = tracks[i].input;
+            break;
+        }
+    if (primary) {
+        if (!frame_plan_opt(p, "map_metadata") &&
+            (err = av_dict_copy(&out->metadata, primary->metadata, 0)) < 0)
+            return err;
+        if ((err = copy_chapters(p, primary, out)) < 0)
+            return err;
+    }
+    AVDictionary *options = NULL;
+    static const char *const keys[] = {
+        "mpegts_m2ts_mode", "allow_raw_vfw", "loop", "hash", "format_version", NULL};
+    for (const char *const *k = keys; *k; k++) {
+        const char *v = frame_plan_opt(p, *k);
+        if (v && (err = av_dict_set(&options, *k, v, 0)) < 0)
+            goto done;
+    }
+    for (int i = 0; i < p->options_len; i++) {
+        if (!strcmp(p->options[i].name, "metadata") &&
+            (err = set_metadata(&out->metadata, p->options[i].value)) < 0)
+            goto done;
+    }
+    if (!(out->oformat->flags & AVFMT_NOFILE)) {
+        int seekable = frame_output_open(io, p->output, frame_plan_opt(p, "y") != NULL, 0);
+        if (seekable < 0) {
+            err = AVERROR(EIO);
+            goto done;
+        }
+        unsigned char *buf = av_malloc(32768);
+        if (!buf) {
+            err = AVERROR(ENOMEM);
+            goto done;
+        }
+        *pb = avio_alloc_context(buf, 32768, 1, io, NULL, frame_output_write,
+                                 seekable ? frame_output_seek : NULL);
+        if (!*pb) {
+            av_free(buf);
+            err = AVERROR(ENOMEM);
+            goto done;
+        }
+        out->pb = *pb;
+        out->flags |= AVFMT_FLAG_CUSTOM_IO;
+    }
+    err = avformat_write_header(out, &options);
+    if (err >= 0 && av_dict_count(options)) {
+        fprintf(stderr, "Muxer %s rejected option %s\n", out->oformat->name,
+                av_dict_get(options, "", NULL, AV_DICT_IGNORE_SUFFIX)->key);
+        err = AVERROR_OPTION_NOT_FOUND;
+    }
+done:
+    av_dict_free(&options);
+    return err;
+}
+
+static void free_track(ConvertTrack *t) {
+    av_packet_free(&t->next);
+    av_packet_free(&t->raw);
+    av_packet_free(&t->filtered_input);
+    av_frame_free(&t->frame);
+    av_frame_free(&t->audio_input);
+    av_frame_free(&t->cadence.previous);
+    av_frame_free(&t->cadence.current);
+    av_bsf_free(&t->bsf);
+    frame_render_close(&t->render);
+    avcodec_free_context(&t->encoder);
+    avcodec_free_context(&t->subdecoder);
+}
+
+static int64_t stream_end_us(const AVFormatContext *input, const AVStream *stream) {
+    if (stream->duration > 0) {
+        int64_t start = stream->start_time == AV_NOPTS_VALUE ? input->start_time :
+                        av_rescale_q(stream->start_time, stream->time_base, AV_TIME_BASE_Q);
+        int64_t duration = av_rescale_q(stream->duration, stream->time_base, AV_TIME_BASE_Q);
+        return av_sat_add64(start == AV_NOPTS_VALUE ? 0 : start, duration);
+    }
+    if (av_match_name("matroska", input->iformat->name)) {
+        const AVDictionaryEntry *tag = av_dict_get(stream->metadata, "DURATION", NULL, 0);
+        int64_t end;
+        // matroskaenc.c writes max(packet timestamp + packet duration) on
+        // the container timeline. A delayed track's start is already included.
+        if (tag && av_parse_time(&end, tag->value, 1) == 0 && end > 0) {
+            if (stream->start_time != AV_NOPTS_VALUE && stream->start_time != 0) {
+                // MKVToolNix track statistics record elapsed duration rather
+                // than the endpoint. Other writers have no common convention.
+                const AVDictionaryEntry *encoder = av_dict_get(input->metadata, "encoder", NULL, 0);
+                if (!encoder || !av_strstart(encoder->value, "Lavf", NULL)) {
+                    const AVDictionaryEntry *statistics = av_dict_get(stream->metadata, "_STATISTICS_WRITING_APP", NULL, 0);
+                    if (!statistics)
+                        return AV_NOPTS_VALUE;
+                    end = av_sat_add64(end, av_rescale_q(stream->start_time, stream->time_base, AV_TIME_BASE_Q));
+                }
+            }
+            return end;
+        }
+    }
+    return AV_NOPTS_VALUE;
+}
+
+static int all_timed_streams_selected(const AVFormatContext *input, const ConvertTrack *tracks,
+                                      int count) {
+    for (unsigned i = 0; i < input->nb_streams; ++i) {
+        const AVStream *stream = input->streams[i];
+        enum AVMediaType type = stream->codecpar->codec_type;
+        if ((type != AVMEDIA_TYPE_VIDEO && type != AVMEDIA_TYPE_AUDIO && type != AVMEDIA_TYPE_SUBTITLE)
+            || (stream->disposition & AV_DISPOSITION_ATTACHED_PIC))
+            continue;
+        int selected = 0;
+        for (int k = 0; k < count && !selected; ++k)
+            selected = tracks[k].src == stream;
+        if (!selected)
+            return 0;
+    }
+    return 1;
+}
+
+static int64_t output_duration(const ConvertPlan *p, const ConvertTrack *tracks, int count) {
+    int64_t longest = -1;
+    for (int i = 0; i < p->sources_len; ++i) {
+        const Source *source = &p->sources[i];
+        const AVFormatContext *input = source->input;
+        if (!input)
+            continue;
+        int64_t origin = frame_clock_origin(input, source->mapped, source->mapped_count, source->seek);
+        int missing = 0;
+        for (int k = 0; k < count; ++k) {
+            if (tracks[k].source != source)
+                continue;
+            int64_t end = stream_end_us(input, tracks[k].src);
+            if (end == AV_NOPTS_VALUE) {
+                missing = 1;
+            } else {
+                longest = FFMAX(longest, FFMAX(0, av_sat_sub64(end, origin)));
+            }
+        }
+        // The format duration can be set by an unselected track. It is
+        // meaningful only if every potentially longer stream is included.
+        if (missing && input->duration > 0 && all_timed_streams_selected(input, tracks, count)) {
+            int64_t start = input->start_time == AV_NOPTS_VALUE ? 0 : input->start_time;
+            // Matroska SegmentInfo.Duration is a timestamp measured from
+            // the Segment origin, including any initial timestamp gap.
+            int64_t end = av_match_name("matroska", input->iformat->name)
+                              ? input->duration : av_sat_add64(start, input->duration);
+            longest = FFMAX(longest, FFMAX(0, av_sat_sub64(end, origin)));
+        } else if (missing) {
+            return FFMAX(0, p->duration);
+        }
+    }
+    if (longest < 0)
+        return FFMAX(0, p->duration);
+    return p->duration < 0 ? longest : FFMIN(longest, p->duration);
+}
+
+static int analyze_video(ConvertPlan *p, const AVFormatContext *out, ConvertTrack *tracks,
+                         int count, int64_t duration, void *io) {
+    const ConvertTrack *video = NULL;
+    for (int i = 0; i < count; ++i) {
+        if (tracks[i].kind == 'v') {
+            if (video)
+                return AVERROR(EINVAL);
+            video = &tracks[i];
+        }
+    }
+    if (!video)
+        return AVERROR_STREAM_NOT_FOUND;
+    const char *name = frame_track_opt(p, video, "c");
+    const AVCodec *encoder = name ? frame_find_encoder(name) : NULL;
+    const char *codec = encoder ? encoder->name : NULL;
+    const char *rate = frame_track_opt(p, video, "b");
+    char *end = NULL;
+    double bitrate = rate ? av_strtod(rate, &end) : 0;
+    if (!codec ||
+        (strcmp(codec, "libx264") && strcmp(codec, "libx265") && strcmp(codec, "libvpx-vp9")) ||
+        !isfinite(bitrate) || bitrate <= 0 || *end || frame_track_opt(p, video, "crf") ||
+        frame_track_opt(p, video, "q")) {
+        fprintf(stderr, "Two-pass encoding requires a bitrate and libx264, libx265 "
+                        "or libvpx-vp9\n");
+        return AVERROR(EINVAL);
+    }
+    p->stats_path = frame_pass_path(io);
+    if (!p->stats_path)
+        return AVERROR(EIO);
+    AVFormatContext *analysis = NULL;
+    int err = avformat_alloc_output_context2(&analysis, out->oformat, NULL, NULL);
+    if (err < 0)
+        return err;
+    // input_for_map has only borrowed its stream/source pointers. Reuse all
+    // mapped clock facts, but give the analysis encoder its own filter graph,
+    // stream descriptor and cadence. Only the final pass opens the destination.
+    ConvertTrack first = *video;
+    first.analysis_io = io;
+    p->video_pass = 1;
+    int64_t video_duration = output_duration(p, video, 1);
+    frame_output_pass(io, 1, duration, video_duration, 1);
+    err = configure_track(p, &first, analysis);
+    if (err >= 0) {
+        while ((err = frame_read_encoded(&first, first.next)) == 0)
+            av_packet_unref(first.next);
+        if (err == AVERROR_EOF)
+            err = first.frames ? 0 : AVERROR_INVALIDDATA;
+        if (err >= 0 && !strcmp(codec, "libvpx-vp9")) {
+            const char *stats = first.encoder->stats_out;
+            if (!stats || !*stats)
+                err = AVERROR_INVALIDDATA;
+            else if (!(p->vpx_stats = av_strdup(stats)))
+                err = AVERROR(ENOMEM);
+        }
+    }
+    free_track(&first); // x264 and x265 finalize their stats files on close
+    avformat_free_context(analysis);
+    if (err >= 0) {
+        p->video_pass = 2;
+        frame_output_pass(io, 2, duration, video_duration, 1);
+    }
+    return err;
+}
+
+static int convert(ConvertPlan *p, AVFormatContext **outp, ConvertTrack *tracks, int *count,
+                   void *io, AVIOContext **pb) {
+    const char *format = frame_plan_opt(p, "f");
+    /* Still-image exports use the same exclusive file handle as containers.
+     * image2pipe writes exactly the encoded image packet to that handle. */
+    if (frame_plan_opt(p, "update"))
+        format = "image2pipe";
+    int err = avformat_alloc_output_context2(outp, NULL, format, p->output);
+    if (err < 0)
+        return err;
+    AVFormatContext *out = *outp;
+    if (!strcmp(out->oformat->name, "mpegts"))
+        out->max_delay = 700000;
+    for (int i = 0; i < p->options_len; i++) {
+        if (strcmp(p->options[i].name, "map"))
+            continue;
+        ConvertTrack *track = &tracks[(*count)++];
+        err = input_for_map(track, p, p->options[i].value);
+        if (err == AVERROR_STREAM_NOT_FOUND && strchr(p->options[i].value, '?')) {
+            memset(track, 0, sizeof(*track));
+            (*count)--;
+            continue;
+        }
+        if (err < 0)
+            return err;
+        for (int k = 0; k < *count - 1; ++k)
+            track->ordinal += tracks[k].kind == track->kind;
+    }
+    const int64_t duration = output_duration(p, tracks, *count);
+    const char *two_pass = frame_plan_opt(p, "frame_two_pass");
+    if (two_pass) {
+        if (strcmp(two_pass, "1"))
+            return AVERROR(EINVAL);
+        if ((err = analyze_video(p, out, tracks, *count, duration, io)) < 0)
+            return err;
+    } else {
+        int has_video = 0;
+        for (int i = 0; i < *count; ++i)
+            has_video |= tracks[i].kind == 'v';
+        frame_output_pass(io, 0, duration, 0, has_video);
+    }
+    const char *progress = frame_plan_opt(p, "progress");
+    if (progress && frame_output_open(io, progress, 1, 1) < 0)
+        return AVERROR(EIO);
+    for (int i = 0; i < *count; ++i) {
+        err = configure_track(p, &tracks[i], out);
+        if (err == AVERROR_EOF && *count == 1 && !strcmp(out->oformat->name, "null"))
+            return 0;
+        if (err < 0)
+            return err;
+    }
+    if (!*count)
+        return AVERROR_STREAM_NOT_FOUND;
+    set_implicit_defaults(p, tracks, *count);
+    if ((err = setup_muxer(p, out, tracks, *count, io, pb)) < 0)
+        return err;
+    if ((err = frame_mux_packets(p, tracks, *count, out, io)) < 0)
+        return err;
+    err = av_write_trailer(out);
+    if (*pb) {
+        avio_flush(*pb);
+        if (err >= 0 && (*pb)->error < 0)
+            err = (*pb)->error;
+    }
+    return err;
+}
+
+int frame_convert(int argc, const char *const *argv, void *io) {
+    ConvertPlan p = {0};
+    AVIOContext *pb = NULL;
+    AVFormatContext *out = NULL;
+    ConvertTrack *tracks = NULL;
+    int count = 0;
+    int err = frame_convert_parse(&p, argc, argv);
+    if (err >= 0) {
+        int level = log_level(frame_plan_opt(&p, "loglevel"));
+        av_log_set_level(level);
+        frame_output_quiet(io, level < AV_LOG_INFO || frame_plan_opt(&p, "nostats") != NULL);
+        tracks = av_calloc(p.options_len, sizeof(*tracks));
+        if (!tracks)
+            err = AVERROR(ENOMEM);
+        else
+            err = convert(&p, &out, tracks, &count, io, &pb);
+    }
+    for (int i = 0; i < count; ++i) {
+        ConvertTrack *t = &tracks[i];
+        free_track(t);
+    }
+    av_free(tracks);
+    if (pb) {
+        av_freep(&pb->buffer);
+        avio_context_free(&pb);
+    }
+    avformat_free_context(out);
+    for (int i = 0; i < p.sources_len; ++i) {
+        Source *source = &p.sources[i];
+        frame_clock_free(&source->clock);
+        av_packet_free(&source->pending);
+        av_free(source->mapped);
+        av_free(source->first_track);
+        avformat_close_input(&source->input);
+        frame_media_file_close(&source->shared_file);
+    }
+    av_free(p.sources);
+    av_free(p.options);
+    av_free(p.vpx_stats);
+    return err;
+}

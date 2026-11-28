@@ -3,6 +3,7 @@ use frame_core::error::ConversionError;
 use frame_core::types::DEFAULT_MAX_CONCURRENCY;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::{Duration, Instant};
 use sysinfo::{Pid, ProcessesToUpdate, System};
 
 mod publication;
@@ -25,6 +26,39 @@ struct ConversionProcessState {
 struct ActiveConversionProcess {
     pid: u32,
     start_time: u64,
+    clock: EncodingClock,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct EncodingClock {
+    started: Instant,
+    pause_started: Option<Instant>,
+    paused: Duration,
+}
+
+impl EncodingClock {
+    const fn new(started: Instant) -> Self {
+        Self {
+            started,
+            pause_started: None,
+            paused: Duration::ZERO,
+        }
+    }
+
+    fn elapsed(self, now: Instant) -> Duration {
+        self.pause_started
+            .unwrap_or(now)
+            .saturating_duration_since(self.started)
+            .saturating_sub(self.paused)
+    }
+
+    fn set_paused(&mut self, paused: bool, now: Instant) {
+        if paused {
+            self.pause_started.get_or_insert(now);
+        } else if let Some(start) = self.pause_started.take() {
+            self.paused += now.saturating_duration_since(start);
+        }
+    }
 }
 
 impl Default for ConversionProcessState {
@@ -105,6 +139,7 @@ impl ConversionProcessController {
         let process = ActiveConversionProcess {
             pid,
             start_time: process_start_time(pid).unwrap_or(0),
+            clock: EncodingClock::new(Instant::now()),
         };
         let was_cancelled = {
             let mut state = self.lock_state()?;
@@ -167,7 +202,8 @@ impl ConversionProcessController {
             .active_process(id)
             .ok_or_else(|| ConversionError::TaskNotFound(id.to_string()))?;
         ensure_same_process(id, process)?;
-        pause_process(process.pid)
+        pause_process(process.pid)?;
+        self.update_pause_clock(id, process.pid, true)
     }
 
     /// Resumes the process associated with a task.
@@ -181,7 +217,23 @@ impl ConversionProcessController {
             .active_process(id)
             .ok_or_else(|| ConversionError::TaskNotFound(id.to_string()))?;
         ensure_same_process(id, process)?;
-        resume_process(process.pid)
+        resume_process(process.pid)?;
+        self.update_pause_clock(id, process.pid, false)
+    }
+
+    fn update_pause_clock(&self, id: &str, pid: u32, paused: bool) -> Result<(), ConversionError> {
+        if let Some(process) = self.lock_state()?.active_processes.get_mut(id)
+            && process.pid == pid
+        {
+            process.clock.set_paused(paused, Instant::now());
+        }
+        Ok(())
+    }
+
+    pub(super) fn encoding_elapsed(&self, id: &str) -> Duration {
+        self.active_process(id).map_or(Duration::ZERO, |process| {
+            process.clock.elapsed(Instant::now())
+        })
     }
 
     /// Removes and returns the cancellation marker for a task.
@@ -239,12 +291,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn encoding_clock_excludes_pauses_and_resets_on_new_attempts() {
+        let start = Instant::now();
+        let at = |seconds| start + Duration::from_secs(seconds);
+        let mut clock = EncodingClock::new(start);
+        clock.set_paused(true, at(3));
+        clock.set_paused(true, at(5));
+        assert_eq!(clock.elapsed(at(20)), Duration::from_secs(3));
+        clock.set_paused(false, at(21));
+        clock.set_paused(false, at(22));
+        clock.set_paused(true, at(25));
+        clock.set_paused(false, at(30));
+        assert_eq!(clock.elapsed(at(32)), Duration::from_secs(9));
+        assert_eq!(EncodingClock::new(at(32)).elapsed(at(32)), Duration::ZERO);
+    }
+
+    #[test]
     fn ensure_same_process_accepts_current_process_identity() {
         let pid = std::process::id();
         let start_time =
             process_start_time(pid).expect("current process start time should be readable");
 
-        let result = ensure_same_process("self", ActiveConversionProcess { pid, start_time });
+        let result = ensure_same_process(
+            "self",
+            ActiveConversionProcess {
+                pid,
+                start_time,
+                clock: EncodingClock::new(Instant::now()),
+            },
+        );
 
         assert!(result.is_ok());
     }
@@ -304,6 +379,7 @@ mod tests {
             ActiveConversionProcess {
                 pid,
                 start_time: start_time.saturating_add(1),
+                clock: EncodingClock::new(Instant::now()),
             },
         )
         .expect_err("mismatched process identity should fail");

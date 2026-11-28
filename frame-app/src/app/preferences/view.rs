@@ -158,9 +158,8 @@ pub(in crate::app) fn app_settings_drawer(
                 .flex()
                 .flex_col()
                 .rounded(theme::ui_rem(theme::RADIUS_XL))
-                .bg(theme::shadows::surface_fill(palette.surface, palette))
+                .raised_panel_surface(palette)
                 .text_color(color(palette.token("card-foreground")))
-                .shadow(theme::shadows::ShadowLevel::Lg.shadows())
                 .opacity(progress)
                 .occlude()
                 .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {

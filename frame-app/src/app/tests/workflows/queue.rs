@@ -306,3 +306,24 @@ fn prepare_file_for_reconversion_keeps_source_settings_and_enables_start() {
     root.default_output_directory = Some(PathBuf::from("/tmp/frame-output"));
     assert!(root.app_state().can_start_conversion());
 }
+
+#[test]
+fn late_progress_and_completion_from_previous_batch_do_not_touch_a_reused_task_id() {
+    let mut root = FrameRoot::new();
+    root.file_queue
+        .add_file(FileItem::from_path("a", "/tmp/a.mov", 1));
+    root.file_queue.update_status("a", FileStatus::Queued, 0);
+    root.conversion_batch_generation = 2;
+    assert!(root.apply_batch_event(2, ConversionEvent::started("a")));
+    assert!(!root.apply_batch_event(1, ConversionEvent::progress("a", 99.0)));
+    assert!(!root.apply_batch_event(1, ConversionEvent::completed("a", "wrong.mov")));
+    let file = root.file_queue.file_by_id("a").unwrap();
+    assert_eq!(
+        (
+            file.status,
+            file.progress_percent,
+            file.output_path.as_ref()
+        ),
+        (FileStatus::Converting, 0, None)
+    );
+}

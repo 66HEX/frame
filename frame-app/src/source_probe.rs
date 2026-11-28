@@ -20,13 +20,17 @@ pub fn probe(
         command.program = program;
         command.interpreter = interpreter;
     }
-    command.args = ffprobe_json_args(&path.to_string_lossy())
-        .into_iter()
-        .map(Into::into)
-        .collect();
-    if let Some(argument) = command.args.last_mut() {
-        path.as_os_str().clone_into(argument);
-    }
+    command.args = crate::runtime_binaries::worker_subcommand(&command.program, "probe")
+        .map_or_else(
+            || {
+                let mut args: Vec<_> = ffprobe_json_args("").into_iter().map(Into::into).collect();
+                if let Some(argument) = args.last_mut() {
+                    path.as_os_str().clone_into(argument);
+                }
+                args
+            },
+            |probe| vec![probe.into(), "metadata".into(), path.as_os_str().to_owned()],
+        );
     probe_command(
         &command,
         path,
@@ -65,7 +69,7 @@ pub fn probe_command(
     }
     if !output.success {
         return Err(ConversionError::Probe(format!(
-            "ffprobe exited with code {:?}: {}",
+            "source probe exited with code {:?}: {}",
             output.code,
             String::from_utf8_lossy(&output.stderr.bytes).trim(),
         )));
@@ -150,11 +154,11 @@ mod tests {
         let Ok(mode) = std::env::var("FRAME_SOURCE_PROBE_MODE") else {
             return;
         };
-        std::fs::write(
-            std::env::var_os("FRAME_SOURCE_PROBE_MARKER").unwrap(),
-            std::process::id().to_string(),
-        )
-        .unwrap();
+        let marker =
+            std::path::PathBuf::from(std::env::var_os("FRAME_SOURCE_PROBE_MARKER").unwrap());
+        let staged = marker.with_extension("starting");
+        std::fs::write(&staged, std::process::id().to_string()).unwrap();
+        std::fs::rename(staged, marker).unwrap();
         if mode == "silent" {
             std::thread::sleep(Duration::from_secs(2));
         }
@@ -301,7 +305,7 @@ mod tests {
         wav.extend(vec![0; sample_bytes as usize]);
         std::fs::write(&path, wav).unwrap();
         let metadata = probe(
-            &crate::runtime_binaries::ffprobe_executable(),
+            &crate::runtime_binaries::media_worker_executable(),
             &path,
             || false,
         )

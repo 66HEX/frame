@@ -887,7 +887,7 @@ fn output_sections_start_closed_and_keyboard_enters_only_expanded_controls() {
         }));
         click(cx, "settings-tab-output");
         for id in [
-            "output-mode-reencode",
+            "output-video-mode-reencode",
             "resolution-tabs",
             "audio-codec-select",
             "subtitle-type",
@@ -899,14 +899,14 @@ fn output_sections_start_closed_and_keyboard_enters_only_expanded_controls() {
         press(cx, "tab");
         let general = focus(cx);
         press(cx, "space");
-        assert!(cx.debug_bounds("output-mode-reencode").is_some());
+        assert!(cx.debug_bounds("output-video-mode-reencode").is_some());
         assert_eq!(focus(cx), general);
         press(cx, "tab");
         assert_ne!(focus(cx), general);
         press(cx, "shift-tab");
         assert_eq!(focus(cx), general);
         press(cx, "enter");
-        assert!(cx.debug_bounds("output-mode-reencode").is_none());
+        assert!(cx.debug_bounds("output-video-mode-reencode").is_none());
         press(cx, "shift-tab");
         assert_eq!(focus(cx), tab);
         press(cx, "tab");

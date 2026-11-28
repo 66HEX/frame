@@ -76,7 +76,7 @@ pub fn preview_control_availability(input: PreviewControlInput<'_>) -> PreviewCo
             || media_kind == PreviewMediaKind::Unknown,
         overlay_available: media_kind == PreviewMediaKind::Video
             && !is_audio_only_output
-            && input.processing_mode != ProcessingMode::Copy
+            && !input.processing_mode.copies_video()
             && !media_rules::is_gif_container(container),
     }
 }

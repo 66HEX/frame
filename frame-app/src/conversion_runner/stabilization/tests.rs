@@ -103,6 +103,28 @@ mod controlled {
     }
 
     #[test]
+    fn missing_subtitle_filter_only_blocks_burn_in() {
+        let _serial = crate::bounded_process::serial_test_processes();
+        let runtime = FakeRuntime::new("printf 'Filters:\\n .. null V->V Pass video.\\n'");
+        let mut config = config();
+        config.subtitle_burn_path = Some("captions.srt".into());
+        let error = check_support(&config, runtime.executable(), || false).unwrap_err();
+        assert!(error.to_string().contains("subtitle burn-in"));
+        config.subtitle_burn_path = None;
+        config.selected_subtitle_tracks.push(1);
+        check_support(&config, "/unused", || panic!("unused")).unwrap();
+        config.subtitle_burn_path = Some("   ".into());
+        check_support(&config, "/unused", || panic!("unused")).unwrap();
+        config.subtitle_burn_path = Some("captions.srt".into());
+        let video_container = std::mem::replace(&mut config.container, "wav".into());
+        check_support(&config, "/unused", || panic!("unused")).unwrap();
+        config.container = video_container;
+        let runtime =
+            FakeRuntime::new("printf 'Filters:\\n .. subtitles V->V Render subtitles.\\n'");
+        check_support(&config, runtime.executable(), || false).unwrap();
+    }
+
+    #[test]
     fn stabilization_missing_capability_does_not_emit_export_lifecycle_events() {
         let _serial = crate::bounded_process::serial_test_processes();
         let runtime = FakeRuntime::new("printf 'Filters:\\n .. null V->V Pass video.\\n'");
@@ -127,7 +149,7 @@ mod controlled {
         let _serial = crate::bounded_process::serial_test_processes();
         let mut config = config();
         config.video_filters.stabilization_enabled = true;
-        let runtime = FakeRuntime::new(": > \"$0.started\"; exec /bin/sleep 30");
+        let runtime = FakeRuntime::new(": > \"$0.started\"; exec sleep 30");
         let marker = runtime.0.with_extension("started");
         let controller = ConversionProcessController::default();
         let worker_controller = controller.clone();

@@ -255,6 +255,14 @@ jobs:
         rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
         rustup default 1.95.0
         test "$(rustc --version | awk '{print $2}')" = "1.95.0"
+    - name: steps::restore_sdk_cache
+      id: sdk-cache
+      if: runner.os == 'macOS'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: target/media-sdk/archives
+        key: libav-macos-${{ runner.arch }}-${{ hashFiles('packaging/media/**', 'script/media-worker.py') }}
+        restore-keys: libav-macos-${{ runner.arch }}-
     - name: steps::install_cargo_bundle
       run: cargo install cargo-bundle --version 0.11.0 --locked
     - name: release::build_macos_x86_64_unsigned
@@ -273,7 +281,7 @@ jobs:
         path: target/Frame-x86_64-unsigned.app.zip
         if-no-files-found: error
         retention-days: 3
-    timeout-minutes: 90
+    timeout-minutes: 150
 
   package_macos_x86_64:
     runs-on: macos-26-intel
@@ -347,6 +355,14 @@ jobs:
         rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
         rustup default 1.95.0
         test "$(rustc --version | awk '{print $2}')" = "1.95.0"
+    - name: steps::restore_sdk_cache
+      id: sdk-cache
+      if: runner.os == 'macOS'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: target/media-sdk/archives
+        key: libav-macos-${{ runner.arch }}-${{ hashFiles('packaging/media/**', 'script/media-worker.py') }}
+        restore-keys: libav-macos-${{ runner.arch }}-
     - name: steps::install_cargo_bundle
       run: cargo install cargo-bundle --version 0.11.0 --locked
     - name: release::build_macos_aarch64_unsigned
@@ -365,7 +381,7 @@ jobs:
         path: target/Frame-aarch64-unsigned.app.zip
         if-no-files-found: error
         retention-days: 3
-    timeout-minutes: 90
+    timeout-minutes: 150
 
   package_macos_aarch64:
     runs-on: macos-26
@@ -1100,6 +1116,11 @@ jobs:
           perl -0pi -e 's/version = "[^"]+";/version = "$ENV{VERSION}";/' "$package_path"
           perl -0pi -e 's/hash = "[^"]+";/hash = lib.fakeHash;/' "$package_path"
           perl -0pi -e 's/cargoHash = "[^"]+";/cargoHash = lib.fakeHash;/' "$package_path"
+          # Preserve downstream changes, including nixfmt's shared cargoFlags list.
+          perl -0pi -e 's/(cargo(?:Build|Test)?Flags\s*=\s*\[[^\]]*?"frame-app")(?![^\]]*"frame-media")/$1 "--package" "frame-media"/gs' "$package_path"
+          perl -0pi -e 's/(\bbuildInputs\s*=\s*\[)(?![^\]]*\bffmpeg\b)/$1 ffmpeg/gs' "$package_path"
+          sed -i '/--prefix PATH : [$]{lib.makeBinPath \[ ffmpeg \]}/d; /--set FRAME_USE_SYSTEM_MEDIA_TOOLS 1/d' "$package_path"
+          grep -q '"frame-media"' "$package_path"
         else
           mkdir -p "$(dirname "$package_path")"
           cat > "$package_path" <<'EOF'
@@ -1135,8 +1156,8 @@ jobs:
           };
 
           cargoHash = lib.fakeHash;
-          cargoBuildFlags = [ "--package" "frame-app" ];
-          cargoTestFlags = [ "--package" "frame-app" ];
+          cargoBuildFlags = [ "--package" "frame-app" "--package" "frame-media" ];
+          cargoTestFlags = [ "--package" "frame-app" "--package" "frame-media" ];
 
           nativeBuildInputs = [
             makeWrapper
@@ -1144,6 +1165,7 @@ jobs:
           ];
 
           buildInputs = [
+            ffmpeg
             alsa-lib
             fontconfig
             freetype
@@ -1177,8 +1199,6 @@ jobs:
 
           postFixup = ''
             wrapProgram $out/bin/frame \
-              --prefix PATH : ${lib.makeBinPath [ ffmpeg ]} \
-              --set FRAME_USE_SYSTEM_MEDIA_TOOLS 1 \
               --set FRAME_UPDATE_EXPLANATION \
                 'This Nixpkgs build is managed by Nix. Install updates through your Nix profile, flake, or NixOS configuration.'
           '';
@@ -1240,6 +1260,10 @@ jobs:
         nix-build -A "$NIXPKGS_PACKAGE"
         nix-shell -I nixpkgs="$PWD" -p nixfmt-rfc-style --run "nixfmt $package_path maintainers/maintainer-list.nix"
         nix-build -A "$NIXPKGS_PACKAGE"
+        source_dir="$(nix-build --no-out-link -A "$NIXPKGS_PACKAGE.src")"
+        media_libs="$(nix-build --no-out-link -A ffmpeg.lib)"
+        python3 "$source_dir/script/media-worker.py" verify --target x86_64-unknown-linux-gnu \
+          --package-root result --bin-dir result/bin --lib-dir "$media_libs/lib"
         nix-build lib/tests/maintainers.nix
 
         git config user.name "github-actions[bot]"
@@ -1280,7 +1304,12 @@ jobs:
         path: nixpkgs
     - name: release::build_nixpkgs_aarch64
       working-directory: nixpkgs
-      run: nix-build -A "$NIXPKGS_PACKAGE"
+      run: |
+        nix-build -A "$NIXPKGS_PACKAGE"
+        source_dir="$(nix-build --no-out-link -A "$NIXPKGS_PACKAGE.src")"
+        media_libs="$(nix-build --no-out-link -A ffmpeg.lib)"
+        python3 "$source_dir/script/media-worker.py" verify --target aarch64-unknown-linux-gnu \
+          --package-root result --bin-dir result/bin --lib-dir "$media_libs/lib"
     timeout-minutes: 90
 
   publish_nixpkgs:

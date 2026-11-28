@@ -14,7 +14,7 @@ use crate::app::inspector::subtitles::tracks::{
     settings_external_subtitles_section, settings_subtitle_track_button,
 };
 use crate::app::root::FrameRoot;
-use crate::settings::{ConversionConfig, ProcessingMode, SourceMetadata, subtitle_track_options};
+use crate::settings::{ConversionConfig, SourceMetadata, subtitle_track_options};
 use crate::theme;
 use gpui::prelude::*;
 use gpui::{Context, FocusHandle, ScrollHandle, Window};
@@ -24,6 +24,7 @@ pub(in crate::app) struct SettingsSubtitlesTabState<'a> {
     pub(in crate::app) config: &'a ConversionConfig,
     pub(in crate::app) metadata: Option<&'a SourceMetadata>,
     pub(in crate::app) settings_disabled: bool,
+    pub(in crate::app) available_filters: &'a frame_core::capabilities::AvailableFilters,
     pub(in crate::app) available_encoders: &'a frame_core::capabilities::AvailableEncoders,
     pub(in crate::app) subtitle_fonts: &'a [String],
     pub(in crate::app) focuses: SettingsSubtitleFocuses<'a>,
@@ -200,8 +201,9 @@ pub(super) fn settings_burn_in_subtitles_content(
 ) -> gpui::Div {
     let config = state.config;
     let palette = state.palette;
-    let copy_mode = config.processing_mode == ProcessingMode::Copy;
-    let burn_in_disabled = state.settings_disabled || copy_mode;
+    let copy_mode = config.processing_mode.copies_video();
+    let burn_in_disabled =
+        state.settings_disabled || copy_mode || !state.available_filters.subtitles;
     let mut burn_in_section = settings_field("Burn-in file", palette)
         .child(settings_subtitle_file_button(
             SettingsSubtitleMode::BurnIn,
@@ -214,6 +216,8 @@ pub(super) fn settings_burn_in_subtitles_content(
         .child(settings_hint_text(
             if copy_mode {
                 "Burn-in subtitles are disabled in stream copy mode."
+            } else if !state.available_filters.subtitles {
+                "This media runtime does not support subtitle burn-in."
             } else {
                 "Burning in subtitles will force video re-encoding."
             },
@@ -223,7 +227,7 @@ pub(super) fn settings_burn_in_subtitles_content(
     if config.subtitle_burn_path.is_some() {
         burn_in_section = burn_in_section.child(settings_subtitle_burn_file_row(
             config,
-            burn_in_disabled,
+            state.settings_disabled || copy_mode,
             palette,
             window,
             cx,
@@ -232,7 +236,7 @@ pub(super) fn settings_burn_in_subtitles_content(
 
     let content = crate::app::components::frame_field_group().child(burn_in_section);
 
-    if copy_mode {
+    if copy_mode || !state.available_filters.subtitles {
         return content;
     }
 

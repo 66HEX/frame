@@ -6,7 +6,7 @@ the current project structure, local setup, checks, and pull request standards.
 ## Technical Stack
 
 - **Application:** Rust native desktop app built with GPUI-CE.
-- **Core Engine:** FFmpeg and FFprobe runtime binaries.
+- **Core Engine:** `frame-media`, an isolated process linked to the FFmpeg libraries.
 - **Shared Logic:** `frame-core` for conversion arguments, probing data,
   compatibility rules, filters, and validation.
 - **Native UI:** `frame-app` for the application shell, GPUI views, app state,
@@ -36,8 +36,7 @@ for desktop builds. Follow [the website setup guide](website/README.md).
 These dependencies are needed when building Frame from source. Release artifacts
 such as AppImage, DMG, and the Windows installer have their own bundled runtime
 layout. The production Flathub build is different: it builds from source inside
-the Freedesktop SDK and uses runtime-provided FFmpeg/FFprobe and media libraries
-instead of Frame's bundled media tools.
+the Freedesktop SDK and uses the media libraries provided by that runtime.
 
 #### macOS
 
@@ -63,9 +62,8 @@ xcodebuild -downloadComponent MetalToolchain
 xcrun metal --version
 ```
 
-No additional Homebrew packages are required for normal local development.
-`cargo xtask setup-ffmpeg` downloads the FFmpeg and FFprobe binaries used by the
-app during development.
+For a local build, provide the FFmpeg library SDK through pkg-config or set
+`FFMPEG_DIR` to its prefix. Subtitle burn-in requires libass support in libavfilter.
 
 #### Linux
 
@@ -161,14 +159,11 @@ choco install innosetup --no-progress -y
    cd frame
    ```
 
-2. **Setup FFmpeg binaries:**
+2. **Prepare the media libraries.**
 
-   The application looks for FFmpeg and FFprobe in `frame-app/resources/binaries/`
-   during local development. Download the platform-specific tools with:
-
-   ```bash
-   cargo xtask setup-ffmpeg
-   ```
+   Use an SDK with include and lib directories for the target. On Windows,
+   keep its DLLs on PATH during development. Use `cargo xtask setup-ffmpeg`
+   to prepare the independent reference tools when running differential tests.
 
 3. **Run in development mode:**
 
@@ -197,11 +192,9 @@ choco install innosetup --no-progress -y
    ```
 
    Windows app icons are embedded into the `.exe` by `frame-app/build.rs`
-   during the normal Cargo build, and the Windows package script places the
-   FFmpeg and FFprobe runtime files next to the app. The production Flathub
-   package is generated through `cargo xtask flathub-sources` and
-   `cargo xtask flathub-manifest`; it does not install Frame's bundled media
-   binaries.
+   during the normal Cargo build. The package script stages the media worker and
+   its runtime DLLs next to the app. The production Flathub manifest builds
+   the worker against the Freedesktop SDK.
 
 ## Development Workflow
 
@@ -216,6 +209,7 @@ choco install innosetup --no-progress -y
   rendering code where possible.
 - `frame-core/`: shared conversion/probe logic, FFmpeg argument construction,
   filters, media compatibility rules, and conversion event types.
+- `frame-media/` implements the linked media worker. See the [migration plan and parity matrix](MEDIA_MIGRATION.md).
 - `frame-core/media-rules.json`: source of truth for container, codec, stream,
   and pixel format compatibility.
 - `frame-updater/`: signed update verification and the installation helper.

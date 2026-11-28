@@ -22,13 +22,13 @@ jobs:
         include:
           - runner: ubuntu-22.04
             platform: linux-x86_64
-            archive_limit_mib: 80
+            archive_limit_mib: 180
           - runner: ubuntu-22.04-arm
             platform: linux-aarch64
-            archive_limit_mib: 80
+            archive_limit_mib: 180
           - runner: windows-2022
             platform: windows-x86_64
-            archive_limit_mib: 140
+            archive_limit_mib: 240
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     env:
@@ -51,6 +51,17 @@ __LINUX_SETUP__
       if: runner.os == 'Windows'
       shell: powershell
       run: '& .\script\qa\tests\test-windows-job.ps1 -Runs .\target\native-qa-helper'
+    - name: qa::setup_media_sdk
+      run: python script/media-worker.py setup-ci
+    - name: qa::build_media_worker
+      run: cargo build --release --locked --package frame-media
+    - name: qa::package_media_worker
+      shell: bash
+      run: |
+        bundle=target/native-qa-worker
+        libs="$bundle/lib"
+        if [[ "$RUNNER_OS" == Windows ]]; then libs="$bundle"; fi
+        python script/media-worker.py bundle --bin-dir "$bundle" --lib-dir "$libs"
     - name: qa::setup_media_tools
       run: cargo xtask setup-ffmpeg
     - name: qa::test_process_lifecycle
@@ -199,12 +210,12 @@ mod tests {
             .filter_map(|line| line.trim().strip_prefix("archive_limit_mib: "))
             .map(|value| value.parse::<u32>().unwrap())
             .collect::<Vec<_>>();
-        assert_eq!(limits, [80, 80, 140]);
-        assert_eq!(limits.iter().sum::<u32>(), 300);
+        assert_eq!(limits, [180, 180, 240]);
+        assert_eq!(limits.iter().sum::<u32>(), 600);
         for (platform, limit) in [
-            ("linux-x86_64", 80),
-            ("linux-aarch64", 80),
-            ("windows-x86_64", 140),
+            ("linux-x86_64", 180),
+            ("linux-aarch64", 180),
+            ("windows-x86_64", 240),
         ] {
             assert!(workflow.contains(&format!(
                 "platform: {platform}\n            archive_limit_mib: {limit}"

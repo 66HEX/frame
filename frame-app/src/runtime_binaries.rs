@@ -29,6 +29,42 @@ const SETUP_TARGET_TRIPLE: Option<&str> = Some("x86_64-pc-windows-msvc");
 )))]
 const SETUP_TARGET_TRIPLE: Option<&str> = None;
 
+/// Absolute sibling path in installed packages and `cargo xtask run`.
+/// Cargo's unit and integration test harnesses live one level below the binaries.
+#[must_use]
+pub fn media_worker_executable() -> String {
+    let name = if cfg!(windows) {
+        "frame-media.exe"
+    } else {
+        "frame-media"
+    };
+    env::current_exe()
+        .ok()
+        .and_then(|exe| {
+            let dir = exe.parent()?;
+            if dir.join(name).is_file() {
+                return Some(path_to_string(&dir.join(name)));
+            }
+            let dir = if dir
+                .file_name()
+                .is_some_and(|n| n == "deps" || n == "examples")
+            {
+                dir.parent()?
+            } else {
+                dir
+            };
+            Some(path_to_string(&dir.join(name)))
+        })
+        .unwrap_or_else(|| name.to_owned())
+}
+
+/// Explicit executable injection is used by process-lifecycle tests and reference runs.
+pub(crate) fn worker_subcommand(path: &Path, operation: &'static str) -> Option<&'static str> {
+    (path.file_name() == Some(std::ffi::OsStr::new("frame-media"))
+        || path.file_name() == Some(std::ffi::OsStr::new("frame-media.exe")))
+    .then_some(operation)
+}
+
 #[must_use]
 pub fn ffmpeg_executable() -> String {
     resolve_tool_executable(FFMPEG_ENV_VAR, "ffmpeg")

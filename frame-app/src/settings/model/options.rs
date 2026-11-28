@@ -1,10 +1,7 @@
-use crate::settings::model::processing::ProcessingMode;
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OutputModeOption {
-    pub mode: ProcessingMode,
+    pub copy: bool,
     pub label: &'static str,
-    pub hint: &'static str,
     pub is_selected: bool,
     pub is_disabled: bool,
 }
@@ -89,4 +86,17 @@ pub struct AudioTrackOption {
     pub bitrate: String,
     pub is_selected: bool,
     pub is_disabled: bool,
+}
+
+impl AudioTrackOption {
+    #[must_use]
+    pub fn description(&self) -> String {
+        if let Some(reason) = self.copy_error {
+            return reason.to_owned();
+        }
+        if self.bitrate.is_empty() {
+            return self.detail.clone();
+        }
+        format!("{} · {}", self.detail, self.bitrate)
+    }
 }

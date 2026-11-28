@@ -4,7 +4,6 @@ Param(
     [Parameter()][Alias('h')][switch]$Help,
     [Parameter()][switch]$PrepareOnly,
     [Parameter()][switch]$PackageOnly,
-    [Parameter()][switch]$SkipSetupFfmpeg,
     [Parameter()][Alias('a')][string]$Architecture
 )
 
@@ -20,7 +19,6 @@ function Help-Info {
     Write-Output "  -Install, -i      Run the installer after building."
     Write-Output "  -PrepareOnly      Build binaries and prepare installer inputs without signing."
     Write-Output "  -PackageOnly      Package prepared inputs without running Cargo."
-    Write-Output "  -SkipSetupFfmpeg  FFmpeg binaries are already prepared (used by cargo xtask)."
     Write-Output "  -Help, -h         Show this help message."
 }
 
@@ -52,12 +50,6 @@ $InnoDir = "$RepoRoot\target\inno\$Architecture"
 $InstallerPath = "$RepoRoot\target\Frame-$Architecture.exe"
 $Version = (Select-String -Path "$RepoRoot\frame-app\Cargo.toml" -Pattern '^version = "(.+)"$').Matches[0].Groups[1].Value
 
-function Get-RuntimeBinaryPaths {
-    @("ffmpeg-$Target.exe", "ffprobe-$Target.exe") | ForEach-Object {
-        "$RepoRoot\frame-app\resources\binaries\$_"
-    }
-}
-
 function Invoke-Checked {
     param(
         [Parameter(Mandatory = $true)][string]$Command,
@@ -84,17 +76,12 @@ function Prepare-BundleDirectory {
     if (Test-Path $InnoDir) {
         Remove-Item -Path $InnoDir -Recurse -Force
     }
-    New-Item -Path "$InnoDir\binaries" -ItemType Directory -Force | Out-Null
+    New-Item -Path $InnoDir -ItemType Directory -Force | Out-Null
 
     Copy-Item -Path "$ReleaseDir\frame.exe" -Destination "$InnoDir\Frame.exe" -Force
     Copy-Item -Path "$ReleaseDir\frame-update-helper.exe" -Destination "$InnoDir\frame-update-helper.exe" -Force
     Copy-Item -Path "$RepoRoot\frame-app\resources\app-icons\icon.ico" -Destination "$InnoDir\app-icon.ico" -Force
-    foreach ($source in Get-RuntimeBinaryPaths) {
-        if (-not (Test-Path $source)) {
-            throw "Missing runtime binary: $source"
-        }
-        Copy-Item -Path $source -Destination "$InnoDir\binaries\$(Split-Path -Leaf $source)" -Force
-    }
+    Invoke-Checked python "$RepoRoot/script/media-worker.py" bundle --target $Target --bin-dir $InnoDir --lib-dir $InnoDir --package-root $InnoDir
 }
 
 function Build-Installer {
@@ -125,22 +112,6 @@ function Build-Installer {
 if (-not $PackageOnly) {
     Initialize-VsDevShell
     Invoke-Checked rustup target add $Target
-    if ($SkipSetupFfmpeg) {
-        foreach ($runtimeBinary in Get-RuntimeBinaryPaths) {
-            if (-not (Test-Path $runtimeBinary)) {
-                throw "Missing runtime binary: $runtimeBinary"
-            }
-        }
-    }
-    else {
-        Push-Location $RepoRoot
-        try {
-            Invoke-Checked cargo xtask setup-ffmpeg --platform win32 --arch $Architecture
-        }
-        finally {
-            Pop-Location
-        }
-    }
     Invoke-Checked cargo build --manifest-path "$RepoRoot\frame-app\Cargo.toml" --release --target $Target
     Invoke-Checked cargo build --manifest-path "$RepoRoot\frame-updater\Cargo.toml" --release --target $Target --bin frame-update-helper
     Prepare-BundleDirectory
@@ -149,6 +120,10 @@ if (-not $PackageOnly) {
 # Check the application copied into the installer, including separately restored
 # PackageOnly inputs. The installer and updater helper have different entrypoints.
 & "$PSScriptRoot\check-windows-subsystem.ps1" -Path "$InnoDir\Frame.exe"
+
+if ($PackageOnly) {
+    Invoke-Checked python "$RepoRoot/script/media-worker.py" verify --target $Target --bin-dir $InnoDir --lib-dir $InnoDir --package-root $InnoDir
+}
 
 if ($PrepareOnly) {
     Write-Output "Prepared unsigned installer inputs at $InnoDir"

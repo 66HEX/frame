@@ -1,6 +1,6 @@
 use crate::settings::model::{
     AUDIO_CHANNEL_DEFINITIONS, AUDIO_CODEC_DEFINITIONS, AudioQualityRange, ConversionConfig,
-    DEFAULT_AUDIO_QUALITY, MAX_AUDIO_VOLUME, OPTIONAL_AUDIO_CODEC_DEFINITIONS, ProcessingMode,
+    DEFAULT_AUDIO_QUALITY, MAX_AUDIO_VOLUME, OPTIONAL_AUDIO_CODEC_DEFINITIONS,
 };
 use crate::settings::rules::{container_supports_audio, is_audio_codec_allowed_for_container};
 use crate::settings::updates::normalize::normalize_audio_encoding_settings;
@@ -22,7 +22,7 @@ pub fn toggle_audio_track_selection(config: &mut ConversionConfig, index: u32) -
 
 pub fn apply_audio_codec(config: &mut ConversionConfig, codec: &str) -> bool {
     let codec = codec.to_ascii_lowercase();
-    if config.processing_mode == ProcessingMode::Copy
+    if config.processing_mode.copies_audio()
         || !is_known_audio_codec(&codec)
         || !container_supports_audio(&config.container)
         || !is_audio_codec_allowed_for_container(&config.container, &codec)
@@ -41,7 +41,7 @@ pub fn apply_audio_codec(config: &mut ConversionConfig, codec: &str) -> bool {
 
 pub fn apply_audio_channels(config: &mut ConversionConfig, channels: &str) -> bool {
     let channels = channels.to_ascii_lowercase();
-    if config.processing_mode == ProcessingMode::Copy || !is_known_audio_channels(&channels) {
+    if config.processing_mode.copies_audio() || !is_known_audio_channels(&channels) {
         return false;
     }
 
@@ -54,7 +54,7 @@ pub fn apply_audio_channels(config: &mut ConversionConfig, channels: &str) -> bo
 }
 
 pub fn apply_audio_bitrate(config: &mut ConversionConfig, bitrate: &str) -> bool {
-    if config.processing_mode == ProcessingMode::Copy {
+    if config.processing_mode.copies_audio() {
         return false;
     }
 
@@ -69,7 +69,7 @@ pub fn apply_audio_bitrate(config: &mut ConversionConfig, bitrate: &str) -> bool
 
 pub fn apply_audio_bitrate_mode(config: &mut ConversionConfig, mode: &str) -> bool {
     let mode = mode.to_ascii_lowercase();
-    if config.processing_mode == ProcessingMode::Copy
+    if config.processing_mode.copies_audio()
         || !matches!(mode.as_str(), "bitrate" | "vbr")
         || (mode == "vbr" && !audio_codec_supports_vbr(&config.audio_codec))
     {
@@ -86,7 +86,7 @@ pub fn apply_audio_bitrate_mode(config: &mut ConversionConfig, mode: &str) -> bo
 }
 
 pub fn apply_opus_vbr(config: &mut ConversionConfig, enabled: bool) -> bool {
-    if config.processing_mode == ProcessingMode::Copy
+    if config.processing_mode.copies_audio()
         || config.audio_codec != "libopus"
         || config.opus_vbr == enabled
     {
@@ -98,7 +98,7 @@ pub fn apply_opus_vbr(config: &mut ConversionConfig, enabled: bool) -> bool {
 }
 
 pub fn apply_audio_quality(config: &mut ConversionConfig, quality: &str) -> bool {
-    if config.processing_mode == ProcessingMode::Copy {
+    if config.processing_mode.copies_audio() {
         return false;
     }
 
@@ -112,7 +112,7 @@ pub fn apply_audio_quality(config: &mut ConversionConfig, quality: &str) -> bool
 }
 
 pub fn apply_audio_volume(config: &mut ConversionConfig, volume: u32) -> bool {
-    if config.processing_mode == ProcessingMode::Copy {
+    if config.processing_mode.copies_audio() {
         return false;
     }
 
@@ -125,8 +125,8 @@ pub fn apply_audio_volume(config: &mut ConversionConfig, volume: u32) -> bool {
     true
 }
 
-pub fn apply_audio_normalize(config: &mut ConversionConfig, enabled: bool) -> bool {
-    if config.processing_mode == ProcessingMode::Copy {
+pub const fn apply_audio_normalize(config: &mut ConversionConfig, enabled: bool) -> bool {
+    if config.processing_mode.copies_audio() {
         return false;
     }
 
@@ -191,4 +191,52 @@ pub(super) fn is_known_audio_channels(channels: &str) -> bool {
     AUDIO_CHANNEL_DEFINITIONS
         .iter()
         .any(|definition| definition.id == channels)
+}
+
+pub fn apply_audio_track_default(config: &mut ConversionConfig, index: u32, value: bool) -> bool {
+    if !config.selected_audio_tracks.contains(&index)
+        || !frame_core::media_rules::audio_track_metadata_support(&config.container).default_flag
+    {
+        return false;
+    }
+    if value {
+        for (source, edit) in &mut config.audio_track_overrides {
+            if *source != index && edit.is_default == Some(true) {
+                edit.is_default = Some(false);
+            }
+        }
+    }
+    let current = &mut config
+        .audio_track_overrides
+        .entry(index)
+        .or_default()
+        .is_default;
+    let changed = *current != Some(value);
+    *current = Some(value);
+    changed
+}
+
+/// Store the per-source draft unchanged so validation can explain a rate the current encoder cannot use.
+pub fn apply_audio_sample_rate(
+    config: &mut ConversionConfig,
+    index: u32,
+    rate: Option<u32>,
+) -> bool {
+    if config.processing_mode.copies_audio()
+        || !container_supports_audio(&config.container)
+        || !config.selected_audio_tracks.contains(&index)
+        || config
+            .audio_track_overrides
+            .get(&index)
+            .and_then(|edit| edit.sample_rate)
+            == rate
+    {
+        return false;
+    }
+    let edit = config.audio_track_overrides.entry(index).or_default();
+    edit.sample_rate = rate;
+    if *edit == frame_core::types::AudioTrackOverride::default() {
+        config.audio_track_overrides.remove(&index);
+    }
+    true
 }

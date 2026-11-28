@@ -141,6 +141,54 @@ fn run_conversion_batch_with_control_accepts_empty_batches() {
 }
 
 #[test]
+fn missing_default_audio_track_is_reported_in_the_file_log() {
+    let sandbox = ConversionRunnerSandbox::new("missing-audio-default");
+    let source = sandbox.path("source.mp4");
+    fs::write(&source, []).unwrap();
+    let mut config = GpuiConversionConfig {
+        container: "mp4".into(),
+        selected_audio_tracks: vec![1],
+        ..GpuiConversionConfig::default()
+    };
+    config
+        .audio_track_overrides
+        .entry(1)
+        .or_default()
+        .is_default = Some(false);
+    let task = ConversionTask {
+        id: "source".into(),
+        file_path: source.to_string_lossy().into_owned(),
+        output_directory: sandbox.root.to_string_lossy().into_owned(),
+        output_name: Some("result.mp4".into()),
+        config: core_config_from_gpui(&config),
+    };
+    let mut queue = crate::file_queue::FileQueue::new();
+    queue.add_file(crate::file_queue::FileItem::from_path(
+        &task.id,
+        &task.file_path,
+        0,
+    ));
+    let mut events = crate::conversion_events::ConversionEventState::new();
+    run_conversion_batch_with_control(
+        vec![task],
+        &ConversionProcessController::default(),
+        |event| {
+            events.apply_conversion_event(&mut queue, event);
+        },
+    )
+    .unwrap();
+    assert!(
+        events
+            .logs_for("source")
+            .iter()
+            .any(|line| line.starts_with("[ERROR]")
+                && line.contains(
+                    "MP4 requires a default audio track. Set Default to Yes on one track."
+                ))
+    );
+}
+
+#[test]
 fn next_batch_launch_count_respects_live_concurrency_limit() {
     assert_eq!(next_batch_launch_count(5, 1, 2), 1);
     assert_eq!(next_batch_launch_count(5, 2, 2), 0);

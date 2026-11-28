@@ -90,9 +90,10 @@ impl Runtime {
         if let Some(interpreter) = &command.interpreter {
             identity_paths.push(interpreter.clone());
         }
-        #[cfg(not(windows))]
-        let _ = &mut identity_paths;
         let cacheable = identity_paths.len() == 1 && native_header(&command.program);
+        if crate::runtime_binaries::worker_subcommand(&command.program, "capabilities").is_some() {
+            identity_paths.extend(worker_library_paths(&command)?);
+        }
         let observed_identity = fingerprint(&identity_paths);
         let identity = cacheable.then(|| observed_identity.clone()).flatten();
         Ok(Self {
@@ -108,6 +109,54 @@ impl Runtime {
             .as_ref()
             .is_none_or(|identity| fingerprint(&self.identity_paths).as_ref() == Some(identity))
     }
+}
+
+fn worker_library_paths(worker: &CommandSpec) -> io::Result<Vec<PathBuf>> {
+    use crate::bounded_process::{ExecutionDomain, Limits};
+    static QUERIES: ExecutionDomain = ExecutionDomain::new();
+    let mut query = worker.clone();
+    query.args = ["capabilities", "libraries"].map(Into::into).into();
+    let result = QUERIES
+        .run(
+            &query,
+            &[],
+            Limits {
+                stdout_bytes: 1024 * 1024,
+                ..Limits::default()
+            },
+            || false,
+        )
+        .map_err(io::Error::other)?;
+    if !result.success || result.stdout.truncated {
+        return Err(io::Error::other(format!(
+            "Could not identify the loaded media libraries. {}",
+            String::from_utf8_lossy(&result.stderr.bytes).trim()
+        )));
+    }
+    let bytes = result
+        .stdout
+        .bytes
+        .strip_suffix(&[0])
+        .ok_or_else(|| io::Error::other("Incomplete library paths"))?;
+    let paths: Vec<_> = bytes
+        .split(|b| *b == 0)
+        .map(|bytes| {
+            #[cfg(unix)]
+            let path = {
+                use std::os::unix::ffi::OsStrExt;
+                Path::new(std::ffi::OsStr::from_bytes(bytes))
+            };
+            #[cfg(windows)]
+            let path = Path::new(std::str::from_utf8(bytes).map_err(io::Error::other)?);
+            path.is_absolute()
+                .then(|| path.to_owned())
+                .ok_or_else(|| io::Error::other("Missing absolute media library path"))
+        })
+        .collect::<io::Result<_>>()?;
+    if paths.len() != 6 {
+        return Err(io::Error::other("Incomplete media library set"));
+    }
+    Ok(paths)
 }
 
 fn fingerprint(paths: &[PathBuf]) -> Option<RuntimeIdentity> {

@@ -9,7 +9,8 @@ mod subtitles;
 mod video;
 
 pub use audio::{
-    audio_channel_options, audio_codec_options, audio_settings_error, audio_track_options,
+    audio_channel_options, audio_codec_options, audio_settings_error, audio_settings_hint,
+    audio_track_is_default, audio_track_options, audio_track_sample_rate_error,
     mp2_original_channels_are_unsupported, stereo_width_available,
 };
 pub use images::{
@@ -22,7 +23,7 @@ pub use metadata::{
 };
 pub use output::{
     is_container_compatible_for_stream_copy, output_container_options,
-    output_processing_mode_options, visible_output_containers,
+    output_processing_mode_options, processing_stream_available, visible_output_containers,
 };
 pub use presets::{
     configs_match, create_custom_preset, default_presets, preset_is_compatible, preset_options,

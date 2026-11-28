@@ -388,3 +388,263 @@ fn header_and_row_columns_align_horizontally_across_scales_and_widths() {
         }
     }
 }
+
+const STATS_TRIGGER: &str = "file-row-action-stats-fixture-preview";
+const STATS_DIALOG: &str = "encoding-stats-dialog";
+const STATS_CLOSE: &str = "encoding-stats-close";
+
+fn workspace_regions(cx: &mut VisualTestContext) -> [Bounds<Pixels>; 4] {
+    [
+        "preview-viewport",
+        "file-list-header-col-name",
+        "file-list-body",
+        "file-list-row-fixture-preview",
+    ]
+    .map(|id| {
+        cx.debug_bounds(id)
+            .unwrap_or_else(|| panic!("missing {id}"))
+    })
+}
+
+#[test]
+fn encoding_stats_never_resize_the_preview_or_queue_during_conversion() {
+    use crate::file_queue::FileStatus;
+    use frame_core::events::ConversionEvent;
+    use frame_core::types::{EncodingStats, ProgressPayload};
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = test_window(&mut app, VisualFixture::PreviewReady, scale);
+        cx.simulate_resize(size(px(1200.0), px(800.0)));
+        draw(cx);
+        let idle = workspace_regions(cx);
+        assert_first_row_visible(cx);
+        assert!(cx.debug_bounds(STATS_TRIGGER).is_none());
+
+        root.update(cx, |root, cx| {
+            root.file_queue
+                .update_status("fixture-preview", FileStatus::Queued, 0);
+            root.apply_conversion_event(ConversionEvent::started("fixture-preview"));
+            root.apply_conversion_event(ConversionEvent::progress("fixture-preview", 42.0));
+            cx.notify();
+        });
+        draw(cx);
+        assert_eq!(workspace_regions(cx), idle);
+        assert!(cx.debug_bounds("encoding-stats").is_none());
+
+        click(cx, STATS_TRIGGER);
+        let dialog = cx
+            .debug_bounds(STATS_DIALOG)
+            .expect("opened statistics dialog");
+        assert!(dialog.top() >= px(0.0) && dialog.left() >= px(0.0));
+        assert!(dialog.bottom() <= px(800.0) && dialog.right() <= px(1200.0));
+        assert_eq!(workspace_regions(cx), idle);
+        let close_button = cx.debug_bounds(STATS_CLOSE).unwrap();
+        root.update(cx, |root, cx| {
+            root.apply_conversion_event(ConversionEvent::Progress(ProgressPayload {
+                id: "fixture-preview".into(),
+                progress: 73.0,
+                stats: Some(EncodingStats {
+                    frame: Some(3712),
+                    fps: Some(38.4),
+                    size_bytes: Some(100_000_000),
+                    bitrate_kbps: Some(5200.0),
+                    speed: Some(1.6),
+                    media_seconds: 108.0,
+                    elapsed_seconds: 67.5,
+                    eta_seconds: Some(24.0),
+                    duration_seconds: Some(148.0),
+                    pass: Some(2),
+                }),
+            }));
+            cx.notify();
+        });
+        draw(cx);
+        assert_eq!(cx.debug_bounds(STATS_DIALOG), Some(dialog));
+        assert_eq!(cx.debug_bounds(STATS_CLOSE), Some(close_button));
+        assert_eq!(workspace_regions(cx), idle);
+
+        click(cx, STATS_CLOSE);
+        assert!(cx.debug_bounds(STATS_DIALOG).is_none());
+        assert_eq!(workspace_regions(cx), idle);
+        click(cx, STATS_TRIGGER);
+        let overlay = cx.debug_bounds("encoding-stats-overlay").unwrap();
+        let outside = overlay.origin + point(px(2.0), px(2.0));
+        assert!(!dialog.contains(&outside));
+        cx.simulate_click(outside, Modifiers::default());
+        draw(cx);
+        assert!(cx.debug_bounds(STATS_DIALOG).is_none());
+        assert_eq!(workspace_regions(cx), idle);
+        root.update(cx, |root, cx| {
+            root.apply_conversion_event(ConversionEvent::cancelled("fixture-preview"));
+            cx.notify();
+        });
+        draw(cx);
+        assert!(cx.debug_bounds(STATS_TRIGGER).is_none());
+        assert_eq!(workspace_regions(cx), idle);
+    }
+}
+
+fn assert_fixture_stats(cx: &mut VisualTestContext) {
+    cx.update(|window, _| {
+        let tree = window.a11y_tree().unwrap();
+        assert!(
+            tree.nodes
+                .iter()
+                .any(|(_, node)| node.role() == gpui::Role::Dialog
+                    && node.is_modal()
+                    && node.label() == Some("Encoding statistics"))
+        );
+        let (_, group) = tree
+            .nodes
+            .iter()
+            .find(|(_, node)| node.label() == Some("Encoding statistics for source_render.mov"))
+            .expect("statistics for the requested file");
+        let description = group.description().expect("spoken metrics");
+        for detail in [
+            "ETA 0:16",
+            "Media time 0:57 / 1:30",
+            "Frame 1389",
+            "FPS 48.2",
+            "Speed 2.01×",
+            "Bitrate 5820 kb/s",
+            "Size ",
+            "Elapsed 0:28",
+        ] {
+            assert!(description.contains(detail), "{description}");
+        }
+        let (_, bar) = tree
+            .nodes
+            .iter()
+            .find(|(_, node)| {
+                node.role() == gpui::Role::ProgressIndicator
+                    && node.label() == Some("Encoding progress")
+            })
+            .expect("accessible progress indicator");
+        assert_eq!(bar.numeric_value(), Some(64.0));
+    });
+}
+
+#[test]
+fn encoding_stats_dialog_exposes_live_metrics_and_restores_keyboard_focus() {
+    use frame_core::events::ConversionEvent;
+    let mut app = TestAppContext::single();
+    let (root, cx) = test_window(
+        &mut app,
+        VisualFixture::WorkspaceEncodingStats,
+        ScalePreset::Percent100,
+    );
+    cx.update(|window, _| window.set_a11y_forced(true));
+    draw(cx);
+    assert!(cx.debug_bounds(STATS_DIALOG).is_none());
+    a11y_focus(cx, "File queue");
+    for _ in 0..20 {
+        press(cx, "tab");
+        if keyboard_tests::focused_node(cx)["aria"]["label"] == "Show encoding statistics" {
+            break;
+        }
+    }
+    assert_eq!(
+        keyboard_tests::focused_node(cx)["aria"]["label"],
+        "Show encoding statistics"
+    );
+    let trigger_focus = focus(cx);
+    for key in ["enter", "space"] {
+        press(cx, key);
+        assert!(cx.debug_bounds(STATS_DIALOG).is_some());
+        let close_focus = focus(cx);
+        assert_ne!(close_focus, trigger_focus);
+        for key in ["tab", "shift-tab"] {
+            press(cx, key);
+            assert_eq!(
+                keyboard_tests::focused_node(cx)["aria"]["label"],
+                "Encoding statistics for source_render.mov"
+            );
+            press(cx, key);
+            assert_eq!(focus(cx), close_focus);
+        }
+        assert_fixture_stats(cx);
+        press(cx, "escape");
+        assert!(cx.debug_bounds(STATS_DIALOG).is_none());
+        assert_eq!(focus(cx), trigger_focus);
+    }
+    press(cx, "enter");
+    root.update(cx, |root, cx| {
+        root.apply_conversion_event(ConversionEvent::completed(
+            "fixture-preview",
+            "/tmp/done.mov",
+        ));
+        cx.notify();
+    });
+    draw(cx);
+    assert!(cx.debug_bounds(STATS_DIALOG).is_some());
+    assert!(cx.debug_bounds(STATS_TRIGGER).is_none());
+    cx.update(|window, _| {
+        let (_, group) = window
+            .a11y_tree()
+            .unwrap()
+            .nodes
+            .iter()
+            .find(|(_, node)| node.label() == Some("Encoding statistics for source_render.mov"))
+            .unwrap();
+        let description = group.description().unwrap();
+        assert!(description.contains("Completed"), "{description}");
+        assert!(description.contains("Frame 1389"), "{description}");
+    });
+    click(cx, STATS_CLOSE);
+    assert!(cx.debug_bounds(STATS_DIALOG).is_none());
+}
+
+#[test]
+fn encoding_stats_open_for_the_requested_queue_row() {
+    use crate::file_queue::{FileItem, FileStatus};
+    use frame_core::events::ConversionEvent;
+    let mut app = TestAppContext::single();
+    let (root, cx) = test_window(
+        &mut app,
+        VisualFixture::WorkspaceEncodingStats,
+        ScalePreset::Percent100,
+    );
+    root.update(cx, |root, cx| {
+        root.file_queue
+            .add_file(FileItem::from_path("other", "/tmp/second.mov", 10));
+        root.file_queue
+            .update_status("other", FileStatus::Queued, 0);
+        root.apply_conversion_event(ConversionEvent::started("other"));
+        root.apply_conversion_event(ConversionEvent::progress("other", 17.0));
+        cx.notify();
+    });
+    cx.update(|window, _| window.set_a11y_forced(true));
+    draw(cx);
+    assert_eq!(selected(&root, cx), "fixture-preview");
+    click(cx, "file-row-action-stats-other");
+    assert_eq!(selected(&root, cx), "fixture-preview");
+    cx.update(|window, _| {
+        let tree = window.a11y_tree().unwrap();
+        assert!(
+            tree.nodes
+                .iter()
+                .any(|(_, node)| node.label() == Some("Encoding statistics for second.mov"))
+        );
+        let (_, bar) = tree
+            .nodes
+            .iter()
+            .find(|(_, node)| node.label() == Some("Encoding progress"))
+            .unwrap();
+        assert_eq!(bar.numeric_value(), Some(17.0));
+    });
+    root.update(cx, |root, cx| {
+        root.apply_conversion_event(ConversionEvent::progress("other", 31.0));
+        cx.notify();
+    });
+    draw(cx);
+    cx.update(|window, _| {
+        let (_, bar) = window
+            .a11y_tree()
+            .unwrap()
+            .nodes
+            .iter()
+            .find(|(_, node)| node.label() == Some("Encoding progress"))
+            .unwrap();
+        assert_eq!(bar.numeric_value(), Some(31.0));
+    });
+}

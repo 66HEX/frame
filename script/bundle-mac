@@ -74,7 +74,6 @@ case "$target_triple" in
 esac
 
 if [[ "$package_only" = false ]]; then
-	(cd "$repo_root" && cargo xtask setup-ffmpeg --platform darwin --arch "$arch_suffix")
 	rustup target add "$target_triple"
 
 	(
@@ -102,21 +101,22 @@ if [[ -z "$app_bundle" ]]; then
 fi
 
 if [[ "$package_only" = false ]]; then
+	# cargo-bundle can reuse a bundle directory created by an older release.
+	rm -rf "$app_bundle/Contents/Resources/resources/binaries"
 	helper_binary="$target_dir/$target_triple/$target_profile/frame-update-helper"
 	if [[ ! -x "$helper_binary" ]]; then
 		echo "Missing update helper binary: $helper_binary" >&2
 		exit 1
 	fi
 	cp "$helper_binary" "$app_bundle/Contents/MacOS/frame-update-helper"
+	python3 "$repo_root/script/media-worker.py" bundle --target "$target_triple" --profile "$target_profile" \
+		--bin-dir "$app_bundle/Contents/MacOS" --lib-dir "$app_bundle/Contents/Frameworks" --package-root "$app_bundle"
+	mv "$app_bundle/Contents/MacOS/frame-media.LICENSE" "$app_bundle/Contents/Resources/frame-media.LICENSE"
 fi
 
-resource_dir="$app_bundle/Contents/Resources/resources/binaries"
-for binary in "ffmpeg-$target_triple" "ffprobe-$target_triple"; do
-	if [[ ! -x "$resource_dir/$binary" ]]; then
-		echo "Missing bundled runtime binary: $resource_dir/$binary" >&2
-		exit 1
-	fi
-done
+if [[ "$package_only" = true ]]; then
+	python3 "$repo_root/script/media-worker.py" verify --target "$target_triple" --bin-dir "$app_bundle/Contents/MacOS" --lib-dir "$app_bundle/Contents/Frameworks" --package-root "$app_bundle"
+fi
 
 if [[ "$build_only" = true ]]; then
 	echo "Prepared unsigned application bundle: $app_bundle"
@@ -209,6 +209,8 @@ if [[ "$can_notarize" = true ]]; then
 	rm "$notarization_key_file"
 	"$xcode_bin_dir_path/stapler" staple "$dmg_file_path"
 fi
+
+python3 "$repo_root/script/media-worker.py" verify-macos-images --dmg "$dmg_file_path" --archive "$app_zip_file_path"
 
 if [[ "$local_install" = true ]]; then
 	open "$dmg_file_path"

@@ -4,6 +4,11 @@ use crate::utils::{
     map_vp9_speed,
 };
 
+#[must_use]
+pub fn supports_video_two_pass(codec: &str, bitrate_mode: &str) -> bool {
+    bitrate_mode == "bitrate" && matches!(codec, "libx264" | "libx265" | "vp9")
+}
+
 pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
     let is_still_image_codec = matches!(
         config.video_codec.as_str(),

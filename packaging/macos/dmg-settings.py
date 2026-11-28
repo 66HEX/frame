@@ -5,7 +5,8 @@ format = "UDZO"
 filesystem = "HFS+"
 files = [(application, "Frame.app")]
 symlinks = {"Applications": "/Applications"}
-hide_extensions = ["Frame.app"]
+# Finder uses its normal app extension setting. SetFile would add FinderInfo
+# to the signed bundle after signing and invalidate strict verification.
 
 # Finder includes its 32 pt title bar in the stored window bounds. Keep the
 # content area at 600x380 pt so the Retina background is not cropped.

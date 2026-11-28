@@ -1,7 +1,7 @@
 use crate::settings::model::{
     AUDIO_CHANNEL_DEFINITIONS, AUDIO_CODEC_DEFINITIONS, AudioChannelOption, AudioCodecOption,
     AudioTrack, AudioTrackOption, ConversionConfig, OPTIONAL_AUDIO_CODEC_DEFINITIONS,
-    ProcessingMode, SourceMetadata,
+    SourceMetadata,
 };
 use crate::settings::rules::is_audio_codec_allowed_for_container;
 use crate::settings::source_info::{audio_track_bitrate, audio_track_detail, display_source_value};
@@ -18,7 +18,7 @@ pub fn audio_codec_options(
     available_encoders: &AvailableEncoders,
     disabled: bool,
 ) -> Vec<AudioCodecOption> {
-    let encode_controls_disabled = disabled || config.processing_mode == ProcessingMode::Copy;
+    let encode_controls_disabled = disabled || config.processing_mode.copies_audio();
 
     AUDIO_CODEC_DEFINITIONS
         .iter()
@@ -53,7 +53,7 @@ pub fn audio_channel_options(
     metadata: Option<&SourceMetadata>,
     disabled: bool,
 ) -> [AudioChannelOption; 3] {
-    let disabled = disabled || config.processing_mode == ProcessingMode::Copy;
+    let disabled = disabled || config.processing_mode.copies_audio();
     let original_is_unsupported = mp2_original_channels_are_unsupported(config, metadata)
         || (config.audio_codec == "libopus"
             && metadata.is_some_and(|metadata| {
@@ -86,6 +86,19 @@ pub fn audio_settings_error(
     config: &ConversionConfig,
     metadata: Option<&SourceMetadata>,
 ) -> Option<String> {
+    frame_core::audio_rules::missing_audio_default_error(
+        &config.container,
+        &config.selected_audio_tracks,
+        &config.audio_track_overrides,
+    )
+    .or_else(|| audio_settings_hint(config, metadata))
+}
+
+#[must_use]
+pub fn audio_settings_hint(
+    config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
+) -> Option<String> {
     if !frame_core::media_rules::container_supports_audio(&config.container) {
         return None;
     }
@@ -94,13 +107,37 @@ pub fn audio_settings_error(
     {
         return Some(reason);
     }
+    if let Some(reason) = frame_core::audio_rules::audio_track_metadata_edit_error(
+        &config.container,
+        &config.selected_audio_tracks,
+        &config.audio_track_overrides,
+        config.metadata.mode == crate::settings::MetadataMode::Preserve,
+    ) {
+        return Some(reason);
+    }
+    if !config.processing_mode.copies_audio() {
+        for index in &config.selected_audio_tracks {
+            if let Some(rate) = config
+                .audio_track_overrides
+                .get(index)
+                .and_then(|edit| edit.sample_rate)
+                && let Some(reason) = audio_track_sample_rate_error(
+                    config,
+                    metadata.and_then(|source| source.audio_track(*index)),
+                    rate,
+                )
+            {
+                return Some(format!("Track #{index}: {reason}"));
+            }
+        }
+    }
     let metadata = metadata?;
     for track in metadata
         .audio_tracks
         .iter()
         .filter(|track| config.selected_audio_tracks.contains(&track.index))
     {
-        let reason = if config.processing_mode == ProcessingMode::Copy {
+        let reason = if config.processing_mode.copies_audio() {
             audio_copy_error_for_track(&config.container, metadata, track).map(str::to_string)
         } else if config.audio_codec == "libopus" {
             let channels = effective_audio_channels(
@@ -181,7 +218,8 @@ pub fn mp2_original_channels_are_unsupported(
     config: &ConversionConfig,
     metadata: Option<&SourceMetadata>,
 ) -> bool {
-    config.audio_codec == "mp2"
+    !config.processing_mode.copies_audio()
+        && config.audio_codec == "mp2"
         && metadata.is_some_and(|metadata| {
             metadata.audio_tracks.iter().any(|track| {
                 config.selected_audio_tracks.contains(&track.index)
@@ -210,7 +248,7 @@ pub fn audio_track_options(
                     index_label: format!("#{}", track.index),
                     codec: display_source_value(Some(&track.codec)),
                     detail: audio_track_detail(track),
-                    copy_error: (config.processing_mode == ProcessingMode::Copy
+                    copy_error: (config.processing_mode.copies_audio()
                         && config.selected_audio_tracks.contains(&track.index))
                     .then(|| audio_copy_error_for_track(&config.container, metadata, track))
                     .flatten(),
@@ -221,4 +259,56 @@ pub fn audio_track_options(
                 .collect()
         })
         .unwrap_or_default()
+}
+
+#[must_use]
+pub fn audio_track_is_default(
+    config: &ConversionConfig,
+    metadata: &SourceMetadata,
+    track: &AudioTrack,
+) -> bool {
+    let source_default = |index| {
+        metadata
+            .audio_tracks
+            .iter()
+            .any(|source| source.index == index && source.is_default)
+    };
+    let projected = frame_core::audio_rules::audio_track_default_actions(
+        &config.container,
+        &config.selected_audio_tracks,
+        &config.audio_track_overrides,
+        source_default,
+    );
+    let ordinal = config
+        .selected_audio_tracks
+        .iter()
+        .position(|index| *index == track.index);
+    ordinal
+        .and_then(|index| projected.ok()?.get(index).copied().flatten())
+        .or_else(|| {
+            config
+                .audio_track_overrides
+                .get(&track.index)
+                .and_then(|edit| edit.is_default)
+        })
+        .unwrap_or(track.is_default)
+}
+
+#[must_use]
+pub fn audio_track_sample_rate_error(
+    config: &ConversionConfig,
+    track: Option<&AudioTrack>,
+    rate: u32,
+) -> Option<String> {
+    let channels = effective_audio_channels(
+        &config.audio_channels,
+        track.and_then(|source| source.channels.as_deref()?.parse().ok()),
+    );
+    frame_core::audio_rules::audio_sample_rate_encoding_error(
+        &config.container,
+        &config.audio_codec,
+        rate,
+        &config.audio_bitrate,
+        channels,
+    )
 }

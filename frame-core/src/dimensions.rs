@@ -36,7 +36,7 @@ pub fn output_dimensions(
     if source_width == 0 || source_height == 0 || is_audio_only_container(&config.container) {
         return None;
     }
-    if config.processing_mode == "copy" {
+    if config.copies_video() {
         return Some((source_width, source_height));
     }
     let geometry = filter_geometry(config, Some((source_width, source_height)), true)?;
@@ -180,7 +180,7 @@ pub fn output_display_aspect_ratio(
     let (width, height) = output_dimensions(config, source_width, source_height, None)?;
     let mut aspect = DisplayRatio::new(u128::from(width), u128::from(height))?;
     if let Some(mut sar) = source_sar {
-        if config.processing_mode != "copy" {
+        if !config.copies_video() {
             let geometry = filter_geometry(config, Some((source_width, source_height)), true)?;
             if matches!(config.rotation.as_str(), "90" | "270") {
                 sar = sar.inverted();

@@ -1,7 +1,7 @@
 use super::audio::audio_copy_error_for_track;
 use crate::settings::model::{
     AudioTrack, ConversionConfig, OutputContainerOption, OutputModeOption, ProcessingMode,
-    SourceKind, SourceMetadata,
+    ProcessingStream, SourceKind, SourceMetadata,
 };
 use crate::settings::rules::{
     is_audio_only_container, is_gif_container, is_image_container,
@@ -15,13 +15,41 @@ use frame_core::media_rules;
 pub fn output_processing_mode_options(
     config: &ConversionConfig,
     metadata: Option<&SourceMetadata>,
+    stream: ProcessingStream,
     disabled: bool,
 ) -> [OutputModeOption; 2] {
-    let is_source_image = source_kind_for(metadata) == SourceKind::Image;
-    [
-        output_mode_option(ProcessingMode::Reencode, config, disabled),
-        output_mode_option(ProcessingMode::Copy, config, disabled || is_source_image),
-    ]
+    let can_copy = processing_stream_available(config, metadata, stream);
+    [false, true].map(|copy| {
+        let mode = config.processing_mode.with_copy(stream, copy);
+        OutputModeOption {
+            copy,
+            label: if copy { "Stream copy" } else { "Re-encode" },
+            is_selected: mode == config.processing_mode,
+            is_disabled: disabled || (copy && !can_copy),
+        }
+    })
+}
+
+#[must_use]
+pub fn processing_stream_available(
+    config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
+    stream: ProcessingStream,
+) -> bool {
+    let source_kind = source_kind_for(metadata);
+    match stream {
+        ProcessingStream::Video => {
+            source_kind == SourceKind::Video
+                && !is_audio_only_container(&config.container)
+                && !is_image_container(&config.container)
+                && !is_gif_container(&config.container)
+        }
+        ProcessingStream::Audio => {
+            source_kind != SourceKind::Image
+                && metadata.is_none_or(|source| !source.audio_tracks.is_empty())
+                && frame_core::media_rules::container_supports_audio(&config.container)
+        }
+    }
 }
 
 #[must_use]
@@ -68,62 +96,50 @@ pub fn is_container_compatible_for_stream_copy(
     metadata: Option<&SourceMetadata>,
     container: &str,
 ) -> bool {
-    if config.processing_mode != ProcessingMode::Copy {
+    if config.processing_mode == ProcessingMode::Reencode {
         return true;
     }
     if source_kind_for(metadata) == SourceKind::Image {
         return false;
     }
+    let copy_video = config.processing_mode.copies_video();
+    let copy_audio = config.processing_mode.copies_audio();
     if is_image_container(container) || is_gif_container(container) {
-        return false;
+        return !copy_video;
     }
-
     let Some(metadata) = metadata else {
         return true;
     };
-
     let selected_audio = selected_audio_tracks(config, metadata);
     if selected_audio.len() != config.selected_audio_tracks.len()
         || audio_track_count_error(container, selected_audio.len()).is_some()
     {
         return false;
     }
+    let audio_codecs_allowed = !copy_audio
+        || selected_audio
+            .iter()
+            .all(|track| audio_copy_error_for_track(container, metadata, track).is_none());
     if is_audio_only_container(container) {
-        return !selected_audio.is_empty()
-            && selected_audio
-                .iter()
-                .all(|track| audio_copy_error_for_track(container, metadata, track).is_none());
+        return (!copy_audio || !selected_audio.is_empty()) && audio_codecs_allowed;
     }
-
-    let Some(video_codec) = metadata.video_codec.as_deref() else {
-        return false;
-    };
-    if !is_video_stream_codec_allowed_for_container(container, video_codec) {
+    if copy_video
+        && !metadata
+            .video_codec
+            .as_deref()
+            .is_some_and(|codec| is_video_stream_codec_allowed_for_container(container, codec))
+    {
         return false;
     }
-
-    let audio_codecs_allowed = selected_audio
-        .iter()
-        .all(|track| audio_copy_error_for_track(container, metadata, track).is_none());
-    let subtitle_codecs_allowed = selected_subtitle_codecs(config, metadata)
-        .iter()
-        .all(|codec| is_subtitle_codec_allowed_for_container(container, codec));
+    let subtitle_codecs_allowed = config.selected_subtitle_tracks.iter().all(|index| {
+        metadata
+            .subtitle_tracks
+            .iter()
+            .find(|track| track.index == *index)
+            .is_some_and(|track| is_subtitle_codec_allowed_for_container(container, &track.codec))
+    });
 
     audio_codecs_allowed && subtitle_codecs_allowed
-}
-
-pub(super) fn output_mode_option(
-    mode: ProcessingMode,
-    config: &ConversionConfig,
-    is_disabled: bool,
-) -> OutputModeOption {
-    OutputModeOption {
-        mode,
-        label: mode.label(),
-        hint: mode.hint(),
-        is_selected: config.processing_mode == mode,
-        is_disabled,
-    }
 }
 
 pub(super) fn output_container_disabled_reason(
@@ -147,22 +163,26 @@ pub(super) fn output_container_disabled_reason(
         if audio_track_count_error(container, config.selected_audio_tracks.len()).is_some() {
             return Some("Select one audio track for this format");
         }
-        if metadata.is_some_and(|metadata| {
-            selected_audio_tracks(config, metadata).iter().any(|track| {
-                frame_core::audio_rules::mp3_requires_mp4_resampling(
-                    container,
-                    &track.codec,
-                    track.sample_rate.as_deref(),
-                )
+        if config.processing_mode.copies_audio()
+            && metadata.is_some_and(|metadata| {
+                selected_audio_tracks(config, metadata).iter().any(|track| {
+                    frame_core::audio_rules::mp3_requires_mp4_resampling(
+                        container,
+                        &track.codec,
+                        track.sample_rate.as_deref(),
+                    )
+                })
             })
-        }) {
+        {
             return Some("MP4 needs MP3 audio at 16 kHz or higher");
         }
-        if let Some(reason) = metadata.and_then(|metadata| {
-            selected_audio_tracks(config, metadata)
-                .iter()
-                .find_map(|track| audio_copy_error_for_track(container, metadata, track))
-        }) {
+        if config.processing_mode.copies_audio()
+            && let Some(reason) = metadata.and_then(|metadata| {
+                selected_audio_tracks(config, metadata)
+                    .iter()
+                    .find_map(|track| audio_copy_error_for_track(container, metadata, track))
+            })
+        {
             return Some(reason);
         }
         return Some("Incompatible container");
@@ -175,21 +195,14 @@ pub(super) fn selected_audio_tracks<'a>(
     config: &ConversionConfig,
     metadata: &'a SourceMetadata,
 ) -> Vec<&'a AudioTrack> {
-    metadata
-        .audio_tracks
+    config
+        .selected_audio_tracks
         .iter()
-        .filter(|track| config.selected_audio_tracks.contains(&track.index))
-        .collect()
-}
-
-pub(super) fn selected_subtitle_codecs<'a>(
-    config: &ConversionConfig,
-    metadata: &'a SourceMetadata,
-) -> Vec<&'a str> {
-    metadata
-        .subtitle_tracks
-        .iter()
-        .filter(|track| config.selected_subtitle_tracks.contains(&track.index))
-        .map(|track| track.codec.as_str())
+        .filter_map(|index| {
+            metadata
+                .audio_tracks
+                .iter()
+                .find(|track| track.index == *index)
+        })
         .collect()
 }

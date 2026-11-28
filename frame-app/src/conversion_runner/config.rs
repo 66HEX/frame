@@ -44,6 +44,7 @@ pub fn core_config_from_gpui(config: &GpuiConversionConfig) -> CoreConversionCon
         } else {
             config.video_codec.clone()
         },
+        video_two_pass: config.video_two_pass,
         video_bitrate_mode: non_empty_or(&config.video_bitrate_mode, DEFAULT_VIDEO_BITRATE_MODE),
         video_bitrate: non_empty_or(&config.video_bitrate, DEFAULT_VIDEO_BITRATE),
         audio_codec: config.audio_codec.clone(),
@@ -56,6 +57,7 @@ pub fn core_config_from_gpui(config: &GpuiConversionConfig) -> CoreConversionCon
         audio_normalize: config.audio_normalize,
         video_filters: core_video_filters_from_gpui(&config.video_filters),
         audio_filters: core_audio_filters_from_gpui(&config.audio_filters),
+        audio_track_overrides: config.audio_track_overrides.clone(),
         selected_audio_tracks: config.selected_audio_tracks.clone(),
         selected_subtitle_tracks: config.selected_subtitle_tracks.clone(),
         external_subtitle_tracks: config

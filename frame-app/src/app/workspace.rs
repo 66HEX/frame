@@ -1,8 +1,8 @@
 use crate::app::inspector::settings_panel;
 use crate::app::inspector::state::SettingsRenderState;
 use crate::app::layout::{
-    FILE_LIST_ROW_SPAN, LEFT_COLUMN_SPAN, LEFT_GRID_ROWS, PREVIEW_ROW_SPAN, RIGHT_COLUMN_SPAN,
-    TITLEBAR_HEIGHT, WORKSPACE_COLUMNS, WORKSPACE_GAP,
+    FILE_LIST_ROW_SPAN, LEFT_COLUMN_SPAN, LEFT_GRID_ROWS, RIGHT_COLUMN_SPAN, TITLEBAR_HEIGHT,
+    WORKSPACE_COLUMNS, WORKSPACE_GAP,
 };
 use crate::app::preview::{PreviewPanelProps, preview_panel};
 use crate::app::primitives::{ButtonVariant, FrameSurface, action_button, color};
@@ -47,7 +47,7 @@ pub(super) fn workspace_view(
                 .size_full()
                 .child(
                     preview_panel(file_queue, settings, preview_props, window, cx)
-                        .row_span(PREVIEW_ROW_SPAN),
+                        .row_span(LEFT_GRID_ROWS - FILE_LIST_ROW_SPAN),
                 )
                 .child(
                     file_list_panel(

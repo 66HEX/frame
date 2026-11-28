@@ -58,13 +58,13 @@ impl Bindings {
     fn require_repair_runtime(&mut self, executable: &str) -> Result<(), Failure> {
         if self.source.is_none() || self.ffmpeg.identity.is_none() {
             return Err(Failure::invalid(
-                "repair requires observed source dependencies and a native FFmpeg runtime",
+                "repair requires verified source files and a media worker identity",
             ));
         }
         let runtime = Runtime::resolve(executable).map_err(|error| Failure::invalid(&error))?;
         if runtime.identity.is_none() {
             return Err(Failure::invalid(
-                "repair requires an observed native ffprobe runtime",
+                "repair requires a verified media probe identity",
             ));
         }
         self.ffprobe = Some(runtime);
@@ -208,9 +208,10 @@ fn source_plans(
             continue;
         }
         bindings.checkpoint(&format!("decoding source track #{index}"), cancelled, log)?;
+        let runtime = bindings.probe_runtime()?;
         let bytes = helpers.execute(
-            bindings.probe_runtime()?,
-            Scan::Source(index).args(input),
+            runtime,
+            Scan::Source(index).runtime_args(&runtime.command.program, input),
             false,
             cancelled,
         )?;

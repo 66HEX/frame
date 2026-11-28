@@ -215,6 +215,7 @@ def compare(output, repetitions):
                         "FRAME_TEST_FFMPEG": str(tools["ffmpeg"]),
                         "FRAME_TEST_FFPROBE": str(tools["ffprobe"]),
                         "FRAME_TEST_HEVC_SOURCE": str(fixture),
+                        "FRAME_TEST_HISTORICAL_HEVC": "1",
                         "FRAME_KEEP_MEDIA_TESTS": "1",
                         "FRAME_TEST_TRACE_TOOLS": "1",
                         "TMPDIR": str(temporary), "TMP": str(temporary), "TEMP": str(temporary),

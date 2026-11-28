@@ -154,6 +154,7 @@ fn metadata_from_ffprobe(
 
         metadata.audio_tracks.push(AudioTrack {
             index: stream.index,
+            is_default: stream.disposition.default != 0,
             codec: codec.to_string(),
             codec_tag: stream.codec_tag.as_deref().and_then(parse_codec_tag),
             channels: stream

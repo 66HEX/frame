@@ -8,7 +8,7 @@ Download the current release from [Frame on GitHub](https://github.com/66HEX/fra
 
 ## macOS
 
-Use the Apple Silicon package for an M-series Mac, or the Intel package for an Intel Mac. Open the DMG and move Frame to Applications.
+Frame requires macOS Monterey 12.0 or later. Choose the Apple Silicon package for an M-series Mac or the Intel package for an Intel Mac. Open the DMG and move Frame to Applications.
 
 You can also install through the Frame Homebrew tap:
 
@@ -54,7 +54,7 @@ AppImage downloads are also available on the GitHub release page. Choose x86_64 
 
 ### Nixpkgs
 
-Frame is available as [`frame-media-converter` in Nixpkgs](https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/by-name/fr/frame-media-converter/package.nix), on the `nixos-unstable` branch, for x86_64 and aarch64 Linux. This package uses FFmpeg and FFprobe from Nixpkgs. Updates are managed through Nix.
+Frame is available as [`frame-media-converter` in Nixpkgs](https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/by-name/fr/frame-media-converter/package.nix), on the `nixos-unstable` branch, for x86_64 and aarch64 Linux. Nixpkgs supplies the media libraries for this package. Updates are managed through Nix.
 
 With Nix installed and the [`nix-command` and `flakes` features enabled](https://nix.dev/concepts/flakes#running-commands), run Frame without adding it to your profile:
 

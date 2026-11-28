@@ -50,6 +50,15 @@ fn prepared_queue_restores_full_config_selection_and_folder_without_starting() {
     let mut file = FileItem::from_os_path("file-17", &source);
     file.config.video_bitrate = "12345".into();
     file.config.selected_audio_tracks = vec![1, 3];
+    file.config.audio_track_overrides.insert(
+        3,
+        frame_core::types::AudioTrackOverride {
+            language: Some(String::new()),
+            title: Some("Director commentary".into()),
+            is_default: Some(true),
+            sample_rate: Some(44_100),
+        },
+    );
     file.output_name = "prepared-cut".into();
     file.is_selected_for_conversion = false;
     queue.add_file(file.clone());

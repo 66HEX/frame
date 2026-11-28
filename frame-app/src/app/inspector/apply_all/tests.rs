@@ -1,7 +1,7 @@
 use super::*;
 use crate::app::updates::state::UpdateStatus;
 use crate::file_queue::FileStatus;
-use crate::settings::{AudioTrack, ExternalSubtitleTrack, SubtitleTrack};
+use crate::settings::{AudioTrack, ExternalSubtitleTrack, ProcessingMode, SubtitleTrack};
 
 mod ui;
 
@@ -32,6 +32,14 @@ fn add_target(root: &mut FrameRoot, id: &str, status: FileStatus, kind: SourceKi
     let mut file = FileItem::from_path(id, format!("/tmp/{id}.mov"), 100);
     file.status = status;
     file.config.selected_audio_tracks = vec![3, 7];
+    file.config.audio_track_overrides.insert(
+        3,
+        frame_core::types::AudioTrackOverride {
+            title: Some(id.to_owned()),
+            sample_rate: Some(if id == "donor" { 24_000 } else { 48_000 }),
+            ..Default::default()
+        },
+    );
     file.config.selected_subtitle_tracks = vec![4];
     file.config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
         path: format!("/tmp/{id}.srt"),
@@ -153,6 +161,10 @@ fn batch_preserves_source_bound_state_and_all_non_config_fields_without_persiste
             assert_eq!(
                 new.config.selected_audio_tracks,
                 old.config.selected_audio_tracks
+            );
+            assert_eq!(
+                new.config.audio_track_overrides,
+                old.config.audio_track_overrides
             );
             assert_eq!(new.config.selected_subtitle_tracks, [4]);
             assert_eq!(
@@ -315,7 +327,12 @@ fn copy_compatibility_uses_each_targets_actual_selected_indices_and_rechecks_met
 fn fast_prefilter_matches_full_normalized_oracle_across_media_modes_and_streams() {
     let mut cases = 0;
     for container in ["mp4", "mkv", "webm", "m2t", "opus", "mp3", "gif", "png"] {
-        for mode in [ProcessingMode::Reencode, ProcessingMode::Copy] {
+        for mode in [
+            ProcessingMode::Reencode,
+            ProcessingMode::Copy,
+            ProcessingMode::CopyVideo,
+            ProcessingMode::CopyAudio,
+        ] {
             let config = ConversionConfig {
                 container: container.into(),
                 processing_mode: mode,
@@ -354,7 +371,7 @@ fn fast_prefilter_matches_full_normalized_oracle_across_media_modes_and_streams(
             }
         }
     }
-    assert_eq!(cases, 3840);
+    assert_eq!(cases, 7680);
 }
 
 #[test]

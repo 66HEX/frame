@@ -427,7 +427,7 @@ impl FrameRoot {
         let Some(text) = cx
             .read_from_clipboard()
             .and_then(|item| item.text())
-            .map(|text| text.replace('\n', " "))
+            .map(|text| text.replace("\r\n", " ").replace(['\r', '\n'], " "))
         else {
             return;
         };

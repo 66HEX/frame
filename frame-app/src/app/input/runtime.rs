@@ -24,6 +24,7 @@ impl FrameTextInputMetrics {
 pub(in crate::app) enum FrameTextInputKind {
     MaxConcurrency,
     OutputName,
+    AudioSampleRate,
     AudioBitrate,
     CropWidth,
     CropHeight,
@@ -43,15 +44,18 @@ pub(in crate::app) enum FrameTextInputKind {
     MetadataServiceProvider,
     PresetName,
     ExternalSubtitleLanguage,
+    AudioTrackLanguage,
+    AudioTrackTitle,
     ExternalSubtitleTitle,
     SubtitleFontColorHex,
     SubtitleOutlineColorHex,
 }
 
 impl FrameTextInputKind {
-    pub(in crate::app) const ALL: [Self; 24] = [
+    pub(in crate::app) const ALL: [Self; 27] = [
         Self::MaxConcurrency,
         Self::OutputName,
+        Self::AudioSampleRate,
         Self::AudioBitrate,
         Self::CropWidth,
         Self::CropHeight,
@@ -71,6 +75,8 @@ impl FrameTextInputKind {
         Self::MetadataServiceProvider,
         Self::PresetName,
         Self::ExternalSubtitleLanguage,
+        Self::AudioTrackLanguage,
+        Self::AudioTrackTitle,
         Self::ExternalSubtitleTitle,
         Self::SubtitleFontColorHex,
         Self::SubtitleOutlineColorHex,
@@ -80,6 +86,7 @@ impl FrameTextInputKind {
         match self {
             Self::MaxConcurrency => "Maximum concurrent conversions",
             Self::OutputName => "Output name",
+            Self::AudioSampleRate => "Custom sample rate in hertz",
             Self::AudioBitrate => "Audio bitrate",
             Self::CropWidth => "Crop width",
             Self::CropHeight => "Crop height",
@@ -99,6 +106,8 @@ impl FrameTextInputKind {
             Self::MetadataServiceProvider => "MPEG transport stream service provider",
             Self::PresetName => "Preset name",
             Self::ExternalSubtitleLanguage => "Selectable subtitle language",
+            Self::AudioTrackLanguage => "Audio track language",
+            Self::AudioTrackTitle => "Audio track title",
             Self::ExternalSubtitleTitle => "Selectable subtitle title",
             Self::SubtitleFontColorHex => "Subtitle font color",
             Self::SubtitleOutlineColorHex => "Subtitle outline color",
@@ -204,6 +213,7 @@ mod metrics_tests {
 pub(in crate::app) struct FrameTextInputStore {
     max_concurrency: FrameTextInputRuntime,
     output_name: FrameTextInputRuntime,
+    audio_sample_rate: FrameTextInputRuntime,
     audio_bitrate: FrameTextInputRuntime,
     crop_width: FrameTextInputRuntime,
     crop_height: FrameTextInputRuntime,
@@ -223,6 +233,8 @@ pub(in crate::app) struct FrameTextInputStore {
     metadata_service_provider: FrameTextInputRuntime,
     preset_name: FrameTextInputRuntime,
     external_subtitle_language: FrameTextInputRuntime,
+    audio_track_language: FrameTextInputRuntime,
+    audio_track_title: FrameTextInputRuntime,
     external_subtitle_title: FrameTextInputRuntime,
     subtitle_font_color: FrameTextInputRuntime,
     subtitle_outline_color: FrameTextInputRuntime,
@@ -233,6 +245,7 @@ impl FrameTextInputStore {
         match kind {
             FrameTextInputKind::MaxConcurrency => &self.max_concurrency,
             FrameTextInputKind::OutputName => &self.output_name,
+            FrameTextInputKind::AudioSampleRate => &self.audio_sample_rate,
             FrameTextInputKind::AudioBitrate => &self.audio_bitrate,
             FrameTextInputKind::CropWidth => &self.crop_width,
             FrameTextInputKind::CropHeight => &self.crop_height,
@@ -252,6 +265,8 @@ impl FrameTextInputStore {
             FrameTextInputKind::MetadataServiceProvider => &self.metadata_service_provider,
             FrameTextInputKind::PresetName => &self.preset_name,
             FrameTextInputKind::ExternalSubtitleLanguage => &self.external_subtitle_language,
+            FrameTextInputKind::AudioTrackLanguage => &self.audio_track_language,
+            FrameTextInputKind::AudioTrackTitle => &self.audio_track_title,
             FrameTextInputKind::ExternalSubtitleTitle => &self.external_subtitle_title,
             FrameTextInputKind::SubtitleFontColorHex => &self.subtitle_font_color,
             FrameTextInputKind::SubtitleOutlineColorHex => &self.subtitle_outline_color,
@@ -265,6 +280,7 @@ impl FrameTextInputStore {
         match kind {
             FrameTextInputKind::MaxConcurrency => &mut self.max_concurrency,
             FrameTextInputKind::OutputName => &mut self.output_name,
+            FrameTextInputKind::AudioSampleRate => &mut self.audio_sample_rate,
             FrameTextInputKind::AudioBitrate => &mut self.audio_bitrate,
             FrameTextInputKind::CropWidth => &mut self.crop_width,
             FrameTextInputKind::CropHeight => &mut self.crop_height,
@@ -284,6 +300,8 @@ impl FrameTextInputStore {
             FrameTextInputKind::MetadataServiceProvider => &mut self.metadata_service_provider,
             FrameTextInputKind::PresetName => &mut self.preset_name,
             FrameTextInputKind::ExternalSubtitleLanguage => &mut self.external_subtitle_language,
+            FrameTextInputKind::AudioTrackLanguage => &mut self.audio_track_language,
+            FrameTextInputKind::AudioTrackTitle => &mut self.audio_track_title,
             FrameTextInputKind::ExternalSubtitleTitle => &mut self.external_subtitle_title,
             FrameTextInputKind::SubtitleFontColorHex => &mut self.subtitle_font_color,
             FrameTextInputKind::SubtitleOutlineColorHex => &mut self.subtitle_outline_color,
@@ -295,6 +313,7 @@ impl FrameTextInputStore {
 pub(in crate::app) struct FrameTextInputFocusStore {
     max_concurrency: Option<FocusHandle>,
     output_name: Option<FocusHandle>,
+    audio_sample_rate: Option<FocusHandle>,
     audio_bitrate: Option<FocusHandle>,
     crop_width: Option<FocusHandle>,
     crop_height: Option<FocusHandle>,
@@ -314,6 +333,8 @@ pub(in crate::app) struct FrameTextInputFocusStore {
     metadata_service_provider: Option<FocusHandle>,
     preset_name: Option<FocusHandle>,
     external_subtitle_language: Option<FocusHandle>,
+    audio_track_language: Option<FocusHandle>,
+    audio_track_title: Option<FocusHandle>,
     external_subtitle_title: Option<FocusHandle>,
     subtitle_font_color: Option<FocusHandle>,
     subtitle_outline_color: Option<FocusHandle>,
@@ -324,6 +345,7 @@ impl FrameTextInputFocusStore {
         match kind {
             FrameTextInputKind::MaxConcurrency => self.max_concurrency.as_ref(),
             FrameTextInputKind::OutputName => self.output_name.as_ref(),
+            FrameTextInputKind::AudioSampleRate => self.audio_sample_rate.as_ref(),
             FrameTextInputKind::AudioBitrate => self.audio_bitrate.as_ref(),
             FrameTextInputKind::CropWidth => self.crop_width.as_ref(),
             FrameTextInputKind::CropHeight => self.crop_height.as_ref(),
@@ -345,6 +367,8 @@ impl FrameTextInputFocusStore {
             FrameTextInputKind::ExternalSubtitleLanguage => {
                 self.external_subtitle_language.as_ref()
             }
+            FrameTextInputKind::AudioTrackLanguage => self.audio_track_language.as_ref(),
+            FrameTextInputKind::AudioTrackTitle => self.audio_track_title.as_ref(),
             FrameTextInputKind::ExternalSubtitleTitle => self.external_subtitle_title.as_ref(),
             FrameTextInputKind::SubtitleFontColorHex => self.subtitle_font_color.as_ref(),
             FrameTextInputKind::SubtitleOutlineColorHex => self.subtitle_outline_color.as_ref(),
@@ -358,6 +382,7 @@ impl FrameTextInputFocusStore {
         match kind {
             FrameTextInputKind::MaxConcurrency => &mut self.max_concurrency,
             FrameTextInputKind::OutputName => &mut self.output_name,
+            FrameTextInputKind::AudioSampleRate => &mut self.audio_sample_rate,
             FrameTextInputKind::AudioBitrate => &mut self.audio_bitrate,
             FrameTextInputKind::CropWidth => &mut self.crop_width,
             FrameTextInputKind::CropHeight => &mut self.crop_height,
@@ -377,6 +402,8 @@ impl FrameTextInputFocusStore {
             FrameTextInputKind::MetadataServiceProvider => &mut self.metadata_service_provider,
             FrameTextInputKind::PresetName => &mut self.preset_name,
             FrameTextInputKind::ExternalSubtitleLanguage => &mut self.external_subtitle_language,
+            FrameTextInputKind::AudioTrackLanguage => &mut self.audio_track_language,
+            FrameTextInputKind::AudioTrackTitle => &mut self.audio_track_title,
             FrameTextInputKind::ExternalSubtitleTitle => &mut self.external_subtitle_title,
             FrameTextInputKind::SubtitleFontColorHex => &mut self.subtitle_font_color,
             FrameTextInputKind::SubtitleOutlineColorHex => &mut self.subtitle_outline_color,

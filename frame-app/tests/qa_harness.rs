@@ -180,6 +180,18 @@ fn headless_qa_exports_through_the_app_runner_and_reports_the_actual_result() {
         .collect();
     assert_eq!(completed.len(), 1, "{events:?}");
     let result = Path::new(completed[0]["payload"]["output_path"].as_str().unwrap());
+    let stats = events
+        .iter()
+        .rev()
+        .find_map(|event| event["payload"].get("stats"))
+        .unwrap();
+    assert!(stats["frame"].is_null() && stats["fps"].is_null());
+    assert!(stats["media_seconds"].as_f64().unwrap() > 0.2);
+    assert!(stats["bitrate_kbps"].as_f64().unwrap() > 0.0);
+    assert_eq!(
+        stats["size_bytes"].as_u64(),
+        Some(fs::metadata(result).unwrap().len())
+    );
     assert_ne!(result, sentinel);
     assert!(result.is_file());
     assert_eq!(fs::read(&source).unwrap(), before);
@@ -192,4 +204,283 @@ fn headless_qa_exports_through_the_app_runner_and_reports_the_actual_result() {
         2,
         "only sentinel and completed result remain"
     );
+}
+
+fn generate_av_source(sandbox: &Sandbox) -> PathBuf {
+    let input = sandbox.0.join("źródło test.mkv");
+    let generated = Command::new(frame_app::runtime_binaries::ffmpeg_executable())
+        .args([
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=96x64:duration=2",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=duration=2",
+            "-c:v",
+            "mpeg2video",
+            "-c:a",
+            "mp2",
+        ])
+        .arg(&input)
+        .output()
+        .unwrap();
+    assert!(
+        generated.status.success(),
+        "{}",
+        String::from_utf8_lossy(&generated.stderr)
+    );
+    input
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn headless_qa_applies_independent_modes_to_video_and_audio() {
+    let sandbox = Sandbox::new();
+    let input = generate_av_source(&sandbox);
+
+    for (mode, expected_video, expected_audio) in [
+        ("copyAudio", "h264", "mp2"),
+        ("copyVideo", "mpeg2video", "flac"),
+    ] {
+        let request = sandbox.0.join(format!("{mode}.json"));
+        let output_name = format!("{mode}.mkv");
+        fs::write(
+            &request,
+            serde_json::to_vec(&serde_json::json!({
+                "input": input,
+                "outputDirectory": sandbox.0,
+                "outputName": output_name,
+                "config": {
+                    "container": "mkv", "processingMode": mode, "videoCodec": "libx264",
+                    "audioCodec": "flac", "selectedAudioTracks": [1]
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let run = run_qa("--export", &request);
+        assert!(
+            run.status.success(),
+            "{mode}: {} {}",
+            String::from_utf8_lossy(&run.stderr),
+            String::from_utf8_lossy(&run.stdout)
+        );
+        let streams = probe_streams(&sandbox.0.join(output_name));
+        assert_eq!(streams.len(), 2);
+        assert_eq!(streams[0]["codec_name"], expected_video, "{mode}");
+        assert_eq!(streams[1]["codec_name"], expected_audio, "{mode}");
+    }
+}
+
+fn probe_streams(path: &Path) -> Vec<serde_json::Value> {
+    let probe = Command::new(frame_app::runtime_binaries::ffprobe_executable())
+        .args([
+            "-v",
+            "error",
+            "-count_frames",
+            "-show_entries",
+            "stream=codec_name,nb_read_frames,sample_rate:stream_tags=title,language:stream_disposition=default,comment",
+            "-of",
+            "json",
+        ])
+        .arg(path)
+        .output()
+        .unwrap();
+    assert!(
+        probe.status.success(),
+        "{}",
+        String::from_utf8_lossy(&probe.stderr)
+    );
+    let mut info: serde_json::Value = serde_json::from_slice(&probe.stdout).unwrap();
+    serde_json::from_value(info["streams"].take()).unwrap()
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe and the Frame media worker; run with --ignored"]
+fn headless_two_pass_export_publishes_the_selected_trim_with_audio() {
+    let sandbox = Sandbox::new();
+    let input = generate_av_source(&sandbox);
+    let request = sandbox.0.join("two-pass.json");
+    let out = sandbox.0.join("Zażółć two-pass output");
+    fs::create_dir(&out).unwrap();
+    fs::write(
+        &request,
+        serde_json::to_vec(&serde_json::json!({
+            "input": input,
+            "outputDirectory": out,
+            "outputName": "render.mkv",
+            "config": {
+                "container": "mkv", "videoCodec": "libx265", "videoBitrateMode": "bitrate",
+                "videoBitrate": "180", "videoTwoPass": true, "selectedAudioTracks": [1],
+                "audioCodec": "flac", "startTime": "0.4", "endTime": "1.6"
+            }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let plan = run_qa("--plan", &request);
+    assert!(
+        plan.status.success(),
+        "{}",
+        String::from_utf8_lossy(&plan.stderr)
+    );
+    let plan: serde_json::Value = serde_json::from_slice(&plan.stdout).unwrap();
+    assert!(
+        plan["args"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|arg| arg == "-frame_two_pass")
+    );
+    let result = run_qa("--export", &request);
+    assert!(
+        result.status.success(),
+        "{} {}",
+        String::from_utf8_lossy(&result.stderr),
+        String::from_utf8_lossy(&result.stdout)
+    );
+    let events: Vec<serde_json::Value> = std::str::from_utf8(&result.stdout)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let samples: Vec<_> = events
+        .iter()
+        .map(|event| &event["payload"])
+        .filter(|payload| payload["stats"].is_object())
+        .collect();
+    assert!(samples.iter().any(|payload| payload["stats"]["pass"] == 1));
+    for payload in samples
+        .iter()
+        .filter(|payload| payload["stats"]["pass"] == 1)
+    {
+        assert!(payload["progress"].as_f64().unwrap() <= 50.0);
+        assert!(payload["stats"]["size_bytes"].is_null());
+    }
+    let last = &samples.last().unwrap()["stats"];
+    assert_eq!(last["pass"], 2);
+    assert_eq!(last["frame"], 30);
+    assert_eq!(
+        last["size_bytes"].as_u64(),
+        Some(fs::metadata(out.join("render.mkv")).unwrap().len())
+    );
+    assert!((last["duration_seconds"].as_f64().unwrap() - 1.2).abs() < 0.001);
+    let streams = probe_streams(&out.join("render.mkv"));
+    assert_eq!(streams.len(), 2);
+    assert_eq!(streams[0]["codec_name"], "hevc");
+    assert_eq!(streams[0]["nb_read_frames"], "30");
+    assert_eq!(streams[1]["codec_name"], "flac");
+    assert_eq!(fs::read_dir(out).unwrap().count(), 1);
+}
+
+fn generate_multitrack_source(sandbox: &Sandbox) -> PathBuf {
+    let input = generate_av_source(sandbox);
+    let bilingual = sandbox.0.join("bilingual.mkv");
+    let source = Command::new(frame_app::runtime_binaries::ffmpeg_executable())
+        .args(["-v", "error", "-i"])
+        .arg(input)
+        .args([
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a:0",
+            "-map",
+            "0:a:0",
+            "-c",
+            "copy",
+            "-metadata:s:a:0",
+            "title=Old title",
+            "-metadata:s:a:0",
+            "language=eng",
+            "-disposition:a:0",
+            "default+comment",
+            "-disposition:a:1",
+            "0",
+        ])
+        .arg(&bilingual)
+        .output()
+        .unwrap();
+    assert!(
+        source.status.success(),
+        "{}",
+        String::from_utf8_lossy(&source.stderr)
+    );
+    bilingual
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe and the Frame media worker; run with --ignored"]
+fn headless_copy_writes_audio_labels_and_moves_default_to_the_selected_track() {
+    let sandbox = Sandbox::new();
+    let bilingual = generate_multitrack_source(&sandbox);
+    let request = sandbox.0.join("track-names.json");
+    fs::write(
+        &request,
+        serde_json::to_vec(&serde_json::json!({
+            "input": bilingual, "outputDirectory": sandbox.0, "outputName": "labelled.mkv",
+            "config": {
+                "container": "mkv", "processingMode": "copy", "selectedAudioTracks": [2, 1],
+                "audioTrackOverrides": {
+                    "1": {"title": ""},
+                    "2": {"title": "Głos reżysera", "language": "pol", "isDefault": true}
+                }
+            }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let result = run_qa("--export", &request);
+    assert!(
+        result.status.success(),
+        "{} {}",
+        String::from_utf8_lossy(&result.stderr),
+        String::from_utf8_lossy(&result.stdout)
+    );
+    let streams = probe_streams(&sandbox.0.join("labelled.mkv"));
+    assert_eq!(streams.len(), 3);
+    assert_eq!(streams[1]["tags"]["title"], "Głos reżysera");
+    assert_eq!(streams[1]["tags"]["language"], "pol");
+    assert_eq!(streams[1]["disposition"]["default"], 1);
+    assert!(streams[2]["tags"]["title"].is_null());
+    assert_eq!(streams[2]["tags"]["language"], "eng");
+    assert_eq!(streams[2]["disposition"]["default"], 0);
+    assert_eq!(streams[2]["disposition"]["comment"], 1);
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe and the Frame media worker; run with --ignored"]
+fn headless_export_resamples_each_selected_audio_stream_at_its_requested_rate() {
+    let sandbox = Sandbox::new();
+    let input = generate_multitrack_source(&sandbox);
+    let request = sandbox.0.join("resample.json");
+    fs::write(
+        &request,
+        serde_json::to_vec(&serde_json::json!({
+            "input": input, "outputDirectory": sandbox.0, "outputName": "rates.mkv",
+            "config": {
+                "container": "mkv", "processingMode": "copyVideo", "audioCodec": "flac",
+                "selectedAudioTracks": [2, 1, 2],
+                "audioTrackOverrides": { "1": {"sampleRate": 96000}, "2": {"sampleRate": 32000} }
+            }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let result = run_qa("--export", &request);
+    assert!(
+        result.status.success(),
+        "{} {}",
+        String::from_utf8_lossy(&result.stderr),
+        String::from_utf8_lossy(&result.stdout)
+    );
+    let streams = probe_streams(&sandbox.0.join("rates.mkv"));
+    assert_eq!(streams.len(), 4);
+    for (audio, rate) in streams[1..].iter().zip(["32000", "96000", "32000"]) {
+        assert_eq!(audio["codec_name"], "flac");
+        assert_eq!(audio["sample_rate"], rate);
+    }
 }

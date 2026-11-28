@@ -60,6 +60,7 @@ impl FrameRoot {
         disambiguate_output_paths(&mut tasks);
 
         for task in &tasks {
+            self.conversion_events.clear_encoding_stats(&task.id);
             let Some(output_name) = task.output_name.as_ref() else {
                 continue;
             };
@@ -95,10 +96,12 @@ impl FrameRoot {
         cx.notify();
     }
     pub(in crate::app) fn spawn_conversion_batch(
-        &self,
+        &mut self,
         tasks: Vec<frame_core::types::ConversionTask>,
         cx: &Context<Self>,
     ) {
+        self.conversion_batch_generation = self.conversion_batch_generation.wrapping_add(1);
+        let generation = self.conversion_batch_generation;
         let (tx, rx) = mpsc::channel();
         let controller = self.conversion_processes.clone();
 
@@ -120,8 +123,9 @@ impl FrameRoot {
                         Ok(event) => {
                             if this
                                 .update(cx, |root, cx| {
-                                    root.apply_conversion_event(event);
-                                    cx.notify();
+                                    if root.apply_batch_event(generation, event) {
+                                        cx.notify();
+                                    }
                                 })
                                 .is_err()
                             {
@@ -138,8 +142,10 @@ impl FrameRoot {
 
                 if is_disconnected {
                     this.update(cx, |root, cx| {
-                        root.refresh_processing_state_from_queue();
-                        cx.notify();
+                        if root.conversion_batch_generation == generation {
+                            root.refresh_processing_state_from_queue();
+                            cx.notify();
+                        }
                     })
                     .ok();
                     return;
@@ -251,9 +257,25 @@ impl FrameRoot {
             ),
         );
     }
+    pub(in crate::app) fn apply_batch_event(
+        &mut self,
+        generation: u64,
+        event: ConversionEvent,
+    ) -> bool {
+        if generation != self.conversion_batch_generation {
+            return false;
+        }
+        self.apply_conversion_event(event);
+        true
+    }
+
     pub(in crate::app) fn apply_conversion_event(&mut self, event: ConversionEvent) {
+        let dialog_updated = self.encoding_stats_dialog.follows_event(&event);
         self.conversion_events
             .apply_conversion_event(&mut self.file_queue, event);
+        if dialog_updated {
+            self.refresh_encoding_stats_dialog();
+        }
         self.refresh_processing_state_from_queue();
     }
 

@@ -40,7 +40,7 @@ pub(super) fn settings_external_subtitles_section(
         ))
         .child(settings_hint_text(
             if needs_unavailable_dvbsub {
-                "Selectable .sup/PGS requires the DVB subtitle encoder, which is unavailable in the active FFmpeg runtime. Text subtitles can still be burned in."
+                "This build of Frame needs the DVB subtitle encoder to embed .sup/PGS tracks in this format."
             } else {
                 "Embedded as switchable tracks in the exported file; they are not shown in the preview."
             },
@@ -102,7 +102,11 @@ pub(super) fn settings_external_subtitles_section(
             .is_some_and(|extension| extension.eq_ignore_ascii_case("sup"))
     {
         section = section.child(settings_hint_text(
-            "Unavailable as selectable; use Burn-in",
+            if state.available_filters.subtitles {
+                "Use Burn-in to include this text track."
+            } else {
+                "This format cannot embed a switchable text track."
+            },
             palette,
         ));
     }

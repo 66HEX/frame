@@ -110,6 +110,19 @@ impl FrameRoot {
                 self.preview_ui.transport.hovered = true;
                 self.preview_ui.transport.open = fixture == Some(VisualFixture::PreviewTrim);
             }
+            Some(VisualFixture::SettingsAudioSampleRate) => {
+                self.apply_settings_audio_fixture();
+                let file = self.file_queue.selected_file_mut().unwrap();
+                file.config.container = "wav".into();
+                file.config.audio_codec = "pcm_s16le".into();
+                file.config.selected_audio_tracks = vec![0];
+                file.config
+                    .audio_track_overrides
+                    .entry(0)
+                    .or_default()
+                    .sample_rate = Some(44_100);
+            }
+            Some(VisualFixture::SettingsAudioTracks) => self.apply_audio_tracks_fixture(),
             Some(VisualFixture::SettingsAudio) => self.apply_settings_audio_fixture(),
             Some(VisualFixture::SettingsAudioFilters) => {
                 self.apply_settings_audio_filters_fixture();
@@ -128,6 +141,7 @@ impl FrameRoot {
                 self.apply_settings_video_filters_fixture();
             }
             Some(VisualFixture::UpdateAvailable) => self.apply_update_available_fixture(),
+            Some(VisualFixture::WorkspaceEncodingStats) => self.apply_encoding_stats_fixture(),
             Some(VisualFixture::WorkspaceAudio) => self.apply_workspace_audio_fixture(),
             Some(VisualFixture::WorkspaceEmpty) => self.apply_workspace_empty_fixture(),
             Some(VisualFixture::WorkspaceImage) => self.apply_workspace_image_fixture(),
@@ -169,6 +183,37 @@ impl FrameRoot {
         self.seed_audio_source_fixture();
         self.settings_ui.active_tab = SettingsTab::Metadata;
     }
+    fn apply_encoding_stats_fixture(&mut self) {
+        self.apply_preview_ready_fixture();
+        self.is_processing = true;
+        let id = "fixture-preview";
+        self.file_queue
+            .update_status(id, crate::file_queue::FileStatus::Queued, 0);
+        self.conversion_events.apply_conversion_event(
+            &mut self.file_queue,
+            frame_core::events::ConversionEvent::started(id),
+        );
+        self.conversion_events.apply_conversion_event(
+            &mut self.file_queue,
+            frame_core::events::ConversionEvent::Progress(frame_core::types::ProgressPayload {
+                id: id.into(),
+                progress: 64.0,
+                stats: Some(frame_core::types::EncodingStats {
+                    frame: Some(1389),
+                    fps: Some(48.2),
+                    size_bytes: Some(42_110_976),
+                    bitrate_kbps: Some(5_820.4),
+                    speed: Some(2.01),
+                    media_seconds: 57.86,
+                    elapsed_seconds: 28.8,
+                    eta_seconds: Some(16.2),
+                    duration_seconds: Some(90.4),
+                    pass: None,
+                }),
+            }),
+        );
+    }
+
     pub(super) fn apply_workspace_image_fixture(&mut self) {
         self.seed_image_source_fixture();
         self.settings_ui.active_tab = SettingsTab::Metadata;
@@ -225,6 +270,13 @@ impl FrameRoot {
                 bitrate: Some("12000000".to_string()),
                 video_codec: Some("prores".to_string()),
                 audio_codec: Some("aac".to_string()),
+                audio_tracks: vec![crate::settings::AudioTrack {
+                    index: 1,
+                    codec: "aac".into(),
+                    channels: Some("2".into()),
+                    sample_rate: Some("48000".into()),
+                    ..Default::default()
+                }],
                 resolution: Some("3840x2160".to_string()),
                 frame_rate: Some(24.0),
                 width: Some(3840),
@@ -377,6 +429,34 @@ impl FrameRoot {
             file.config.selected_audio_tracks = vec![1];
         }
     }
+    fn apply_audio_tracks_fixture(&mut self) {
+        self.apply_preview_ready_fixture();
+        self.settings_ui.active_tab = SettingsTab::Output;
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::Audio);
+        let mut metadata = self.selected_source_metadata().unwrap();
+        let mut mix = metadata.audio_tracks[0].clone();
+        mix.language = Some("eng".into());
+        mix.metadata_title = Some("Main mix".into());
+        mix.label.clone_from(&mix.metadata_title);
+        mix.is_default = true;
+        let commentary = crate::settings::AudioTrack {
+            index: 2,
+            language: Some("pol".into()),
+            metadata_title: Some("Director commentary".into()),
+            label: Some("Director commentary".into()),
+            is_default: false,
+            ..mix.clone()
+        };
+        metadata.audio_tracks = vec![mix, commentary];
+        self.source_metadata.mark_ready("fixture-preview", metadata);
+        let file = self.file_queue.selected_file_mut().unwrap();
+        file.config.container = "mkv".into();
+        file.config.processing_mode = crate::settings::ProcessingMode::CopyAudio;
+        file.config.selected_audio_tracks = vec![1, 2];
+    }
+
     pub(super) fn apply_settings_audio_filters_fixture(&mut self) {
         self.seed_audio_source_fixture();
         self.settings_ui.active_tab = SettingsTab::Output;
@@ -456,6 +536,7 @@ impl FrameRoot {
     }
     pub(super) fn apply_settings_subtitles_fixture(&mut self) {
         self.apply_preview_ready_fixture();
+        self.available_filters.subtitles = true;
         self.settings_ui.active_tab = SettingsTab::Output;
         self.settings_ui
             .expanded_output_sections
@@ -572,6 +653,8 @@ impl FrameRoot {
                         channels: Some("2".to_string()),
                         channel_layout: Some("stereo".to_string()),
                         language: Some("eng".to_string()),
+                        metadata_title: Some("Main mix".to_string()),
+                        is_default: true,
                         label: Some("Main mix".to_string()),
                         bitrate_kbps: Some(1536.0),
                         sample_rate: Some("48000".to_string()),
@@ -583,6 +666,8 @@ impl FrameRoot {
                         channels: Some("2".to_string()),
                         channel_layout: Some("stereo".to_string()),
                         language: Some("eng".to_string()),
+                        metadata_title: Some("Reference".to_string()),
+                        is_default: false,
                         label: Some("Reference".to_string()),
                         bitrate_kbps: Some(192.0),
                         sample_rate: Some("48000".to_string()),

@@ -13,12 +13,20 @@ fn native_opus_trim_rejects_incomplete_selected_packet_timing_before_export() {
             ("end", None, "0.2130009"),
             ("late", Some("1.4570009"), "1.8000009"),
         ] {
-            for selected in [vec![0], vec![1, 0, 1]] {
-                let name = format!("{origin}-{label}-{}.opus", selected.len());
+            for (processing_mode, selected) in [
+                (ProcessingMode::Copy, vec![0]),
+                (ProcessingMode::Copy, vec![1, 0, 1]),
+                (ProcessingMode::CopyAudio, vec![0]),
+            ] {
+                let name = format!(
+                    "{origin}-{label}-{}-{}.opus",
+                    processing_mode.id(),
+                    selected.len()
+                );
                 let output = sandbox.path(&name);
                 let config = GpuiConversionConfig {
                     container: "opus".into(),
-                    processing_mode: ProcessingMode::Copy,
+                    processing_mode,
                     audio_codec: "copy".into(),
                     selected_audio_tracks: selected,
                     start_time: start.map(Into::into),

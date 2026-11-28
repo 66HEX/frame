@@ -12,9 +12,8 @@
       controls, source probing, conversion logs, and FFmpeg-backed previews.
     </p>
     <p>
-      The Flathub build uses FFmpeg, FFprobe, codecs, graphics, and media
-      libraries from the Freedesktop runtime instead of bundling private media
-      binaries.
+      The Flathub build runs Frame’s media worker with the codec, filter and
+      graphics libraries supplied by the Freedesktop runtime.
     </p>
   </description>
   <launchable type="desktop-id">io.github._66HEX.Frame.desktop</launchable>

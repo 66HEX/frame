@@ -156,3 +156,89 @@ fn old_label_only_payloads_remain_untitled_and_stale_selection_errors_are_unchan
         assert!(actual.contains("#999"), "{actual}");
     }
 }
+
+#[test]
+fn audio_edits_follow_source_indices_and_preserve_policy_for_every_output_ordinal() {
+    use crate::types::AudioTrackOverride;
+    let mut config = sample_config("mp4", "libx264");
+    config.selected_audio_tracks = vec![3, 1, 3];
+    config.audio_track_overrides.insert(
+        3,
+        AudioTrackOverride {
+            sample_rate: None,
+            language: Some(" POL ".into()),
+            title: Some("Żółć = ♥".into()),
+            is_default: Some(true),
+        },
+    );
+    config.audio_track_overrides.insert(
+        1,
+        AudioTrackOverride {
+            sample_rate: None,
+            language: Some(String::new()),
+            title: Some(String::new()),
+            is_default: None,
+        },
+    );
+    config.audio_track_overrides.insert(
+        99,
+        AudioTrackOverride {
+            is_default: Some(true),
+            ..Default::default()
+        },
+    );
+    let mut probe = titled_probe();
+    probe.audio_tracks[0].is_default = true;
+    for mode in [
+        MetadataMode::Preserve,
+        MetadataMode::Clean,
+        MetadataMode::Replace,
+    ] {
+        config.metadata.mode.clone_from(&mode);
+        let args = build_ffmpeg_args("source.mp4", "out.mp4", &config, &probe).unwrap();
+        for (ordinal, default) in ["+default", "-default", "-default"].iter().enumerate() {
+            assert!(args_contains_pair(
+                &args,
+                &format!("-disposition:a:{ordinal}"),
+                default
+            ));
+        }
+        let texts = audio_title_pairs(&args);
+        if mode == MetadataMode::Preserve {
+            assert_eq!(
+                texts,
+                [
+                    ("-metadata:s:a:0", "title=Żółć = ♥"),
+                    ("-metadata:s:a:1", "title="),
+                    ("-metadata:s:a:2", "title=Żółć = ♥")
+                ]
+            );
+            assert!(args_contains_pair(&args, "-metadata:s:a:0", "language=pol"));
+            assert!(args_contains_pair(&args, "-metadata:s:a:1", "language="));
+        } else {
+            assert!(texts.is_empty());
+            assert!(!args.iter().any(|arg| arg.starts_with("-metadata:s:a:")));
+        }
+    }
+}
+
+#[test]
+fn audio_override_drafts_round_trip_and_old_serialized_tasks_remain_unchanged() {
+    use crate::types::AudioTrackOverride;
+    let old = serde_json::to_value(sample_config("mkv", "libx264")).unwrap();
+    assert!(old.get("audioTrackOverrides").is_none());
+    let mut config: ConversionConfig = serde_json::from_value(old).unwrap();
+    let edit = AudioTrackOverride {
+        title: Some(String::new()),
+        is_default: Some(false),
+        ..Default::default()
+    };
+    config.audio_track_overrides.insert(7, edit.clone());
+    let json = serde_json::to_value(&config).unwrap();
+    assert_eq!(
+        json["audioTrackOverrides"]["7"],
+        serde_json::json!({"title":"","isDefault":false})
+    );
+    let restored: ConversionConfig = serde_json::from_value(json).unwrap();
+    assert_eq!(restored.audio_track_overrides.get(&7), Some(&edit));
+}
