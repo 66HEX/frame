@@ -347,7 +347,7 @@ fn fast_prefilter_matches_full_normalized_oracle_across_media_modes_and_streams(
                     ("", "flac"),
                 ] {
                     let metadata = metadata(kind, video, audio);
-                    let mut policy = CandidatePolicy::new(&config);
+                    let mut policy = CandidatePolicy::new(&config, preset.enable_source_audio);
                     for audio in [vec![], vec![3], vec![3, 7], vec![99], vec![3, 99]] {
                         for subtitles in [vec![], vec![4], vec![99], vec![4, 99]] {
                             let target = ConversionConfig {
@@ -669,7 +669,7 @@ fn memo_does_not_cache_target_qualification_or_cross_audio_video_or_containers()
             ..ConversionConfig::default()
         };
         let preset = create_custom_preset(String::new(), "test", &donor);
-        let mut policy = CandidatePolicy::new(&donor);
+        let mut policy = CandidatePolicy::new(&donor, preset.enable_source_audio);
         for indices in [vec![3], vec![99], vec![], vec![7], vec![3, 99]] {
             let target = ConversionConfig {
                 selected_audio_tracks: indices,
@@ -708,7 +708,7 @@ fn copy_audio_rate_validation_is_not_cached_by_codec() {
                 source
             })
             .collect();
-        let mut policy = CandidatePolicy::new(&donor);
+        let mut policy = CandidatePolicy::new(&donor, preset.enable_source_audio);
         for (source, rate) in sources.iter().zip(rates) {
             assert!(policy.may_apply(&target, source));
             assert_eq!(
@@ -769,7 +769,7 @@ fn copy_adpcm_source_verdict_is_not_cached_by_codec() {
                 source
             })
             .collect();
-        let mut policy = CandidatePolicy::new(&donor);
+        let mut policy = CandidatePolicy::new(&donor, preset.enable_source_audio);
         for (source, tag) in sources.iter().zip(tags) {
             assert!(policy.may_apply(&target, source));
             assert_eq!(
@@ -893,4 +893,47 @@ fn empty_selected_scope_changes_nothing_even_when_files_are_checked_later() {
     let before = root.file_queue.files().to_vec();
     assert!(!root.apply_all_snapshot(&selected));
     assert_eq!(root.file_queue.files(), before);
+}
+
+#[test]
+fn named_audio_preset_qualifies_targets_with_the_tracks_it_will_actually_copy() {
+    let mut root = batch_root();
+    let mut preset = create_custom_preset(
+        "audio-copy".into(),
+        "AAC copy",
+        &ConversionConfig {
+            container: "m4a".into(),
+            processing_mode: ProcessingMode::CopyAudio,
+            ..Default::default()
+        },
+    );
+    preset.enable_source_audio = true;
+    for (id, index, codec) in [
+        ("aac", 0, "aac"),
+        ("incompatible", 2, "vorbis"),
+        ("silent", 1, ""),
+    ] {
+        let file = FileItem::from_path(id, format!("/tmp/{id}.mkv"), 10);
+        root.file_queue.add_file(file);
+        let mut source = metadata(SourceKind::Video, "h264", codec);
+        source.audio_tracks.truncate(usize::from(!codec.is_empty()));
+        if let Some(track) = source.audio_tracks.first_mut() {
+            track.index = index;
+        }
+        root.source_metadata.mark_ready(id, source);
+    }
+    let snapshot = root.snapshot_batch(&preset, None);
+    let included = |id: &str| snapshot.targets.iter().any(|item| item.id == id);
+    assert!(included("aac"));
+    assert!(!included("incompatible"));
+    assert!(!included("silent"));
+    assert!(root.apply_all_snapshot(&snapshot));
+    assert_eq!(
+        root.file_queue
+            .file_by_id("aac")
+            .unwrap()
+            .config
+            .selected_audio_tracks,
+        [0]
+    );
 }

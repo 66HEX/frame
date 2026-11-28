@@ -9,6 +9,8 @@ pub struct PresetDefinition {
     pub config: ConversionConfig,
     #[serde(default)]
     pub built_in: bool,
+    #[serde(default)]
+    pub enable_source_audio: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -27,6 +29,7 @@ impl PresetDefinition {
             name: name.to_string(),
             config,
             built_in: true,
+            enable_source_audio: false,
         }
     }
 
@@ -37,6 +40,7 @@ impl PresetDefinition {
             name,
             config,
             built_in: false,
+            enable_source_audio: false,
         }
     }
 }

@@ -162,21 +162,22 @@ pub fn preset_options(
     presets
         .iter()
         .map(|preset| {
-            let is_compatible = preset_is_compatible(preset, metadata);
+            let unavailable = if preset_is_compatible(preset, metadata) {
+                preset_audio_unavailable(preset, config, metadata)
+            } else {
+                Some("Incompatible container")
+            };
+            let is_compatible = unavailable.is_none();
             let mut applied = config.clone();
             crate::settings::apply_preset(&mut applied, preset, metadata);
-            let is_selected = is_compatible && configs_match(config, &applied);
+            let is_selected = is_compatible
+                && config.selected_audio_tracks == applied.selected_audio_tracks
+                && configs_match(config, &applied);
             PresetOption {
                 preset: preset.clone(),
                 is_selected,
                 is_compatible,
-                status: if !is_compatible {
-                    Some("Incompatible container")
-                } else if is_selected {
-                    Some("Applied")
-                } else {
-                    None
-                },
+                status: unavailable.or(is_selected.then_some("Applied")),
             }
         })
         .collect()
@@ -208,6 +209,39 @@ pub fn preset_is_compatible(preset: &PresetDefinition, metadata: Option<&SourceM
         SourceKind::Audio => is_audio_only_container(&preset.config.container),
         SourceKind::Video => true,
     }
+}
+
+/// Explains why a saved preset cannot enable audio on this source.
+pub(crate) fn preset_audio_unavailable(
+    preset: &PresetDefinition,
+    target: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
+) -> Option<&'static str> {
+    let metadata = metadata?;
+    let container = &preset.config.container;
+    if !preset.enable_source_audio || !crate::settings::container_supports_audio(container) {
+        return None;
+    }
+    let default_track =
+        crate::settings::preset_default_audio_track(target, true, true, Some(metadata));
+    let indices = default_track.map_or(
+        target.selected_audio_tracks.as_slice(),
+        std::slice::from_ref,
+    );
+    if is_audio_only_container(container) && indices.is_empty() {
+        return Some("No source audio");
+    }
+    for &index in indices {
+        let Some(track) = metadata.audio_track(index) else {
+            return Some("Source track unavailable");
+        };
+        if preset.config.processing_mode.copies_audio()
+            && super::audio::audio_copy_error_for_track(container, metadata, track).is_some()
+        {
+            return Some("Incompatible audio for copying");
+        }
+    }
+    None
 }
 
 #[must_use]

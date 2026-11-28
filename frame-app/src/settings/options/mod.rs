@@ -25,6 +25,7 @@ pub use output::{
     is_container_compatible_for_stream_copy, output_container_options,
     output_processing_mode_options, processing_stream_available, visible_output_containers,
 };
+pub(crate) use presets::preset_audio_unavailable;
 pub use presets::{
     configs_match, create_custom_preset, default_presets, preset_is_compatible, preset_options,
 };

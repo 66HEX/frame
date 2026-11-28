@@ -10,7 +10,7 @@ use crate::settings::{
     audio_settings_error, container_supports_audio, create_custom_preset, is_audio_only_container,
     is_audio_stream_codec_allowed_for_container, is_container_compatible_for_stream_copy,
     is_gif_container, is_image_container, is_video_stream_codec_allowed_for_container,
-    preset_is_compatible, source_kind_for,
+    preset_audio_unavailable, preset_default_audio_track, preset_is_compatible, source_kind_for,
 };
 use crate::source_metadata::MetadataStatus;
 use crate::theme;
@@ -96,14 +96,16 @@ struct CandidatePolicy<'a> {
     donor: &'a ConversionConfig,
     kind: OutputKind,
     supports_audio: bool,
+    enable_source_audio: bool,
     video_verdicts: CodecVerdicts<'a>,
     audio_verdicts: CodecVerdicts<'a>,
 }
 
 impl<'a> CandidatePolicy<'a> {
-    fn new(donor: &'a ConversionConfig) -> Self {
+    fn new(donor: &'a ConversionConfig, enable_source_audio: bool) -> Self {
         Self {
             donor,
+            enable_source_audio,
             kind: if is_audio_only_container(&donor.container) {
                 OutputKind::Audio
             } else if is_image_container(&donor.container) {
@@ -129,8 +131,18 @@ impl<'a> CandidatePolicy<'a> {
             return false;
         }
         let keeps_audio = kind != SourceKind::Image && self.supports_audio;
+        let default_track = preset_default_audio_track(
+            target,
+            keeps_audio,
+            self.enable_source_audio,
+            Some(metadata),
+        );
+        let selected_audio = default_track.map_or(
+            target.selected_audio_tracks.as_slice(),
+            std::slice::from_ref,
+        );
         if keeps_audio
-            && !target.selected_audio_tracks.iter().all(|index| {
+            && !selected_audio.iter().all(|index| {
                 metadata
                     .audio_tracks
                     .iter()
@@ -150,7 +162,7 @@ impl<'a> CandidatePolicy<'a> {
             return !mode.copies_video();
         }
         if self.kind == OutputKind::Audio {
-            if mode.copies_audio() && target.selected_audio_tracks.is_empty() {
+            if mode.copies_audio() && selected_audio.is_empty() {
                 return false;
             }
         } else if mode.copies_video()
@@ -167,7 +179,7 @@ impl<'a> CandidatePolicy<'a> {
             || metadata
                 .audio_tracks
                 .iter()
-                .filter(|track| target.selected_audio_tracks.contains(&track.index))
+                .filter(|track| selected_audio.contains(&track.index))
                 .all(|track| {
                     self.audio_verdicts.allowed(&track.codec, || {
                         is_audio_stream_codec_allowed_for_container(container, &track.codec)
@@ -183,7 +195,9 @@ fn candidate_for(
 ) -> Option<ConversionConfig> {
     #[cfg(test)]
     CANDIDATES.with(|count| count.set(count.get() + 1));
-    if !preset_is_compatible(preset, Some(metadata)) {
+    if !preset_is_compatible(preset, Some(metadata))
+        || preset_audio_unavailable(preset, target, Some(metadata)).is_some()
+    {
         return None;
     }
     let mut candidate = target.clone();
@@ -239,7 +253,7 @@ impl FrameRoot {
             Ok(donor) => donor,
             Err(reason) => return ApplyAllAvailability::Disabled(reason),
         };
-        let mut policy = CandidatePolicy::new(&donor.config);
+        let mut policy = CandidatePolicy::new(&donor.config, false);
         let mut loading = false;
         let available = self.file_queue.files().iter().any(|target| {
             if target.id == donor.id || !target.status.is_actionable_for_conversion() {
@@ -277,7 +291,7 @@ impl FrameRoot {
         preset: &PresetDefinition,
         donor: Option<&FileItem>,
     ) -> ApplyAllSnapshot {
-        let mut policy = CandidatePolicy::new(&preset.config);
+        let mut policy = CandidatePolicy::new(&preset.config, preset.enable_source_audio);
         let mut considered = 0;
         let targets = self
             .file_queue
@@ -351,7 +365,8 @@ impl FrameRoot {
             .iter()
             .map(|target| (target.id.as_str(), target.path.as_str()))
             .collect();
-        let mut policy = CandidatePolicy::new(&snapshot.preset.config);
+        let mut policy =
+            CandidatePolicy::new(&snapshot.preset.config, snapshot.preset.enable_source_audio);
         let mut changed = false;
         let named_preset = self
             .presets

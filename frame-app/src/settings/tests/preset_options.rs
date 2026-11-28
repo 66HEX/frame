@@ -316,3 +316,43 @@ fn create_custom_preset_omits_source_specific_track_state() {
     assert!(preset.config.external_subtitle_tracks.is_empty());
     assert_eq!(preset.config.subtitle_burn_path, None);
 }
+
+#[test]
+fn audio_preset_enables_each_sources_own_first_track_and_updates_applied_status() {
+    let metadata = video_metadata();
+    let mut preset = default_presets().remove(0);
+    preset.enable_source_audio = true;
+    let options = |config: &ConversionConfig| {
+        preset_options(config, std::slice::from_ref(&preset), Some(&metadata))
+    };
+    let mut config = ConversionConfig::default();
+    assert!(!options(&config)[0].is_selected);
+    assert!(apply_preset(&mut config, &preset, Some(&metadata)));
+    assert_eq!(config.selected_audio_tracks, [1]);
+    assert!(options(&config)[0].is_selected);
+    config.selected_audio_tracks.clear();
+    assert!(!options(&config)[0].is_selected);
+
+    let silent = SourceMetadata {
+        audio_tracks: vec![],
+        ..metadata
+    };
+    apply_preset(&mut config, &preset, Some(&silent));
+    assert!(config.selected_audio_tracks.is_empty());
+    assert!(preset_options(&config, &[preset], Some(&silent))[0].is_selected);
+}
+
+#[test]
+fn presets_saved_without_an_audio_policy_preserve_muted_targets() {
+    let mut legacy = serde_json::to_value(create_custom_preset(
+        "old".into(),
+        "Old preset",
+        &ConversionConfig::default(),
+    ))
+    .unwrap();
+    legacy.as_object_mut().unwrap().remove("enableSourceAudio");
+    let preset: PresetDefinition = serde_json::from_value(legacy).unwrap();
+    let mut config = ConversionConfig::default();
+    apply_preset(&mut config, &preset, Some(&video_metadata()));
+    assert!(config.selected_audio_tracks.is_empty());
+}
