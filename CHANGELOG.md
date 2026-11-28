@@ -13,10 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Media Engine:** Frame now reads, previews and exports files through a worker linked directly to the FFmpeg libraries. Desktop packages include the worker, while Flathub and Nixpkgs use their distribution’s libraries.
 - **Homebrew Distribution:** Expands the custom Homebrew tap cask (`brew install 66HEX/frame/frame`) to support Linux AppImages alongside macOS DMGs, automatically strips the macOS quarantine attribute on install, and updates installation docs.
 
 ### Fixed
 
+- **File Queue:** Aligns the column headings with their file rows. [#305](https://github.com/66HEX/frame/pull/305)
 - **Audio Track Selection After Non-Audio Presets:** Restores the default source audio track when switching from a non-audio container or preset (such as GIF) back to an audio-supporting format, while preserving explicit audio exclusion between audio-capable formats. Resolves [#273](https://github.com/66HEX/frame/issues/273).
 - **Windows Bundling:** Stops `cargo xtask bundle windows` from re-entering Cargo via `script/bundle-windows.ps1` and scrubs Cargo package environment variables from child processes so Windows builds no longer fail trying to relink `xtask.exe`. Resolves [#254](https://github.com/66HEX/frame/issues/254).
 
