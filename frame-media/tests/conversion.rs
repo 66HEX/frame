@@ -312,3 +312,75 @@ fn still_image_keeps_unknown_duration_and_quiet_helpers_write_only_completion() 
         }
     }
 }
+
+#[test]
+fn preflight_negotiates_each_decoder_before_any_output_is_opened() {
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("source.ppm");
+    let mut ppm = b"P6\n3 3\n255\n".to_vec();
+    ppm.extend([128; 27]);
+    fs::write(&source, ppm).unwrap();
+    let output = dir.path().join("encoded.mp4");
+    let progress = dir.path().join("progress");
+    for device in ["cuda", "d3d11va", "vaapi"] {
+        let args = [
+            "-hwaccel",
+            device,
+            "-i",
+            source.to_str().unwrap(),
+            "-map",
+            "0:0",
+            "-vf",
+            "pad=4:4",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:v",
+            "libx264",
+            "-progress",
+            progress.to_str().unwrap(),
+            "-n",
+        ];
+        let dest = output.to_str().unwrap();
+        let probe = worker("preflight", args.into_iter().chain([dest]));
+        success(&probe);
+        let route: serde_json::Value = serde_json::from_slice(&probe.stdout).unwrap();
+        assert_eq!(route["encoder"], "libx264");
+        assert_eq!(route["decoder"], "cpu");
+        assert_eq!(route["filters"], "cpu");
+        assert_eq!(route["format"], "yuv420p");
+        assert_eq!(route["upload"], false);
+        assert!(route["fallback"].as_str().is_some());
+        assert!(!output.exists() && !progress.exists());
+
+        for pins in [
+            ["-frame_decoder", device],
+            ["-frame_filters", device],
+            ["-frame_format", "p010le"],
+            ["-frame_device", "removed-adapter"],
+        ] {
+            assert!(
+                !worker("convert", args.into_iter().chain(pins).chain([dest]))
+                    .status
+                    .success()
+            );
+            assert!(!output.exists());
+        }
+        let pins = [
+            "-frame_decoder",
+            "cpu",
+            "-frame_filters",
+            "cpu",
+            "-frame_device",
+            "default",
+            "-frame_format",
+            "yuv420p",
+        ];
+        success(&worker(
+            "convert",
+            args.into_iter().chain(pins).chain([dest]),
+        ));
+        assert!(fs::read(&output).unwrap().len() > 100);
+        fs::remove_file(&output).unwrap();
+        fs::remove_file(&progress).unwrap();
+    }
+}

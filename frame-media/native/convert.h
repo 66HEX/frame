@@ -41,7 +41,7 @@ typedef struct {
     Source *sources;
     int options_len, sources_len;
     const char *output;
-    int video_pass, preflight;
+    int video_pass, preflight, host_filters;
     const char *stats_path;
     char *vpx_stats;
     int64_t duration;

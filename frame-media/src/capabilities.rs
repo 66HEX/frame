@@ -76,3 +76,45 @@ pub fn run(args: &[OsString]) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::{CStr, CString, c_char, c_int};
+
+    unsafe extern "C" {
+        fn frame_filter_mapping(
+            backend: *const c_char,
+            graph: *const c_char,
+            transpose_available: c_int,
+        ) -> *const c_char;
+    }
+
+    #[test]
+    fn filter_domains_use_only_equivalent_registered_device_filters() {
+        for (backend, operation, available, expected) in [
+            ("cuda", "null", false, Some("null")),
+            ("vaapi", "null", false, Some("null")),
+            ("d3d11va", "null", false, Some("null")),
+            ("cuda", "hflip", true, Some("transpose_cuda=hflip")),
+            ("cuda", "transpose=1", true, Some("transpose_cuda=clock")),
+            ("vaapi", "vflip", true, Some("transpose_vaapi=vflip")),
+            ("vaapi", "transpose=2", true, Some("transpose_vaapi=cclock")),
+            ("cuda", "transpose=1", false, None),
+            ("d3d11va", "transpose=1", true, None),
+            ("vaapi", "vflip,pad=642:360", true, None),
+            ("cuda", "crop=101:51", true, None),
+            ("vaapi", "[0:v][1:v]overlay", true, None),
+            ("d3d11va", "subtitles=sub.srt", true, None),
+        ] {
+            let backend = CString::new(backend).unwrap();
+            let graph = CString::new(operation).unwrap();
+            // SAFETY: inputs are NUL-terminated. Each result is NULL or static text.
+            let mapping = unsafe {
+                frame_filter_mapping(backend.as_ptr(), graph.as_ptr(), i32::from(available))
+            };
+            let actual =
+                (!mapping.is_null()).then(|| unsafe { CStr::from_ptr(mapping) }.to_str().unwrap());
+            assert_eq!(actual, expected, "{backend:?}/{operation}");
+        }
+    }
+}

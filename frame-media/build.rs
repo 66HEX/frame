@@ -12,6 +12,9 @@ const LIBRARIES: &[&str] = &[
 fn main() {
     println!("cargo:rerun-if-env-changed=FFMPEG_DIR");
     println!("cargo:rerun-if-changed=native");
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        println!("cargo:rustc-link-lib=dxgi");
+    }
     let mut build = cc::Build::new();
     build.std("c11");
     let sdk = env::var_os("FFMPEG_DIR").map(PathBuf::from);

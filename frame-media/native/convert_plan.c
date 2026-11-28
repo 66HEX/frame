@@ -75,6 +75,7 @@ int frame_convert_parse(ConvertPlan *plan, int argc, const char *const *argv) {
                                          "mpegts_m2ts_mode",
                                          "hwaccel",
                                          "frame_decoder",
+                                         "frame_filters",
                                          "frame_device",
                                          "frame_format",
                                          "ac",

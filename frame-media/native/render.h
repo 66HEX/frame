@@ -20,6 +20,7 @@ typedef struct FrameRenderPlan {
     int threads;               /* 0 for automatic */
     const char *hardware_device;
     AVBufferRef *device_context;
+    int keep_surfaces;
     int *hardware_failed;
     const int *mapped_streams;
     int mapped_count;
@@ -31,6 +32,6 @@ typedef struct FrameRenderer FrameRenderer;
 int frame_render_open(FrameRenderer **result, const FrameRenderPlan *plan);
 int frame_render_next(FrameRenderer *renderer, AVFrame *frame, AVRational *time_base);
 AVFilterContext *frame_render_sink(FrameRenderer *renderer);
-int frame_render_downloaded(const FrameRenderer *renderer);
+int frame_render_used_hardware(const FrameRenderer *renderer);
 void frame_render_close(FrameRenderer **renderer);
 #endif

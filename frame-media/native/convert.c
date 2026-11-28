@@ -495,9 +495,9 @@ static int convert(ConvertPlan *p, AVFormatContext **outp, ConvertTrack *tracks,
             const FrameHardwareRoute *r = &t->route;
             // All strings originate from libav registries or the typed route,
             // including the numeric render node/adapter ID.
-            printf("{\"encoder\":\"%s\",\"decoder\":\"%s\",\"filters\":\"cpu\","
+            printf("{\"encoder\":\"%s\",\"decoder\":\"%s\",\"filters\":\"%s\","
                    "\"upload\":%s,\"device\":\"%s\",\"format\":\"%s\",\"fallback\":",
-                   t->encoder->codec->name, r->decoder, r->upload ? "true" : "false",
+                   t->encoder->codec->name, r->decoder, r->filters, r->upload ? "true" : "false",
                    r->device_name, av_get_pix_fmt_name(r->sample_format));
             if (r->fallback)
                 printf("\"%s\"}\n", r->fallback);
@@ -532,8 +532,8 @@ static int convert(ConvertPlan *p, AVFormatContext **outp, ConvertTrack *tracks,
         const ConvertTrack *t = &tracks[i];
         if (t->kind == 'v' && t->encoder &&
             (frame_plan_opt(p, "hwaccel") || t->route.device || frame_plan_opt(p, "frame_decoder")))
-            fprintf(stderr, "Video route: decoder=%s filters=cpu samples=%s upload=%s encoder=%s device=%s%s%s\n",
-                    t->route.decoder, av_get_pix_fmt_name(t->route.sample_format),
+            fprintf(stderr, "Video route: decoder=%s filters=%s samples=%s upload=%s encoder=%s device=%s%s%s\n",
+                    t->route.decoder, t->route.filters, av_get_pix_fmt_name(t->route.sample_format),
                     t->route.upload ? "yes" : "no", t->encoder->codec->name, t->route.device_name,
                     t->route.fallback ? " fallback=" : "", t->route.fallback ? t->route.fallback : "");
     }
@@ -553,8 +553,9 @@ static int convert(ConvertPlan *p, AVFormatContext **outp, ConvertTrack *tracks,
     return err;
 }
 
-int frame_convert(int argc, const char *const *argv, void *io, int preflight) {
-    ConvertPlan p = {.preflight = preflight};
+static int execute(int argc, const char *const *argv, void *io, int preflight, int *retry_host) {
+    ConvertPlan p = {.preflight = preflight, .host_filters = *retry_host};
+    *retry_host = 0;
     AVIOContext *pb = NULL;
     AVFormatContext *out = NULL;
     ConvertTrack *tracks = NULL;
@@ -572,6 +573,9 @@ int frame_convert(int argc, const char *const *argv, void *io, int preflight) {
     }
     for (int i = 0; i < count; ++i) {
         ConvertTrack *t = &tracks[i];
+        if (err < 0 && preflight && !p.host_filters && !frame_plan_opt(&p, "frame_filters") &&
+            t->route.filters && strcmp(t->route.filters, "cpu"))
+            *retry_host = 1;
         free_track(t);
     }
     av_free(tracks);
@@ -592,5 +596,15 @@ int frame_convert(int argc, const char *const *argv, void *io, int preflight) {
     av_free(p.sources);
     av_free(p.options);
     av_free(p.vpx_stats);
+    return err;
+}
+
+int frame_convert(int argc, const char *const *argv, void *io, int preflight) {
+    int retry_host = 0;
+    int err = execute(argc, argv, io, preflight, &retry_host);
+    // Device filters are optional: negotiate their real pool, graph and first
+    // packet, then retry the same requested encoder with host filters on failure.
+    if (retry_host)
+        err = execute(argc, argv, io, preflight, &retry_host);
     return err;
 }

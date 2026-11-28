@@ -34,7 +34,7 @@ typedef struct {
     enum AVPixelFormat hardware_format;
     int32_t display_matrix[9];
     int has_display_matrix;
-    int downloaded;
+    int used_hardware, keep_surfaces;
 } RenderInput;
 
 struct FrameRenderer {
@@ -60,6 +60,7 @@ static enum AVPixelFormat select_device_format(AVCodecContext *codec,
 static int open_input(RenderInput *input, const char *path, enum AVMediaType type, int index,
                       int64_t start_us, const FrameRenderPlan *plan, int primary) {
     input->strict = plan->strict;
+    input->keep_surfaces = primary && plan->keep_surfaces;
     input->audio_delta = AV_NOPTS_VALUE;
     int rc;
     if (primary && plan->shared_file) {
@@ -125,6 +126,8 @@ static int open_input(RenderInput *input, const char *path, enum AVMediaType typ
             }
             if (rc < 0)
                 return rc;
+            if (input->keep_surfaces)
+                input->decoder->extra_hw_frames = 16;
             input->hardware_format = config->pix_fmt;
             input->decoder->opaque = input;
             input->decoder->get_format = select_device_format;
@@ -185,7 +188,10 @@ static int next_decoded(RenderInput *in) {
             if (in->strict &&
                 (in->frame->decode_error_flags || (in->frame->flags & AV_FRAME_FLAG_CORRUPT)))
                 return AVERROR_INVALIDDATA;
-            if (in->frame->hw_frames_ctx) {
+            in->used_hardware |= !!in->frame->hw_frames_ctx;
+            if (in->keep_surfaces && !in->frame->hw_frames_ctx)
+                return AVERROR(ENOSYS);
+            if (!in->keep_surfaces && in->frame->hw_frames_ctx) {
                 AVFrame *software = av_frame_alloc();
                 if (!software)
                     return AVERROR(ENOMEM);
@@ -197,7 +203,6 @@ static int next_decoded(RenderInput *in) {
                 if (rc >= 0) {
                     av_frame_unref(in->frame);
                     av_frame_move_ref(in->frame, software);
-                    in->downloaded = 1;
                 }
                 av_frame_free(&software);
                 if (rc < 0)
@@ -292,6 +297,7 @@ static int configure_input(FrameRenderer *renderer, RenderInput *in, AVFilterCon
         return AVERROR(ENOMEM);
     params->time_base = audio ? frame->time_base : in->stream->time_base;
     params->format = frame->format;
+    params->hw_frames_ctx = frame->hw_frames_ctx;
     params->width = frame->width;
     params->height = frame->height;
     params->sample_aspect_ratio = av_guess_sample_aspect_ratio(in->format, in->stream, frame);
@@ -568,7 +574,7 @@ fail:
     return rc;
 }
 
-int frame_render_downloaded(const FrameRenderer *r) { return r->inputs[0].downloaded; }
+int frame_render_used_hardware(const FrameRenderer *r) { return r->inputs[0].used_hardware; }
 
 AVFilterContext *frame_render_sink(FrameRenderer *r) { return r->sink; }
 
@@ -598,6 +604,11 @@ int frame_render_next(FrameRenderer *r, AVFrame *frame, AVRational *tb) {
             rc = av_buffersrc_close(feed->source, feed->end_pts, 0);
         } else if (rc >= 0) {
             int reconfigure = changed_format(feed->last, feed->frame);
+            if (feed->keep_surfaces && (reconfigure ||
+                feed->last->hw_frames_ctx->data != feed->frame->hw_frames_ctx->data)) {
+                fprintf(stderr, "The source surface configuration changed after preflight. Retry with CPU decoding.\n");
+                return AVERROR_INPUT_CHANGED;
+            }
             av_frame_unref(feed->last);
             av_frame_move_ref(feed->last, feed->frame);
             rc = reconfigure ? rebuild_graph(r, feed) : submit_picture(feed);

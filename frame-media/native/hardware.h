@@ -10,7 +10,7 @@ typedef struct {
     enum AVHWDeviceType type;
     AVBufferRef *device;
     char device_name[80];
-    const char *decoder;
+    const char *decoder, *filters;
     const char *fallback;
     enum AVPixelFormat sample_format;
     int upload;
@@ -18,6 +18,10 @@ typedef struct {
 
 int frame_hardware_route(FrameHardwareRoute *route, const AVCodec *encoder,
                          enum AVPixelFormat samples, const char *requested_device);
+/* Returns a libavfilter chain only when every requested operation can keep
+ * samples on the decoder's device and the encoder consumes that surface. */
+const char *frame_surface_graph(const AVCodec *codec, const char *backend, const char *graph);
+const char *frame_filter_mapping(const char *backend, const char *graph, int transpose_available);
 int frame_prepare_surface(AVCodecContext *ctx, const FrameHardwareRoute *route);
 int frame_send_video_frame(AVCodecContext *ctx, AVFrame *samples);
 enum AVPixelFormat frame_surface_samples(const AVCodec *codec, const char *requested,

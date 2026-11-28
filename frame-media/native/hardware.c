@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <libavutil/avstring.h>
+#include <libavfilter/avfilter.h>
 #include <libavutil/pixdesc.h>
 #include <libavutil/intreadwrite.h>
 #ifdef __linux__
@@ -36,6 +37,43 @@ enum AVPixelFormat frame_surface_samples(const AVCodec *codec, const char *reque
                ? AV_PIX_FMT_P010LE : AV_PIX_FMT_NV12;
 }
 
+const char *frame_filter_mapping(const char *backend, const char *graph, int transpose_available) {
+    int cuda = !strcmp(backend, "cuda"), va = !strcmp(backend, "vaapi");
+    if (!cuda && !va && strcmp(backend, "d3d11va"))
+        return NULL;
+    if (!graph || !strcmp(graph, "null"))
+        return "null";
+    if (!transpose_available || (!cuda && !va))
+        return NULL;
+    static const struct { const char *host, *cuda, *va; } transforms[] = {
+        {"transpose=1", "transpose_cuda=clock", "transpose_vaapi=clock"},
+        {"transpose=2", "transpose_cuda=cclock", "transpose_vaapi=cclock"},
+        {"transpose=1,transpose=1", "transpose_cuda=reversal", "transpose_vaapi=reversal"},
+        {"hflip", "transpose_cuda=hflip", "transpose_vaapi=hflip"},
+        {"vflip", "transpose_cuda=vflip", "transpose_vaapi=vflip"},
+    };
+    for (size_t i = 0; i < sizeof(transforms) / sizeof(*transforms); ++i)
+        if (!strcmp(graph, transforms[i].host))
+            return cuda ? transforms[i].cuda : transforms[i].va;
+    // Keep mixed graphs, exact edge padding, overlays and subtitle rasterization
+    // together on the host. Substituting only one filter can change the result.
+    return NULL;
+}
+
+const char *frame_surface_graph(const AVCodec *codec, const char *backend, const char *graph) {
+    if (!backend)
+        return NULL;
+    enum AVHWDeviceType hw = av_hwdevice_find_type_by_name(backend);
+    const AVCodecHWConfig *config;
+    for (int i = 0; (config = avcodec_get_hw_config(codec, i)); ++i) {
+        if (config->device_type != hw || !(config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_FRAMES_CTX))
+            continue;
+        const char *transpose = hw == AV_HWDEVICE_TYPE_CUDA ? "transpose_cuda" : "transpose_vaapi";
+        return frame_filter_mapping(backend, graph, avfilter_get_by_name(transpose) != NULL);
+    }
+    return NULL;
+}
+
 int frame_prepare_surface(AVCodecContext *ctx, const FrameHardwareRoute *route) {
     if (!route->device)
         return 0;
@@ -59,6 +97,13 @@ int frame_prepare_surface(AVCodecContext *ctx, const FrameHardwareRoute *route) 
 int frame_send_video_frame(AVCodecContext *ctx, AVFrame *samples) {
     if (!ctx->hw_frames_ctx)
         return avcodec_send_frame(ctx, samples);
+    if (samples->hw_frames_ctx) {
+        if (samples->hw_frames_ctx->data != ctx->hw_frames_ctx->data) {
+            fprintf(stderr, "The source surface pool changed after preflight. Retry with CPU decoding.\n");
+            return AVERROR_INPUT_CHANGED;
+        }
+        return avcodec_send_frame(ctx, samples);
+    }
     AVFrame *surface = av_frame_alloc();
     if (!surface)
         return AVERROR(ENOMEM);
@@ -170,6 +215,45 @@ static int amd_adapter_name(AVBufferRef *ref, char *name, size_t size) {
              (unsigned long)desc.AdapterLuid.LowPart);
     return 0;
 }
+
+static int select_radeon(FrameHardwareRoute *r, const AVCodec *codec, const char *pin,
+                         int allow_sw, const uint8_t *input) {
+    static const GUID factory_iid = {0x7b7166ec,0x21c7,0x44ae,{0xb2,0x1a,0xc9,0xae,0x32,0x1a,0xe3,0x69}};
+    IDXGIFactory *factory = NULL;
+    if (FAILED(CreateDXGIFactory(&factory_iid, (void **)&factory)))
+        return AVERROR(ENODEV);
+    int err = AVERROR(ENODEV);
+    for (UINT i = 0;; ++i) {
+        IDXGIAdapter *adapter = NULL;
+        DXGI_ADAPTER_DESC desc;
+        if (FAILED(IDXGIFactory_EnumAdapters(factory, i, &adapter)))
+            break;
+        HRESULT hr = IDXGIAdapter_GetDesc(adapter, &desc);
+        IDXGIAdapter_Release(adapter);
+        if (FAILED(hr) || desc.VendorId != 0x1002)
+            continue;
+        char name[80];
+        snprintf(name, sizeof(name), "amd-%08lx-%08lx", (unsigned long)desc.AdapterLuid.HighPart,
+                 (unsigned long)desc.AdapterLuid.LowPart);
+        if (pin && strcmp(pin, name))
+            continue;
+        char index[16];
+        snprintf(index, sizeof(index), "%u", i);
+        err = av_hwdevice_ctx_create(&r->device, r->type, index, NULL, 0);
+        if (err >= 0)
+            err = amd_adapter_name(r->device, r->device_name, sizeof(r->device_name));
+        // DXGI adapter indices can change while an external GPU is removed.
+        if (err >= 0 && strcmp(name, r->device_name))
+            err = AVERROR(ENODEV);
+        if (err >= 0)
+            err = trial(codec, r, allow_sw, input);
+        if (err >= 0)
+            break;
+        av_buffer_unref(&r->device);
+    }
+    IDXGIFactory_Release(factory);
+    return err;
+}
 #endif
 
 static int select_device(FrameHardwareRoute *r, const AVCodec *codec, const char *pin,
@@ -212,24 +296,7 @@ static int select_device(FrameHardwareRoute *r, const AVCodec *codec, const char
     if (!strcmp(codec->name, "hevc_amf")) {
         r->type = AV_HWDEVICE_TYPE_D3D11VA;
 #ifdef _WIN32
-        // Enumerate DXGI adapters in the order used by libav. An Intel primary
-        // adapter or a Radeon without HEVC support must not hide a second GPU.
-        int err = AVERROR(ENODEV);
-        for (unsigned i = 0; i < 64; ++i) {
-            char index[12];
-            snprintf(index, sizeof(index), "%u", i);
-            if (av_hwdevice_ctx_create(&r->device, r->type, index, NULL, 0) < 0)
-                break;
-            err = amd_adapter_name(r->device, r->device_name, sizeof(r->device_name));
-            if (err >= 0 && pin && strcmp(r->device_name, pin))
-                err = AVERROR(ENODEV);
-            if (err >= 0)
-                err = trial(codec, r, allow_sw, input);
-            if (err >= 0)
-                return 0;
-            av_buffer_unref(&r->device);
-        }
-        return err;
+        return select_radeon(r, codec, pin, allow_sw, input);
 #else
         return AVERROR(ENOSYS);
 #endif
@@ -247,6 +314,7 @@ int frame_hardware_route(FrameHardwareRoute *r, const AVCodec *encoder,
         return AVERROR(EINVAL);
     r->sample_format = samples;
     r->decoder = "cpu";
+    r->filters = "cpu";
     return select_device(r, encoder, requested_device, 0, pattern);
 }
 

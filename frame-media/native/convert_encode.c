@@ -213,7 +213,7 @@ static int negotiate_decoder(const ConvertPlan *p, ConvertTrack *t, FrameRenderP
     int decoder_failed = 0;
     request->hardware_failed = &decoder_failed;
     int err = frame_render_open(&t->render, request);
-    if (err < 0 && err != AVERROR_EOF && err != AVERROR(ENOMEM) && decoder_failed && !pin) {
+    if (err < 0 && err != AVERROR_EOF && err != AVERROR(ENOMEM) && decoder_failed && !pin && !request->keep_surfaces) {
         request->hardware_device = NULL;
         err = frame_render_open(&t->render, request);
         t->route.fallback = "Hardware decoding could not initialize for this source";
@@ -227,7 +227,7 @@ static int negotiate_decoder(const ConvertPlan *p, ConvertTrack *t, FrameRenderP
     }
     if (err < 0 || t->kind != 'v')
         return err;
-    if (frame_render_downloaded(t->render))
+    if (frame_render_used_hardware(t->render))
         t->route.decoder = request->hardware_device;
     else if (request->hardware_device)
         t->route.fallback = "Hardware decoding is unavailable for this source";
@@ -269,8 +269,27 @@ static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *cod
             .strict = t->strict,
             .hardware_device = t->kind == 'v' ? frame_plan_opt(p, "hwaccel") : NULL,
         };
+        const char *filter_pin = t->kind == 'v' ? frame_plan_opt(p, "frame_filters") : NULL;
+        const char *decoder_pin = frame_plan_opt(p, "frame_decoder");
+        int try_surfaces = (p->preflight || filter_pin) && !p->host_filters &&
+                           (!filter_pin || strcmp(filter_pin, "cpu")) &&
+                           (!decoder_pin || strcmp(decoder_pin, "cpu")) && !request.overlay;
+        const char *surface_graph = try_surfaces
+            ? frame_surface_graph(codec, request.hardware_device, graph) : NULL;
+        if (filter_pin && strcmp(filter_pin, "cpu") &&
+            (!surface_graph || strcmp(filter_pin, request.hardware_device)))
+            err = AVERROR(ENOSYS);
+        if (surface_graph) {
+            t->route.filters = request.hardware_device;
+            request.graph = surface_graph;
+            request.keep_surfaces = 1;
+            request.tail = "null";
+        }
         if (err >= 0)
             err = negotiate_decoder(p, t, &request);
+        if (err >= 0 && !surface_graph && request.hardware_device &&
+            !t->route.fallback && ((graph && strcmp(graph, "null")) || p->host_filters))
+            t->route.fallback = "The selected filters or pixel format require CPU processing";
     }
     av_bprint_finalize(&tail, NULL);
     if (err < 0)
@@ -287,13 +306,37 @@ static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *cod
         ctx->width = av_buffersink_get_w(sink);
         ctx->height = av_buffersink_get_h(sink);
         ctx->pix_fmt = av_buffersink_get_format(sink);
-        t->route.sample_format = ctx->pix_fmt;
+        AVBufferRef *surface = av_buffersink_get_hw_frames_ctx(sink);
+        if (surface) {
+            const AVHWFramesContext *pool = (AVHWFramesContext *)surface->data;
+            const char *fixed = frame_plan_opt(p, "pix_fmt");
+            const AVPixFmtDescriptor *actual = av_pix_fmt_desc_get(pool->sw_format);
+            const AVPixFmtDescriptor *requested = fixed ? av_pix_fmt_desc_get(av_get_pix_fmt(fixed)) : NULL;
+            // A surface route can preserve the selected chroma layout/depth.
+            // Format changes must go through the ordinary constrained graph.
+            if (!actual || (fixed && (!requested ||
+                (requested->flags & AV_PIX_FMT_FLAG_RGB) != (actual->flags & AV_PIX_FMT_FLAG_RGB) ||
+                requested->nb_components != actual->nb_components ||
+                requested->log2_chroma_w != actual->log2_chroma_w ||
+                requested->log2_chroma_h != actual->log2_chroma_h ||
+                requested->comp[0].depth != actual->comp[0].depth)))
+                return AVERROR(ENOSYS);
+            if (t->route.device && pool->sw_format != t->route.sample_format)
+                return AVERROR(ENOSYS);
+            ctx->hw_frames_ctx = av_buffer_ref(surface);
+            if (!ctx->hw_frames_ctx)
+                return AVERROR(ENOMEM);
+            t->route.upload = 0;
+            t->route.sample_format = pool->sw_format;
+        } else {
+            t->route.sample_format = ctx->pix_fmt;
+        }
         const char *pin = frame_plan_opt(p, "frame_format");
-        if (pin && strcmp(pin, av_get_pix_fmt_name(ctx->pix_fmt))) {
+        if (pin && strcmp(pin, av_get_pix_fmt_name(t->route.sample_format))) {
             fprintf(stderr, "The pixel format changed after hardware preflight. Check the export again.\n");
             return AVERROR(EINVAL);
         }
-        if ((err = frame_prepare_surface(ctx, &t->route)) < 0)
+        if (!surface && (err = frame_prepare_surface(ctx, &t->route)) < 0)
             return err;
         ctx->sample_aspect_ratio = av_buffersink_get_sample_aspect_ratio(sink);
         ctx->framerate = av_buffersink_get_frame_rate(sink);
