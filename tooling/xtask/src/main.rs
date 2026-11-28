@@ -663,16 +663,7 @@ fn flathub_sources(args: &[String]) -> Result<()> {
         vendor_dir.join("cargo-config.toml"),
         normalized_vendor_config,
     )?;
-    run_command_path(
-        "tar",
-        &[
-            "-czf".to_string(),
-            path_to_string_lossy(&vendor_archive),
-            "-C".to_string(),
-            path_to_string_lossy(&vendor_dir),
-            ".".to_string(),
-        ],
-    )?;
+    archive_flathub_vendor(&vendor_dir, &vendor_archive)?;
 
     let source_sha256 = file_sha256_hex(&source_archive)?;
     let vendor_sha256 = file_sha256_hex(&vendor_archive)?;
@@ -694,6 +685,27 @@ fn flathub_sources(args: &[String]) -> Result<()> {
     println!("Wrote {}", source_archive.display());
     println!("Wrote {}", vendor_archive.display());
     println!("Wrote {}", checksums_path.display());
+    Ok(())
+}
+
+fn archive_flathub_vendor(directory: &Path, archive: &Path) -> Result<()> {
+    // bsdtar on macOS otherwise emits binary AppleDouble files next to XML
+    // inputs. Linux build scripts then attempt to parse them as source files.
+    let status = Command::new("tar")
+        .env("COPYFILE_DISABLE", "1")
+        .arg("--exclude=._*")
+        .arg("-czf")
+        .arg(archive)
+        .arg("-C")
+        .arg(directory)
+        .arg(".")
+        .status()?;
+    if !status.success() {
+        return Err(XtaskError::CommandFailed {
+            program: "tar".into(),
+            status,
+        });
+    }
     Ok(())
 }
 
@@ -4597,6 +4609,40 @@ mod tests {
         assert!(workflow.contains("Frame-x86_64.AppImage.zsync"));
         assert!(workflow.contains("Frame-aarch64.AppImage"));
         assert!(workflow.contains("Frame-aarch64.AppImage.zsync"));
+    }
+
+    #[test]
+    fn flathub_vendor_archive_keeps_xml_without_appledouble_metadata() {
+        let temp = tempfile::tempdir().unwrap();
+        let vendor = temp.path().join("vendor");
+        fs::create_dir(&vendor).unwrap();
+        let xml = vendor.join("interface.xml");
+        fs::write(&xml, "<node/>").unwrap();
+        fs::write(vendor.join("._other.xml"), [0xff]).unwrap();
+        #[cfg(target_os = "macos")]
+        assert!(
+            Command::new("xattr")
+                .args(["-w", "org.frame.test", "metadata"])
+                .arg(&xml)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let archive = temp.path().join("vendor.tar.gz");
+        archive_flathub_vendor(&vendor, &archive).unwrap();
+        let listing = Command::new("tar")
+            .arg("-tzf")
+            .arg(archive)
+            .output()
+            .unwrap();
+        assert!(listing.status.success());
+        let entries = String::from_utf8(listing.stdout).unwrap();
+        assert!(
+            entries
+                .lines()
+                .any(|entry| entry.ends_with("interface.xml"))
+        );
+        assert!(!entries.lines().any(|entry| entry.contains("._")));
     }
 
     #[test]
