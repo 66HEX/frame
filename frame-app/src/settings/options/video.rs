@@ -214,11 +214,7 @@ pub(super) const fn video_codec_capability_available(
 ) -> bool {
     match capability {
         VideoCodecCapability::Mpeg2video => available_encoders.mpeg2video,
-        VideoCodecCapability::H264Videotoolbox => available_encoders.h264_videotoolbox,
-        VideoCodecCapability::H264Nvenc => available_encoders.h264_nvenc,
-        VideoCodecCapability::HevcVideotoolbox => available_encoders.hevc_videotoolbox,
-        VideoCodecCapability::HevcNvenc => available_encoders.hevc_nvenc,
-        VideoCodecCapability::Av1Nvenc => available_encoders.av1_nvenc,
+        VideoCodecCapability::Hardware(encoder) => encoder.compiled(available_encoders),
     }
 }
 
@@ -234,7 +230,7 @@ pub fn is_videotoolbox_video_codec(codec: &str) -> bool {
 
 #[must_use]
 pub fn is_hardware_video_codec(codec: &str) -> bool {
-    is_nvenc_video_codec(codec) || is_videotoolbox_video_codec(codec)
+    HardwareEncoder::from_name(codec).is_some()
 }
 
 #[must_use]

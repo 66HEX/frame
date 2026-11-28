@@ -32,7 +32,11 @@
 			"h264_nvenc",
 			"hevc_videotoolbox",
 			"hevc_nvenc",
-			"av1_nvenc"
+			"av1_nvenc",
+			"h264_vaapi",
+			"hevc_vaapi",
+			"av1_vaapi",
+			"hevc_amf"
 		],
 		"mkv": [
 			"libx264",
@@ -44,7 +48,11 @@
 			"h264_nvenc",
 			"hevc_videotoolbox",
 			"hevc_nvenc",
-			"av1_nvenc"
+			"av1_nvenc",
+			"h264_vaapi",
+			"hevc_vaapi",
+			"av1_vaapi",
+			"hevc_amf"
 		],
 		"webm": ["vp9"],
 		"mov": [
@@ -75,7 +83,11 @@
 			"hevc_videotoolbox": ["yuv420p", "yuv420p10le"],
 			"h264_nvenc": ["yuv420p"],
 			"hevc_nvenc": ["yuv420p", "yuv420p10le"],
-			"av1_nvenc": ["yuv420p", "yuv420p10le"]
+			"av1_nvenc": ["yuv420p", "yuv420p10le"],
+			"h264_vaapi": ["yuv420p"],
+			"hevc_vaapi": ["yuv420p", "yuv420p10le"],
+			"av1_vaapi": ["yuv420p", "yuv420p10le"],
+			"hevc_amf": ["yuv420p", "yuv420p10le"]
 		},
 		"mkv": {
 			"libx264": ["yuv420p", "yuv422p", "yuv444p", "yuv420p10le", "yuv422p10le", "yuv444p10le"],
@@ -87,7 +99,11 @@
 			"hevc_videotoolbox": ["yuv420p", "yuv420p10le"],
 			"h264_nvenc": ["yuv420p"],
 			"hevc_nvenc": ["yuv420p", "yuv420p10le"],
-			"av1_nvenc": ["yuv420p", "yuv420p10le"]
+			"av1_nvenc": ["yuv420p", "yuv420p10le"],
+			"h264_vaapi": ["yuv420p"],
+			"hevc_vaapi": ["yuv420p", "yuv420p10le"],
+			"av1_vaapi": ["yuv420p", "yuv420p10le"],
+			"hevc_amf": ["yuv420p", "yuv420p10le"]
 		},
 		"webm": {
 			"vp9": ["yuv420p", "yuv422p", "yuv444p"]

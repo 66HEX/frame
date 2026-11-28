@@ -15,15 +15,23 @@ pub enum HardwareEncoder {
     H264Nvenc,
     HevcNvenc,
     Av1Nvenc,
+    H264Vaapi,
+    HevcVaapi,
+    Av1Vaapi,
+    HevcAmf,
 }
 
 impl HardwareEncoder {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 9] = [
         Self::H264Videotoolbox,
         Self::HevcVideotoolbox,
         Self::H264Nvenc,
         Self::HevcNvenc,
         Self::Av1Nvenc,
+        Self::H264Vaapi,
+        Self::HevcVaapi,
+        Self::Av1Vaapi,
+        Self::HevcAmf,
     ];
 
     #[must_use]
@@ -39,6 +47,10 @@ impl HardwareEncoder {
             Self::H264Nvenc => "h264_nvenc",
             Self::HevcNvenc => "hevc_nvenc",
             Self::Av1Nvenc => "av1_nvenc",
+            Self::H264Vaapi => "h264_vaapi",
+            Self::HevcVaapi => "hevc_vaapi",
+            Self::Av1Vaapi => "av1_vaapi",
+            Self::HevcAmf => "hevc_amf",
         }
     }
 
@@ -55,6 +67,10 @@ impl HardwareEncoder {
             Self::H264Nvenc => encoders.h264_nvenc,
             Self::HevcNvenc => encoders.hevc_nvenc,
             Self::Av1Nvenc => encoders.av1_nvenc,
+            Self::H264Vaapi => cfg!(target_os = "linux") && encoders.h264_vaapi,
+            Self::HevcVaapi => cfg!(target_os = "linux") && encoders.hevc_vaapi,
+            Self::Av1Vaapi => cfg!(target_os = "linux") && encoders.av1_vaapi,
+            Self::HevcAmf => cfg!(target_os = "windows") && encoders.hevc_amf,
         }
     }
 }

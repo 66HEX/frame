@@ -12,6 +12,10 @@ fn empty_encoders() -> &'static AvailableEncoders {
         hevc_videotoolbox: false,
         hevc_nvenc: false,
         av1_nvenc: false,
+        h264_vaapi: false,
+        hevc_vaapi: false,
+        av1_vaapi: false,
+        hevc_amf: false,
         libfdk_aac: false,
         libmp3lame: false,
     };

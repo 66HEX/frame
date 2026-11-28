@@ -1,3 +1,5 @@
+use crate::capabilities::HardwareEncoder;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::settings) struct AudioCodecDefinition {
     pub(in crate::settings) codec: &'static str,
@@ -86,14 +88,10 @@ pub(in crate::settings) struct VideoCodecDefinition {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::settings) enum VideoCodecCapability {
     Mpeg2video,
-    H264Videotoolbox,
-    H264Nvenc,
-    HevcVideotoolbox,
-    HevcNvenc,
-    Av1Nvenc,
+    Hardware(HardwareEncoder),
 }
 
-pub(in crate::settings) const VIDEO_CODEC_DEFINITIONS: [VideoCodecDefinition; 12] = [
+pub(in crate::settings) const VIDEO_CODEC_DEFINITIONS: [VideoCodecDefinition; 16] = [
     VideoCodecDefinition {
         codec: "libx264",
         label: "H.264 / AVC",
@@ -132,27 +130,51 @@ pub(in crate::settings) const VIDEO_CODEC_DEFINITIONS: [VideoCodecDefinition; 12
     VideoCodecDefinition {
         codec: "h264_videotoolbox",
         label: "H.264 (Apple Silicon)",
-        capability: Some(VideoCodecCapability::H264Videotoolbox),
+        capability: Some(VideoCodecCapability::Hardware(
+            HardwareEncoder::H264Videotoolbox,
+        )),
     },
     VideoCodecDefinition {
         codec: "h264_nvenc",
         label: "H.264 (NVIDIA)",
-        capability: Some(VideoCodecCapability::H264Nvenc),
+        capability: Some(VideoCodecCapability::Hardware(HardwareEncoder::H264Nvenc)),
     },
     VideoCodecDefinition {
         codec: "hevc_videotoolbox",
         label: "H.265 (Apple Silicon)",
-        capability: Some(VideoCodecCapability::HevcVideotoolbox),
+        capability: Some(VideoCodecCapability::Hardware(
+            HardwareEncoder::HevcVideotoolbox,
+        )),
     },
     VideoCodecDefinition {
         codec: "hevc_nvenc",
         label: "H.265 (NVIDIA)",
-        capability: Some(VideoCodecCapability::HevcNvenc),
+        capability: Some(VideoCodecCapability::Hardware(HardwareEncoder::HevcNvenc)),
+    },
+    VideoCodecDefinition {
+        codec: "h264_vaapi",
+        label: "H.264 (VA-API)",
+        capability: Some(VideoCodecCapability::Hardware(HardwareEncoder::H264Vaapi)),
+    },
+    VideoCodecDefinition {
+        codec: "hevc_vaapi",
+        label: "HEVC (VA-API)",
+        capability: Some(VideoCodecCapability::Hardware(HardwareEncoder::HevcVaapi)),
+    },
+    VideoCodecDefinition {
+        codec: "av1_vaapi",
+        label: "AV1 (VA-API)",
+        capability: Some(VideoCodecCapability::Hardware(HardwareEncoder::Av1Vaapi)),
+    },
+    VideoCodecDefinition {
+        codec: "hevc_amf",
+        label: "HEVC (AMD AMF)",
+        capability: Some(VideoCodecCapability::Hardware(HardwareEncoder::HevcAmf)),
     },
     VideoCodecDefinition {
         codec: "av1_nvenc",
         label: "AV1 (NVIDIA)",
-        capability: Some(VideoCodecCapability::Av1Nvenc),
+        capability: Some(VideoCodecCapability::Hardware(HardwareEncoder::Av1Nvenc)),
     },
 ];
 
