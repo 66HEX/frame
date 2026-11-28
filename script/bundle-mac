@@ -108,6 +108,8 @@ if [[ "$package_only" = false ]]; then
 		exit 1
 	fi
 	cp "$helper_binary" "$app_bundle/Contents/MacOS/frame-update-helper"
+	python3 "$repo_root/script/media-worker.py" bundle --target "$target_triple" --profile "$target_profile" \
+		--bin-dir "$app_bundle/Contents/MacOS" --lib-dir "$app_bundle/Contents/Frameworks"
 fi
 
 resource_dir="$app_bundle/Contents/Resources/resources/binaries"
@@ -117,6 +119,10 @@ for binary in "ffmpeg-$target_triple" "ffprobe-$target_triple"; do
 		exit 1
 	fi
 done
+
+if [[ "$package_only" = true ]]; then
+	python3 "$repo_root/script/media-worker.py" verify --target "$target_triple" --bin-dir "$app_bundle/Contents/MacOS"
+fi
 
 if [[ "$build_only" = true ]]; then
 	echo "Prepared unsigned application bundle: $app_bundle"

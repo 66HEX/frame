@@ -1135,8 +1135,8 @@ jobs:
           };
 
           cargoHash = lib.fakeHash;
-          cargoBuildFlags = [ "--package" "frame-app" ];
-          cargoTestFlags = [ "--package" "frame-app" ];
+          cargoBuildFlags = [ "--package" "frame-app" "--package" "frame-media" ];
+          cargoTestFlags = [ "--package" "frame-app" "--package" "frame-media" ];
 
           nativeBuildInputs = [
             makeWrapper
@@ -1144,6 +1144,7 @@ jobs:
           ];
 
           buildInputs = [
+            ffmpeg
             alsa-lib
             fontconfig
             freetype

@@ -38,12 +38,21 @@ class Target:
         return tuple(f"{tool}-{self.triple}{self.suffix}" for tool in ("ffmpeg", "ffprobe"))
 
     @property
+    def worker_members(self):
+        versions = {"avcodec": 63, "avformat": 63, "avutil": 61,
+                    "avfilter": 12, "swscale": 10, "swresample": 7}
+        pattern = {"linux": "lib/lib{}.so.{}", "windows": "{}-{}.dll",
+                   "macos": "Frameworks/lib{}.{}.dylib"}[self.platform]
+        return (f"frame-media{self.suffix}",
+                *(pattern.format(lib, version) for lib, version in versions.items()))
+
+    @property
     def archive_name(self):
         return f"frame-native-qa-{self.platform}-{self.architecture}.zip"
 
     @property
     def archive_limit_mib(self):
-        return {"windows": 140, "linux": 80, "macos": 100}[self.platform]
+        return {"windows": 240, "linux": 180, "macos": 180}[self.platform]
 
 
 def identify_target(system=None, machine=None):
@@ -72,6 +81,7 @@ def build_package(repo_root, output_dir, *, target, git_sha, pr_head_sha, build_
     repo_root, output_dir = Path(repo_root), Path(output_dir)
     inputs = {
         target.app_name: Path(binary_path) if binary_path else repo_root / "target" / "release" / target.app_name,
+        **{name: repo_root / "target/native-qa-worker" / name for name in target.worker_members},
         **{
             f"binaries/{name}": repo_root / "frame-app" / "resources" / "binaries" / name
             for name in target.runtime_names
@@ -132,7 +142,7 @@ def sha256_file(path):
 def unpack_verified(archive, destination, target):
     if Path(archive).stat().st_size > target.archive_limit_mib * 1024 * 1024:
         raise ValueError(f"Archive exceeds the {target.archive_limit_mib} MiB verification limit")
-    expected = {target.app_name, *(f"binaries/{name}" for name in target.runtime_names)}
+    expected = {target.app_name, *target.worker_members, *(f"binaries/{name}" for name in target.runtime_names)}
     with zipfile.ZipFile(archive) as package:
         members = package.namelist()
         if len(members) != len(set(members)) or set(members) != expected | {"manifest.json"}:

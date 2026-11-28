@@ -29,7 +29,7 @@ pub fn read_plan(path: &Path) -> Result<ExportPlan, String> {
     let request: ExportRequest =
         serde_json::from_slice(&bytes).map_err(|error| format!("Invalid request JSON: {error}"))?;
     let probe = crate::source_probe::probe(
-        &crate::runtime_binaries::ffprobe_executable(),
+        &crate::runtime_binaries::media_worker_executable(),
         Path::new(&request.input),
         || false,
     )

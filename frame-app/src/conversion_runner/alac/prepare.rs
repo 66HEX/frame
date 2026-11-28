@@ -208,9 +208,10 @@ fn source_plans(
             continue;
         }
         bindings.checkpoint(&format!("decoding source track #{index}"), cancelled, log)?;
+        let runtime = bindings.probe_runtime()?;
         let bytes = helpers.execute(
-            bindings.probe_runtime()?,
-            Scan::Source(index).args(input),
+            runtime,
+            Scan::Source(index).runtime_args(&runtime.command.program, input),
             false,
             cancelled,
         )?;

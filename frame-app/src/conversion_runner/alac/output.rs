@@ -67,9 +67,10 @@ fn verify_with_helpers(
         cancelled,
         log,
     )?;
+    let runtime = prepared.bindings.probe_runtime()?;
     let bytes = helpers.execute(
-        prepared.bindings.probe_runtime()?,
-        Scan::Physical.args(stage.path()),
+        runtime,
+        Scan::Physical.runtime_args(&runtime.command.program, stage.path()),
         false,
         cancelled,
     )?;
@@ -94,9 +95,10 @@ fn verify_with_helpers(
             cancelled,
             log,
         )?;
+        let runtime = prepared.bindings.probe_runtime()?;
         let bytes = helpers.execute(
-            prepared.bindings.probe_runtime()?,
-            Scan::Normal(index).args(stage.path()),
+            runtime,
+            Scan::Normal(index).runtime_args(&runtime.command.program, stage.path()),
             false,
             cancelled,
         )?;

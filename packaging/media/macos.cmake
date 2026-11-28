@@ -1,0 +1,10 @@
+set(VCPKG_CMAKE_SYSTEM_NAME Darwin)
+set(VCPKG_OSX_DEPLOYMENT_TARGET 12.0)
+set(VCPKG_CRT_LINKAGE dynamic)
+set(VCPKG_BUILD_TYPE release)
+# Keep one relocatable family of libav dylibs; compile codec dependencies into it.
+if(PORT STREQUAL "ffmpeg")
+    set(VCPKG_LIBRARY_LINKAGE dynamic)
+else()
+    set(VCPKG_LIBRARY_LINKAGE static)
+endif()

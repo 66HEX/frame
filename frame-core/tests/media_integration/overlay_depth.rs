@@ -317,7 +317,7 @@ fn selected_rgb16_frames_should_use_precise_overlay_in_export_and_snapshot() -> 
     let mut command = plan.args;
     let sink = command.len() - 1;
     command.splice(sink..sink, ["-frames:v".into(), "1".into()]);
-    let preview = run_tool_output(&tools.ffmpeg, &command)?;
+    let preview = tools.native("preview", &command)?;
     assert_eq!(preview.len(), 8 * 4 * 4);
     assert_bytes_match(
         &preview,
@@ -374,7 +374,7 @@ fn check_first_dynamic_snapshot(
         let mut command = plan.args;
         let sink = command.len() - 1;
         command.splice(sink..sink, ["-frames:v".into(), "1".into()]);
-        let pixels = run_tool_output(&tools.ffmpeg, &command)?;
+        let pixels = tools.native("preview", &command)?;
         assert_bytes_match(
             &pixels,
             &decode(tools, &oracle, "bgra")?,

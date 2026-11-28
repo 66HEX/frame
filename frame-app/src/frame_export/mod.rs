@@ -46,7 +46,7 @@ pub fn export_source_frame(
                 video_stream_index: request.video_stream_index,
             },
         )?;
-        let executable = crate::runtime_binaries::ffmpeg_executable();
+        let executable = crate::runtime_binaries::media_worker_executable();
         let mut command = CommandSpec::new(&executable);
         #[cfg(windows)]
         {
@@ -56,6 +56,11 @@ pub fn export_source_frame(
             command.interpreter = interpreter;
         }
         command.args = args.into_iter().map(Into::into).collect();
+        if let Some(operation) =
+            crate::runtime_binaries::worker_subcommand(&command.program, "preview")
+        {
+            command.args.insert(0, operation.into());
+        }
         if let Some(index) = command.args.iter().position(|arg| arg == "-i") {
             request
                 .source_path

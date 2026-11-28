@@ -43,6 +43,7 @@ mod time_grammar;
 struct Toolchain {
     ffmpeg: PathBuf,
     ffprobe: PathBuf,
+    worker: PathBuf,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -69,7 +70,33 @@ impl Toolchain {
     fn discover() -> TestResult<Self> {
         let ffmpeg = discover_tool("ffmpeg", "FRAME_TEST_FFMPEG")?;
         let ffprobe = discover_tool("ffprobe", "FRAME_TEST_FFPROBE")?;
-        Ok(Self { ffmpeg, ffprobe })
+        let worker = match env::var_os("FRAME_TEST_MEDIA_WORKER") {
+            Some(path) => PathBuf::from(path),
+            None => env::current_exe()
+                .map_err(|e| e.to_string())?
+                .parent()
+                .and_then(Path::parent)
+                .ok_or("test binary has no profile directory")?
+                .join(format!("frame-media{}", env::consts::EXE_SUFFIX)),
+        };
+        if !worker.is_file() {
+            return Err(format!(
+                "Build frame-media first or set FRAME_TEST_MEDIA_WORKER (looked for {})",
+                worker.display()
+            ));
+        }
+        Ok(Self {
+            ffmpeg,
+            ffprobe,
+            worker,
+        })
+    }
+
+    fn native(&self, operation: &str, args: &[String]) -> TestResult<Vec<u8>> {
+        let mut request = Vec::with_capacity(args.len() + 1);
+        request.push(operation.to_string());
+        request.extend_from_slice(args);
+        run_tool_output(&self.worker, &request)
     }
 }
 
@@ -1107,7 +1134,8 @@ fn prores_should_ignore_unused_quality_drafts_and_choose_profile_from_pixels() -
         let probe = probe_media(&tools, &input)?;
         let command = build_ffmpeg_args(&path_arg(&input), &path_arg(&output), &config, &probe)
             .map_err(|error| error.to_string())?;
-        let result = Command::new(&tools.ffmpeg)
+        let result = Command::new(&tools.worker)
+            .arg("convert")
             .args(&command)
             .output()
             .map_err(|error| error.to_string())?;
@@ -1311,7 +1339,7 @@ fn odd_custom_and_crop_dimensions_should_match_export_and_preview() -> TestResul
                 output_index..output_index,
                 ["-frames:v".to_string(), "1".to_string()],
             );
-            let pixels = run_tool_output(&tools.ffmpeg, &preview_args)?;
+            let pixels = tools.native("preview", &preview_args)?;
             assert_eq!(
                 pixels.len(),
                 plan.frame_bytes,
@@ -2957,8 +2985,8 @@ fn bounded_fast_preview_should_match_complete_source_frames_and_chirp_samples() 
     let audio_source_plan =
         build_ffmpeg_preview_audio_args(&path_arg(&input), &config, &audio_options)
             .map_err(|error| error.to_string())?;
-    let source_frames = run_tool_output(&tools.ffmpeg, &video_source_plan.args)?;
-    let source_samples = run_tool_output(&tools.ffmpeg, &audio_source_plan.args)?;
+    let source_frames = tools.native("preview", &video_source_plan.args)?;
+    let source_samples = tools.native("preview", &audio_source_plan.args)?;
     let frame_bytes = video_source_plan.frame_bytes;
     let video_end = 300 * frame_bytes;
     let audio_end = 10 * 48_000 * 2 * 4;
@@ -2980,7 +3008,7 @@ fn bounded_fast_preview_should_match_complete_source_frames_and_chirp_samples() 
                 },
             )
             .map_err(|error| error.to_string())?;
-            let frames = run_tool_output(&tools.ffmpeg, &video.args)?;
+            let frames = tools.native("preview", &video.args)?;
             assert_eq!(
                 frames.len(),
                 video_end - video_start,
@@ -3001,7 +3029,7 @@ fn bounded_fast_preview_should_match_complete_source_frames_and_chirp_samples() 
                 },
             )
             .map_err(|error| error.to_string())?;
-            let samples = run_tool_output(&tools.ffmpeg, &audio.args)?;
+            let samples = tools.native("preview", &audio.args)?;
             assert_eq!(
                 samples.len(),
                 audio_end - audio_start,
@@ -3066,7 +3094,7 @@ fn preview_subtitle_burn_should_use_source_time_after_seek() -> TestResult {
         let insert_at = args.len().saturating_sub(1);
         args.insert(insert_at, "-frames:v".to_string());
         args.insert(insert_at + 1, "1".to_string());
-        let output = run_tool_output(&tools.ffmpeg, &args)?;
+        let output = tools.native("preview", &args)?;
         if output.len() < plan.frame_bytes {
             return Err(format!(
                 "preview frame was too short: got {}, expected at least {}",
@@ -3146,7 +3174,7 @@ fn display_matrix_rotation_should_produce_portrait_preview_frame() -> TestResult
     let output_index = preview_args.len().saturating_sub(1);
     preview_args.insert(output_index, "-frames:v".to_string());
     preview_args.insert(output_index + 1, "1".to_string());
-    let frame = run_tool_output(&tools.ffmpeg, &preview_args)?;
+    let frame = tools.native("preview", &preview_args)?;
 
     assert_eq!(
         (
@@ -3172,10 +3200,15 @@ fn convert(
     let input = path_arg(input);
     let output = path_arg(output);
     validate_task_input(&input, config).map_err(|error| error.to_string())?;
-    let probe = probe_media(tools, Path::new(&input))?;
+    let metadata = tools.native("probe", &["metadata".into(), input.clone()])?;
+    let probe = parse_ffprobe_stdout(
+        &input,
+        String::from_utf8(metadata).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
     let args =
         build_ffmpeg_args(&input, &output, config, &probe).map_err(|error| error.to_string())?;
-    run_tool(&tools.ffmpeg, &args)?;
+    tools.native("convert", &args)?;
 
     let output_path = Path::new(&output);
     if !output_path.is_file() {

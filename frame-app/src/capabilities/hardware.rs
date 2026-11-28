@@ -338,7 +338,20 @@ fn probe_hardware_encoder_with_limits(
         }
         cache.generation
     };
-    runtime.command.args = probe_args(policy);
+    runtime.command.args = if let Some(operation) =
+        crate::runtime_binaries::worker_subcommand(&runtime.command.program, "capabilities")
+    {
+        [
+            operation,
+            "hardware",
+            policy.encoder.name(),
+            if policy.allow_software { "1" } else { "0" },
+        ]
+        .map(Into::into)
+        .into()
+    } else {
+        probe_args(policy)
+    };
     let input = probe_input();
     let report = match bounded_process::run(&runtime.command, &input, limits, &cancelled) {
         Ok(output) => classify_output(policy, &output, input.len()),

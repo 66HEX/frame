@@ -190,6 +190,10 @@ fn run_probe(
     };
     let mut command = proof.runtime.command.clone();
     command.args = args.into_iter().map(Into::into).collect();
+    if let Some(operation) = crate::runtime_binaries::worker_subcommand(&command.program, "preview")
+    {
+        command.args.insert(0, operation.into());
+    }
     let outcome = classify_probe(run(
         &command,
         Limits {

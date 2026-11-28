@@ -10,7 +10,7 @@ pub use hardware::{
 };
 
 use crate::bounded_process::{self, Limits};
-use crate::runtime_binaries::ffmpeg_executable;
+use crate::runtime_binaries::media_worker_executable;
 use frame_core::capabilities::{
     AvailableEncoders, AvailableFilters, ffmpeg_encoder_list_args, ffmpeg_filter_list_args,
     parse_available_encoders, parse_available_filters,
@@ -34,7 +34,7 @@ pub enum CapabilityDetectionError {
 /// Returns an error when `FFmpeg` cannot be executed or reports a failed encoder
 /// listing command.
 pub fn detect_available_encoders() -> Result<AvailableEncoders, CapabilityDetectionError> {
-    let executable = ffmpeg_executable();
+    let executable = media_worker_executable();
     detect_available_encoders_with_executable(&executable)
 }
 
@@ -63,7 +63,7 @@ pub fn detect_available_encoders_with_executable(
 /// Returns an error when `FFmpeg` cannot be executed or reports a failed filter
 /// listing command.
 pub fn detect_available_filters() -> Result<AvailableFilters, CapabilityDetectionError> {
-    let executable = ffmpeg_executable();
+    let executable = media_worker_executable();
     detect_available_filters_with_executable(&executable)
 }
 
@@ -148,6 +148,11 @@ fn bounded_listing(
 ) -> Result<(Vec<u8>, Vec<u8>), CapabilityDetectionError> {
     let mut runtime = runtime::Runtime::resolve(executable)?;
     runtime.command.args = args.iter().map(std::ffi::OsString::from).collect();
+    if let Some(operation) =
+        crate::runtime_binaries::worker_subcommand(&runtime.command.program, "capabilities")
+    {
+        runtime.command.args.insert(0, operation.into());
+    }
     let output = bounded_process::run(
         &runtime.command,
         &[],

@@ -253,7 +253,7 @@ fn one_preview_frame(
     let index = args.len() - 1;
     args.insert(index, "-frames:v".into());
     args.insert(index + 1, "1".into());
-    let pixels = run_tool_output(&tools.ffmpeg, &args)?;
+    let pixels = tools.native("preview", &args)?;
     assert_eq!(pixels.len(), plan.frame_bytes);
     Ok(pixels)
 }

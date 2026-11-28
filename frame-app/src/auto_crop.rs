@@ -61,7 +61,7 @@ pub fn detect_auto_crop(
     detect_with_executable(
         request,
         cancelled,
-        &crate::runtime_binaries::ffmpeg_executable(),
+        &crate::runtime_binaries::media_worker_executable(),
     )
 }
 
