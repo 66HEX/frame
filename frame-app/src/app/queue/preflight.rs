@@ -1,6 +1,7 @@
 use crate::app::root::FrameRoot;
 use crate::conversion_runner::ConversionProcessController;
 use crate::conversion_runner::video_route::{needs_video_route, plan_task_video};
+use crate::file_queue::FileStatus;
 use frame_core::args::VideoRoute;
 use frame_core::events::ConversionEvent;
 use frame_core::types::ConversionTask;
@@ -13,7 +14,7 @@ struct PlannedBatch {
     tasks: Vec<ConversionTask>,
     routes: HashMap<String, VideoRoute>,
     messages: Vec<ConversionEvent>,
-    fallbacks: Vec<String>,
+    fallbacks: HashMap<String, String>,
 }
 
 fn exports_jpeg_xl(task: &ConversionTask) -> bool {
@@ -52,15 +53,17 @@ impl PlannedBatch {
         let mut batch = Self::default();
         for mut task in tasks {
             let id = task.id.clone();
-            let result =
-                if let Some(error) = jpeg_xl_error.as_ref().filter(|_| exports_jpeg_xl(&task)) {
-                    Err(error.clone())
-                } else {
-                    plan_task_video(&mut task, || controller.is_cancelled(&id))
-                        .map_err(|error| error.to_string())
-                };
+            let result = jpeg_xl_error
+                .as_ref()
+                .filter(|_| exports_jpeg_xl(&task))
+                .map_or_else(
+                    || {
+                        plan_task_video(&mut task, || controller.is_cancelled(&id))
+                            .map_err(|error| error.to_string())
+                    },
+                    |error| Err(error.clone()),
+                );
             if controller.is_cancelled(&id) {
-                let _ = controller.take_cancelled(&id);
                 batch.messages.push(ConversionEvent::cancelled(id));
                 continue;
             }
@@ -82,7 +85,9 @@ impl PlannedBatch {
                         batch
                             .messages
                             .push(ConversionEvent::log(&id, format!("[WARN] {reason}")));
-                        batch.fallbacks.push(format!("{name}: {reason}\n{summary}"));
+                        batch
+                            .fallbacks
+                            .insert(id.clone(), format!("{name}: {reason}\n{summary}"));
                     }
                     batch.routes.insert(id, route);
                 }
@@ -126,43 +131,64 @@ impl FrameRoot {
                     PlannedBatch::prepare(tasks, &controller, jpeg_xl_available)
                 })
                 .await;
-            let current = this
-                .update(cx, |root, cx| {
-                    if root.conversion_batch_generation != generation {
-                        return false;
-                    }
-                    for event in batch.messages {
-                        root.apply_batch_event(generation, event);
-                    }
-                    cx.notify();
-                    true
-                })
-                .unwrap_or(false);
-            if !current || batch.tasks.is_empty() {
-                return;
+            this.update_in(cx, |root, window, cx| {
+                root.confirm_planned_batch(generation, batch, window, cx);
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    fn confirm_planned_batch(
+        &mut self,
+        generation: u64,
+        mut batch: PlannedBatch,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        for event in batch.messages.drain(..) {
+            if self.preflight_task_is_queued(generation, event.id()) {
+                self.apply_batch_event(generation, event);
             }
-            let approved = batch.fallbacks.is_empty()
-                || cx
-                    .prompt(
-                        PromptLevel::Warning,
-                        "Use the available video settings?",
-                        Some(&batch.fallbacks.join("\n\n")),
-                        &[
-                            PromptButton::ok("Continue export"),
-                            PromptButton::cancel("Cancel batch"),
-                        ],
-                    )
-                    .await
-                    == Ok(0);
+        }
+        batch
+            .tasks
+            .retain(|task| self.preflight_task_is_queued(generation, &task.id));
+        cx.notify();
+        if batch.tasks.is_empty() {
+            return;
+        }
+
+        let details: Vec<_> = batch
+            .tasks
+            .iter()
+            .filter_map(|task| batch.fallbacks.remove(&task.id))
+            .collect();
+        if details.is_empty() {
+            self.spawn_conversion_batch(batch.tasks, batch.routes, cx);
+            return;
+        }
+
+        let decision = window.prompt(
+            PromptLevel::Warning,
+            "Use the available video settings?",
+            Some(&details.join("\n\n")),
+            &[
+                PromptButton::ok("Continue export"),
+                PromptButton::cancel("Cancel batch"),
+            ],
+            cx,
+        );
+        cx.spawn(async move |this, cx| {
+            let approved = decision.await == Ok(0);
             this.update(cx, |root, cx| {
-                if root.conversion_batch_generation != generation {
-                    return;
-                }
-                if approved {
+                batch
+                    .tasks
+                    .retain(|task| root.preflight_task_is_queued(generation, &task.id));
+                if approved && !batch.tasks.is_empty() {
                     root.spawn_conversion_batch(batch.tasks, batch.routes, cx);
                 } else {
                     for task in batch.tasks {
-                        let _ = root.conversion_processes.take_cancelled(&task.id);
                         root.apply_batch_event(generation, ConversionEvent::cancelled(task.id));
                     }
                 }
@@ -171,6 +197,23 @@ impl FrameRoot {
             .ok();
         })
         .detach();
+    }
+
+    // Both preflight and the confirmation dialog can outlive an individual queue entry.
+    fn preflight_task_is_queued(&mut self, generation: u64, id: &str) -> bool {
+        let Some(file) = self.file_queue.file_by_id(id) else {
+            let _ = self.conversion_processes.take_cancelled(id);
+            return false;
+        };
+        if self.conversion_batch_generation != generation {
+            return false;
+        }
+        if file.status == FileStatus::Cancelling {
+            let _ = self.conversion_processes.take_cancelled(id);
+            self.apply_batch_event(generation, ConversionEvent::cancelled(id));
+            return false;
+        }
+        file.status == FileStatus::Queued
     }
 }
 
@@ -189,3 +232,6 @@ mod tests {
         assert!(error.contains("worker timed out"));
     }
 }
+
+#[cfg(test)]
+mod confirmation_tests;
