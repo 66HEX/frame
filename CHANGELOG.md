@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Dialogs:** In-app dialogs now use the same shadow and highlighted top edge as the Settings drawer in both themes.
 - **macOS:** Intel and Apple Silicon app bundles now declare macOS 12.0 (Monterey) as their minimum, matching the bundled media libraries.
 - **Text Editing:** On Linux and Windows, Ctrl+A selects the contents of a text field and Ctrl+C, Ctrl+X and Ctrl+V copy, cut and paste text.
 - **Pasting Multiline Text:** Pasting a Windows-style line break into a single-line field now inserts a space. This keeps pasted audio track titles valid for export.

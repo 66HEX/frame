@@ -39,13 +39,15 @@ pub(in crate::app) trait FrameStyle: Styled + Sized {
             .shadow(theme::shadows::FLOATING.shadows())
     }
 
+    fn raised_panel_surface(self, palette: &theme::ThemePalette) -> Self {
+        self.bg(theme::shadows::surface_fill(palette.surface, palette))
+            .shadow(theme::shadows::ShadowLevel::Lg.shadows())
+    }
+
     fn dialog_surface(self, palette: &theme::ThemePalette) -> Self {
         self.rounded(theme::ui_rem(theme::RADIUS_BASE * 1.4))
-            .bg(color(palette.token("popover")))
+            .raised_panel_surface(palette)
             .text_color(color(palette.token("popover-foreground")))
-            .shadow_none()
-            .ring(px(1.0))
-            .ring_color(color(palette.token("foreground").with_opacity(0.1)))
     }
 
     fn tab_surface(self, selected: bool, palette: &theme::ThemePalette) -> Self {
