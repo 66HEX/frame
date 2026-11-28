@@ -2069,6 +2069,18 @@ const CI_WORKFLOW_TEMPLATE: &str = r"# Generated from xtask::workflows::ci
 name: ci
 on:
   workflow_dispatch:
+    inputs:
+      native_media_runner:
+        description: Run full CI or only the native media tests on one runner
+        type: choice
+        default: full
+        options:
+          - full
+          - ubuntu-22.04
+          - ubuntu-22.04-arm
+          - macos-15
+          - macos-26-intel
+          - windows-2022
   pull_request:
   push:
     branches:
@@ -2076,10 +2088,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ inputs.native_media_runner && inputs.native_media_runner != 'full' && inputs.native_media_runner || github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
   cargo_xtask_ci:
+    if: (inputs.native_media_runner || 'full') == 'full'
     name: cargo xtask ci
     runs-on: ubuntu-22.04
     steps:
@@ -2124,6 +2137,7 @@ __CI_WORKER_TESTS__
 __CI_MEDIA_TESTS__
     timeout-minutes: 150
   cargo_check_macos:
+    if: (inputs.native_media_runner || 'full') == 'full'
     name: cargo check macos
     runs-on: macos-15
     steps:
@@ -2137,8 +2151,10 @@ __CI_WORKER_TESTS__
     - name: ci::check_macos
       run: cargo check --manifest-path frame-app/Cargo.toml --locked
 __CI_MEDIA_TESTS__
+__CI_MAC_CRASH_REPORTS__
     timeout-minutes: 150
   cargo_check_windows:
+    if: (inputs.native_media_runner || 'full') == 'full'
     name: cargo check windows
     runs-on: windows-2022
     steps:
@@ -2161,6 +2177,7 @@ __CI_WORKER_TESTS__
 __CI_MEDIA_TESTS__
     timeout-minutes: 150
   media_other_architectures:
+    if: (inputs.native_media_runner || 'full') == 'full'
     strategy:
       fail-fast: false
       matrix:
@@ -2176,8 +2193,23 @@ __CI_MEDIA_TESTS__
 __CI_OTHER_LINUX_SETUP__
 __CI_WORKER_TESTS__
 __CI_MEDIA_TESTS__
+__CI_MAC_CRASH_REPORTS__
+    timeout-minutes: 150
+  native_media:
+    if: github.event_name == 'workflow_dispatch' && inputs.native_media_runner && inputs.native_media_runner != 'full'
+    runs-on: ${{ inputs.native_media_runner }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v7.0.0
+    - name: steps::setup_rust
+      run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
+__CI_OTHER_LINUX_SETUP__
+__CI_NATIVE_WORKER_TESTS__
+__CI_MEDIA_INTEGRATION__
+__CI_MAC_CRASH_REPORTS__
     timeout-minutes: 150
   flathub_package:
+    if: (inputs.native_media_runner || 'full') == 'full'
     strategy:
       fail-fast: false
       matrix:
@@ -2207,6 +2239,8 @@ fn ci_workflow() -> String {
     render_workflow(
         &CI_WORKFLOW_TEMPLATE
             .replace("__CI_WORKER_TESTS__", CI_WORKER_TESTS)
+            .replace("__CI_NATIVE_WORKER_TESTS__", CI_NATIVE_WORKER_TESTS)
+            .replace("__CI_MAC_CRASH_REPORTS__", CI_MAC_CRASH_REPORTS)
             .replace("__CI_LINUX_SETUP__", &linux_ci_setup_step())
             .replace(
                 "__CI_OTHER_LINUX_SETUP__",
@@ -2215,7 +2249,8 @@ fn ci_workflow() -> String {
                     "      if: runner.os == 'Linux'\n      run: |",
                 ),
             )
-            .replace("__CI_MEDIA_TESTS__", ci_media_test_steps()),
+            .replace("__CI_MEDIA_TESTS__", ci_media_test_steps())
+            .replace("__CI_MEDIA_INTEGRATION__", CI_MEDIA_INTEGRATION),
     )
 }
 
@@ -2228,7 +2263,7 @@ const RESTORE_MEDIA_SDK_CACHE: &str = "    - name: steps::restore_sdk_cache
         key: libav-macos-${{ runner.arch }}-${{ hashFiles('packaging/media/**', 'script/media-worker.py') }}
         restore-keys: libav-macos-${{ runner.arch }}-";
 
-const CI_WORKER_TESTS: &str = "__RESTORE_MEDIA_SDK_CACHE__
+const CI_NATIVE_WORKER_TESTS: &str = "__RESTORE_MEDIA_SDK_CACHE__
     - name: ci::setup_media_sdk
       run: python script/media-worker.py setup-ci
     - name: ci::save_sdk_cache
@@ -2240,7 +2275,9 @@ const CI_WORKER_TESTS: &str = "__RESTORE_MEDIA_SDK_CACHE__
     - name: ci::build_media_worker
       run: cargo build --locked --package frame-media
     - name: ci::test_media_worker
-      run: cargo test --locked --package frame-media
+      run: cargo test --locked --package frame-media";
+
+const CI_WORKER_TESTS: &str = "__CI_NATIVE_WORKER_TESTS__
     - name: ci::build_app_qa
       run: cargo build --locked --package frame-app --features qa-harness --bin frame-qa
     - name: ci::test_worker_packaging
@@ -2248,11 +2285,23 @@ const CI_WORKER_TESTS: &str = "__RESTORE_MEDIA_SDK_CACHE__
         FRAME_TEST_QA_RELOCATION: '1'
       run: python -B -m unittest discover -s script/tests -p test_media_worker.py -v";
 
-const fn ci_media_test_steps() -> &'static str {
-    "    - name: ci::setup_ffmpeg
+const CI_MAC_CRASH_REPORTS: &str = "    - name: ci::upload_worker_crash_reports
+      if: failure() && runner.os == 'macOS'
+      uses: actions/upload-artifact@v7.0.1
+      with:
+        name: frame-media-crashes-${{ runner.arch }}-attempt-${{ github.run_attempt }}
+        path: |
+          ~/Library/Logs/DiagnosticReports/frame-media*.ips
+          ~/Library/Logs/DiagnosticReports/frame-media*.crash
+        if-no-files-found: warn";
+
+const CI_MEDIA_INTEGRATION: &str = "    - name: ci::setup_ffmpeg
       run: cargo xtask setup-ffmpeg
     - name: ci::test_media_conversions
-      run: cargo test --locked -p frame-core --test media_integration -- --ignored --test-threads=1
+      run: cargo test --locked -p frame-core --test media_integration -- --ignored --test-threads=1";
+
+const fn ci_media_test_steps() -> &'static str {
+    "__CI_MEDIA_INTEGRATION__
     - name: ci::test_app
       run: cargo test --locked -p frame-app --lib -- --test-threads=1
     - name: ci::test_conversion_runner
@@ -4928,6 +4977,24 @@ mod tests {
             );
             assert!(!job.contains("continue-on-error"));
         }
+    }
+
+    #[test]
+    fn diagnostic_dispatch_uses_the_native_suite_without_building_the_gui() {
+        let workflow = ci_workflow();
+        let job = workflow_job(&workflow, "native_media");
+        for required in [
+            "python script/media-worker.py setup-ci",
+            "cargo test --locked --package frame-media",
+            "cargo xtask setup-ffmpeg",
+            "--test media_integration -- --ignored --test-threads=1",
+            "DiagnosticReports/frame-media*.ips",
+            "DiagnosticReports/frame-media*.crash",
+        ] {
+            assert!(job.contains(required), "missing {required}");
+        }
+        assert!(!job.contains("frame-app"));
+        assert!(job.contains("runs-on: ${{ inputs.native_media_runner }}"));
     }
 
     #[test]
