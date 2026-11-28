@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Export still images as lossless or lossy JPEG XL, including images with transparency. [#251](https://github.com/66HEX/frame/issues/251)
+- Select H.264, HEVC or AV1 VA-API encoding on Linux and HEVC AMD AMF encoding on Windows for MP4 and MKV. Available choices depend on the device and driver. [#82](https://github.com/66HEX/frame/issues/82) · [#159](https://github.com/66HEX/frame/issues/159)
+- Frame checks the selected source and filters before a hardware export. When a different processing path is needed, review the proposed settings before starting the batch. [#146](https://github.com/66HEX/frame/issues/146) · [#171](https://github.com/66HEX/frame/issues/171)
+- Save a preset with **Enable source audio** to include the first audio track on files with no track selected. Applying the preset to a batch preserves each file’s existing track selection. [#166](https://github.com/66HEX/frame/issues/166)
 - **Video and Audio Modes:** Choose which streams to re-encode and which to copy. For example, resize the video while keeping the original audio tracks. Resolves [#306](https://github.com/66HEX/frame/issues/306).
 - **Two-Pass Encoding:** H.264 (x264), HEVC (x265) and VP9 can analyze the video before encoding it at the requested average bitrate. Resolves [#307](https://github.com/66HEX/frame/issues/307).
 - **Audio Track Metadata:** Set the language and title of each selected audio track and choose which one players should play by default. Resolves [#308](https://github.com/66HEX/frame/issues/308).
