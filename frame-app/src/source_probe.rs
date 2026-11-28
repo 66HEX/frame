@@ -20,17 +20,17 @@ pub fn probe(
         command.program = program;
         command.interpreter = interpreter;
     }
-    command.args = if let Some(probe) =
-        crate::runtime_binaries::worker_subcommand(&command.program, "probe")
-    {
-        vec![probe.into(), "metadata".into(), path.as_os_str().to_owned()]
-    } else {
-        let mut args: Vec<_> = ffprobe_json_args("").into_iter().map(Into::into).collect();
-        if let Some(argument) = args.last_mut() {
-            path.as_os_str().clone_into(argument);
-        }
-        args
-    };
+    command.args = crate::runtime_binaries::worker_subcommand(&command.program, "probe")
+        .map_or_else(
+            || {
+                let mut args: Vec<_> = ffprobe_json_args("").into_iter().map(Into::into).collect();
+                if let Some(argument) = args.last_mut() {
+                    path.as_os_str().clone_into(argument);
+                }
+                args
+            },
+            |probe| vec![probe.into(), "metadata".into(), path.as_os_str().to_owned()],
+        );
     probe_command(
         &command,
         path,
