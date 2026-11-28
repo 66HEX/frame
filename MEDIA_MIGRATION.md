@@ -52,6 +52,7 @@ The registry covers the 18 output formats in the baseline. It expands to 96 soft
 | --- | --- |
 | Apple Silicon, FFmpeg SDK 9.0.2 | 97 real-media integration tests passed. The registry encoded and independently decoded all 30 VideoToolbox combinations. The packaged worker also decoded all 12 changing frames of each H.264 8-bit, HEVC 8-bit and HEVC 10-bit device sample. |
 | Application on Apple Silicon | All 1,424 application tests passed with the media fixtures enabled, including the normally ignored cases. The standalone worker suite passed all 16 tests. |
+| Linux on both architectures | The native GNU ARM64 worker and the GNU x86_64 worker each passed all 96 applicable real-media integration tests with the release SDK. The local x86_64 Linux run used Docker with Rosetta. |
 | macOS Intel | The x86_64 worker passed all 97 real-media integration tests under Rosetta using the pinned 9.0.2 reference tools. |
 | macOS bundles | Both ARM and Intel DMGs were mounted read-only and both app ZIPs unpacked. The four apps passed strict signature checks, loaded six libraries from their own Frameworks directory and probed PCM with an empty PATH. Intel package execution on this host used Rosetta. |
 | Independent review | An agent outside the implementation team compared packet timestamps, audio samples and filtered frames, tested 80 tracks under a file descriptor limit, verified chapter metadata removal, AAC recovery, and repeated orientation changes. Its final review had no open implementation findings. |
