@@ -861,6 +861,41 @@ fn two_pass_checkbox_follows_target_bitrate_and_rejects_incompatible_video_modes
 }
 
 #[test]
+fn native_clipboard_shortcuts_edit_the_focused_text_field() {
+    use crate::app::input::FrameTextInputKind::AudioTrackTitle;
+    let case = SelectCase {
+        fixture: VisualFixture::SettingsAudioTracks,
+        trigger: "audio-metadata-track",
+        panel: "audio-track-title",
+    };
+    let [select_all, copy, cut, paste] = if cfg!(target_os = "macos") {
+        ["cmd-a", "cmd-c", "cmd-x", "cmd-v"]
+    } else {
+        ["ctrl-a", "ctrl-c", "ctrl-x", "ctrl-v"]
+    };
+    let mut app = TestAppContext::single();
+    let (root, cx) = select_window(&mut app, &case, ColorTheme::Dark, ScalePreset::Percent100);
+    let title = |cx: &mut VisualTestContext| {
+        root.read_with(cx, |root, _| root.text_input_value(AudioTrackTitle))
+    };
+
+    click(cx, case.panel);
+    press(cx, select_all);
+    press(cx, copy);
+    cx.simulate_input("Narration");
+    draw(cx);
+    assert_eq!(title(cx), "Narration");
+    press(cx, select_all);
+    press(cx, paste);
+    assert_eq!(title(cx), "Main mix");
+    press(cx, select_all);
+    press(cx, cut);
+    assert_eq!(title(cx), "");
+    press(cx, paste);
+    assert_eq!(title(cx), "Main mix");
+}
+
+#[test]
 fn audio_track_editor_keeps_edits_bound_to_the_source_track_when_switching_focus() {
     use crate::app::input::FrameTextInputKind::{AudioTrackLanguage, AudioTrackTitle};
     use crate::settings::ProcessingMode;

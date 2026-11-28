@@ -67,6 +67,13 @@ pub fn init_app(cx: &mut App, name: impl Into<SharedString>) {
         KeyBinding::new("secondary--", DecreaseUiScale, None),
         KeyBinding::new("secondary-0", ResetUiScale, None),
     ]);
+    #[cfg(not(target_os = "macos"))]
+    cx.bind_keys([
+        KeyBinding::new("ctrl-a", TextInputSelectAll, Some(FRAME_TEXT_INPUT_CONTEXT)),
+        KeyBinding::new("ctrl-c", TextInputCopy, Some(FRAME_TEXT_INPUT_CONTEXT)),
+        KeyBinding::new("ctrl-x", TextInputCut, Some(FRAME_TEXT_INPUT_CONTEXT)),
+        KeyBinding::new("ctrl-v", TextInputPaste, Some(FRAME_TEXT_INPUT_CONTEXT)),
+    ]);
     cx.set_menus(vec![Menu {
         name: name.into(),
         items: vec![MenuItem::action("Quit", Quit)],
