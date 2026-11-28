@@ -223,7 +223,7 @@ fn settings_source_fixture_opens_source_tab_with_ready_metadata() {
                     *title,
             })
             .collect::<Vec<_>>(),
-        ["File information", "Video stream"]
+        ["File information", "Video stream", "Audio stream"]
     );
 }
 

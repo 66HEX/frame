@@ -36,6 +36,8 @@ mod decode_recovery;
 mod effects;
 #[path = "media_integration/gif_frames.rs"]
 mod gif_frames;
+#[path = "media_integration/mixed_modes.rs"]
+mod mixed_modes;
 #[path = "media_integration/overlay_depth.rs"]
 mod overlay_depth;
 #[path = "media_integration/registry.rs"]
@@ -3636,6 +3638,29 @@ fn generate_audio_source(tools: &Toolchain, output: &Path) -> TestResult {
             &path_arg(output),
         ]),
     )
+}
+
+fn packets(tools: &Toolchain, path: &Path, selector: &str) -> TestResult<serde_json::Value> {
+    let bytes = run_tool_output(
+        &tools.ffprobe,
+        &args(&[
+            "-v",
+            "error",
+            "-select_streams",
+            selector,
+            "-show_packets",
+            "-show_data_hash",
+            "sha256",
+            "-show_entries",
+            "packet=pts,dts,duration,size,data_hash",
+            "-of",
+            "json",
+            &path_arg(path),
+        ]),
+    )?;
+    let json: serde_json::Value =
+        serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+    Ok(json["packets"].clone())
 }
 
 fn probe_media(tools: &Toolchain, path: &Path) -> Result<ProbeMetadata, String> {

@@ -4,9 +4,9 @@ use crate::app::inspector::panel::settings_field;
 use crate::app::inspector::shared::settings_hint_text;
 use crate::app::root::FrameRoot;
 use crate::settings::{
-    ConversionConfig, SourceMetadata, apply_output_container, apply_processing_mode,
-    container_supports_audio, normalize_output_config, output_container_options,
-    output_processing_mode_options,
+    ConversionConfig, ProcessingStream, SourceMetadata, apply_output_container,
+    apply_processing_mode, container_supports_audio, normalize_output_config,
+    output_container_options, output_processing_mode_options, processing_stream_available,
 };
 use crate::theme;
 use gpui::prelude::{FluentBuilder, ParentElement};
@@ -34,19 +34,21 @@ pub(in crate::app) fn settings_output_tab(
             source.pixel_format.as_deref(),
         )
     });
-    crate::app::components::frame_field_group()
-        .child(
-            settings_field("Processing mode", palette)
-                .child(settings_processing_mode_grid(
-                    config,
-                    metadata,
-                    settings_disabled,
-                    palette,
-                    window,
-                    cx,
-                ))
-                .child(settings_hint_text(config.processing_mode.hint(), palette)),
-        )
+    let mut fields = crate::app::components::frame_field_group();
+    for stream in [ProcessingStream::Video, ProcessingStream::Audio] {
+        if processing_stream_available(config, metadata, stream) {
+            fields = fields.child(settings_processing_mode_grid(
+                stream,
+                config,
+                metadata,
+                settings_disabled,
+                palette,
+                window,
+                cx,
+            ));
+        }
+    }
+    fields
         .child(
             crate::app::inspector::panel::settings_fields_grid()
                 .child(
@@ -83,7 +85,8 @@ pub(in crate::app) fn settings_output_tab(
         })
 }
 
-pub(in crate::app) fn settings_processing_mode_grid(
+fn settings_processing_mode_grid(
+    stream: ProcessingStream,
     config: &ConversionConfig,
     metadata: Option<&SourceMetadata>,
     settings_disabled: bool,
@@ -91,12 +94,17 @@ pub(in crate::app) fn settings_processing_mode_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let (id, label) = match stream {
+        ProcessingStream::Video => ("video", "Video mode"),
+        ProcessingStream::Audio => ("audio", "Audio mode"),
+    };
     let mut grid = Vec::new();
-    for option in output_processing_mode_options(config, metadata, settings_disabled) {
-        let mode = option.mode;
+    for option in output_processing_mode_options(config, metadata, stream, settings_disabled) {
+        let copy = option.copy;
+        let action = if copy { "copy" } else { "reencode" };
         let is_enabled = !option.is_disabled;
         grid.push(FrameOption::new(
-            format!("output-mode-{}", option.mode.id()),
+            format!("output-{id}-mode-{action}"),
             option.label,
             option.is_selected,
             is_enabled,
@@ -108,7 +116,11 @@ pub(in crate::app) fn settings_processing_mode_grid(
 
                 let metadata = root.selected_source_metadata();
                 if root.update_selected_config(|config| {
-                    apply_processing_mode(config, metadata.as_ref(), mode)
+                    apply_processing_mode(
+                        config,
+                        metadata.as_ref(),
+                        config.processing_mode.with_copy(stream, copy),
+                    )
                 }) {
                     root.sync_inspector_availability(metadata.as_ref());
                     cx.notify();
@@ -116,14 +128,22 @@ pub(in crate::app) fn settings_processing_mode_grid(
             },
         ));
     }
-    frame_option_field(
-        "processing-mode-select",
-        "Processing mode",
+    let field = settings_field(label, palette).child(frame_option_field(
+        format!("{id}-processing-mode-select"),
+        label,
         grid,
         palette,
         window,
         cx,
-    )
+    ));
+    if stream == ProcessingStream::Video && config.processing_mode.copies_video() {
+        field.child(settings_hint_text(
+            "Video cuts depend on source keyframes.",
+            palette,
+        ))
+    } else {
+        field
+    }
 }
 
 pub(in crate::app) fn settings_container_grid(

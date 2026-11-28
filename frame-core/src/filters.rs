@@ -809,6 +809,9 @@ fn preview_low_res_filters(
 
 #[must_use]
 pub fn build_audio_filters(config: &ConversionConfig) -> Vec<String> {
+    if config.copies_audio() {
+        return Vec::new();
+    }
     build_audio_effect_filters(config)
 }
 

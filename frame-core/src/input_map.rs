@@ -24,8 +24,18 @@ pub fn resolve_reencode_main_input_map(
     available_audio: &[u32],
     available_subtitles: &[(u32, &str)],
 ) -> Result<MainInputStreamMap, ConversionError> {
-    if config.processing_mode == "copy"
-        || is_audio_only_container(&config.container)
+    if config.copies_video() {
+        return Ok(MainInputStreamMap::default());
+    }
+    resolve_main_input_map(config, available_audio, available_subtitles)
+}
+
+pub(crate) fn resolve_main_input_map(
+    config: &ConversionConfig,
+    available_audio: &[u32],
+    available_subtitles: &[(u32, &str)],
+) -> Result<MainInputStreamMap, ConversionError> {
+    if is_audio_only_container(&config.container)
         || is_image_container(&config.container)
         || config.container.eq_ignore_ascii_case("gif")
     {

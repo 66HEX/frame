@@ -1,7 +1,7 @@
 use super::*;
 use crate::app::updates::state::UpdateStatus;
 use crate::file_queue::FileStatus;
-use crate::settings::{AudioTrack, ExternalSubtitleTrack, SubtitleTrack};
+use crate::settings::{AudioTrack, ExternalSubtitleTrack, ProcessingMode, SubtitleTrack};
 
 mod ui;
 
@@ -315,7 +315,12 @@ fn copy_compatibility_uses_each_targets_actual_selected_indices_and_rechecks_met
 fn fast_prefilter_matches_full_normalized_oracle_across_media_modes_and_streams() {
     let mut cases = 0;
     for container in ["mp4", "mkv", "webm", "m2t", "opus", "mp3", "gif", "png"] {
-        for mode in [ProcessingMode::Reencode, ProcessingMode::Copy] {
+        for mode in [
+            ProcessingMode::Reencode,
+            ProcessingMode::Copy,
+            ProcessingMode::CopyVideo,
+            ProcessingMode::CopyAudio,
+        ] {
             let config = ConversionConfig {
                 container: container.into(),
                 processing_mode: mode,
@@ -354,7 +359,7 @@ fn fast_prefilter_matches_full_normalized_oracle_across_media_modes_and_streams(
             }
         }
     }
-    assert_eq!(cases, 3840);
+    assert_eq!(cases, 7680);
 }
 
 #[test]

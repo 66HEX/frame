@@ -90,6 +90,7 @@ fn processing_mode_options_disable_copy_for_image_sources() {
     let options = output_processing_mode_options(
         &ConversionConfig::default(),
         Some(&image_metadata()),
+        ProcessingStream::Video,
         false,
     );
 
@@ -98,8 +99,12 @@ fn processing_mode_options_disable_copy_for_image_sources() {
 
 #[test]
 fn processing_mode_options_disable_all_when_settings_are_locked() {
-    let options =
-        output_processing_mode_options(&ConversionConfig::default(), Some(&video_metadata()), true);
+    let options = output_processing_mode_options(
+        &ConversionConfig::default(),
+        Some(&video_metadata()),
+        ProcessingStream::Video,
+        true,
+    );
 
     assert!(options.iter().all(|option| option.is_disabled));
 }
@@ -299,4 +304,126 @@ fn opus_output_normalizes_flac_source_and_only_copies_opus() {
             "{codec}"
         );
     }
+}
+
+#[test]
+fn mixed_mode_only_requires_the_copied_codecs_to_fit_the_container() {
+    let mut source = video_metadata();
+    source.video_codec = Some("h264".into());
+    source.audio_tracks[0].codec = "opus".into();
+    let mut config = ConversionConfig {
+        selected_audio_tracks: vec![1],
+        processing_mode: ProcessingMode::CopyAudio,
+        container: "webm".into(),
+        video_codec: "vp9".into(),
+        ..ConversionConfig::default()
+    };
+    assert!(is_container_compatible_for_stream_copy(
+        &config,
+        Some(&source),
+        "webm"
+    ));
+    source.audio_tracks[0].codec = "aac".into();
+    assert!(!is_container_compatible_for_stream_copy(
+        &config,
+        Some(&source),
+        "webm"
+    ));
+    config.processing_mode = ProcessingMode::CopyVideo;
+    assert!(!is_container_compatible_for_stream_copy(
+        &config,
+        Some(&source),
+        "webm"
+    ));
+    source.video_codec = Some("vp9".into());
+    assert!(is_container_compatible_for_stream_copy(
+        &config,
+        Some(&source),
+        "webm"
+    ));
+}
+
+#[test]
+fn each_stream_resets_only_its_own_incompatible_controls() {
+    let source = video_metadata();
+    for stream in [ProcessingStream::Video, ProcessingStream::Audio] {
+        let mut config = ConversionConfig {
+            audio_normalize: true,
+            rotation: "90".into(),
+            selected_audio_tracks: vec![1],
+            ..ConversionConfig::default()
+        };
+        let copy = config.processing_mode.with_copy(stream, true);
+        assert!(apply_processing_mode(&mut config, Some(&source), copy));
+        let sections = visible_output_sections(&config, Some(&source));
+        let copies_audio = stream == ProcessingStream::Audio;
+        assert_eq!(config.audio_normalize, !copies_audio);
+        assert_eq!(config.rotation, if copies_audio { "90" } else { "0" });
+        assert_eq!(
+            sections.contains(&OutputSection::AudioFilters),
+            !copies_audio
+        );
+        assert_eq!(
+            sections.contains(&OutputSection::VideoFilters),
+            copies_audio
+        );
+        assert_eq!(config.selected_audio_tracks, [1]);
+        assert!(!normalize_output_config(&mut config, Some(&source)));
+    }
+}
+
+#[test]
+fn saved_processing_modes_preserve_legacy_and_independent_stream_choices() {
+    for (id, video, audio) in [
+        ("copy", true, true),
+        ("reencode", false, false),
+        ("copyVideo", true, false),
+        ("copyAudio", false, true),
+    ] {
+        let stored =
+            serde_json::json!({"name":"Custom preset","id":"saved","config":{"processingMode":id}});
+        let preset: PresetDefinition = serde_json::from_value(stored).unwrap();
+        let mut config = ConversionConfig {
+            selected_audio_tracks: vec![1],
+            ..ConversionConfig::default()
+        };
+        apply_preset(&mut config, &preset, Some(&video_metadata()));
+        let core = crate::conversion_runner::core_config_from_gpui(&config);
+        assert_eq!((core.copies_video(), core.copies_audio()), (video, audio));
+        assert_eq!(config.selected_audio_tracks, [1]);
+        assert_eq!(
+            serde_json::to_value(&preset).unwrap()["config"]["processingMode"],
+            id
+        );
+    }
+    let legacy: ConversionConfig = serde_json::from_str("{}").unwrap();
+    assert_eq!(legacy.processing_mode, ProcessingMode::Reencode);
+}
+
+#[test]
+fn mixed_audio_copy_tracks_preserve_order_and_multiplicity_and_reject_a_missing_index() {
+    let mut metadata = video_metadata();
+    metadata.audio_tracks.push(AudioTrack {
+        index: 2,
+        codec: "alac".into(),
+        ..AudioTrack::default()
+    });
+    let mut config = ConversionConfig {
+        selected_audio_tracks: vec![2, 1, 2],
+        processing_mode: ProcessingMode::CopyAudio,
+        ..ConversionConfig::default()
+    };
+    assert!(is_container_compatible_for_stream_copy(
+        &config,
+        Some(&metadata),
+        "mov"
+    ));
+    let task = crate::conversion_runner::core_config_from_gpui(&config);
+    assert_eq!(task.selected_audio_tracks, [2, 1, 2]);
+    config.selected_audio_tracks[0] = 9;
+    assert!(!is_container_compatible_for_stream_copy(
+        &config,
+        Some(&metadata),
+        "mov"
+    ));
 }

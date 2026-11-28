@@ -1,7 +1,7 @@
 use crate::settings::model::{
     AUDIO_CHANNEL_DEFINITIONS, AUDIO_CODEC_DEFINITIONS, AudioChannelOption, AudioCodecOption,
     AudioTrack, AudioTrackOption, ConversionConfig, OPTIONAL_AUDIO_CODEC_DEFINITIONS,
-    ProcessingMode, SourceMetadata,
+    SourceMetadata,
 };
 use crate::settings::rules::is_audio_codec_allowed_for_container;
 use crate::settings::source_info::{audio_track_bitrate, audio_track_detail, display_source_value};
@@ -18,7 +18,7 @@ pub fn audio_codec_options(
     available_encoders: &AvailableEncoders,
     disabled: bool,
 ) -> Vec<AudioCodecOption> {
-    let encode_controls_disabled = disabled || config.processing_mode == ProcessingMode::Copy;
+    let encode_controls_disabled = disabled || config.processing_mode.copies_audio();
 
     AUDIO_CODEC_DEFINITIONS
         .iter()
@@ -53,7 +53,7 @@ pub fn audio_channel_options(
     metadata: Option<&SourceMetadata>,
     disabled: bool,
 ) -> [AudioChannelOption; 3] {
-    let disabled = disabled || config.processing_mode == ProcessingMode::Copy;
+    let disabled = disabled || config.processing_mode.copies_audio();
     let original_is_unsupported = mp2_original_channels_are_unsupported(config, metadata)
         || (config.audio_codec == "libopus"
             && metadata.is_some_and(|metadata| {
@@ -100,7 +100,7 @@ pub fn audio_settings_error(
         .iter()
         .filter(|track| config.selected_audio_tracks.contains(&track.index))
     {
-        let reason = if config.processing_mode == ProcessingMode::Copy {
+        let reason = if config.processing_mode.copies_audio() {
             audio_copy_error_for_track(&config.container, metadata, track).map(str::to_string)
         } else if config.audio_codec == "libopus" {
             let channels = effective_audio_channels(
@@ -181,7 +181,8 @@ pub fn mp2_original_channels_are_unsupported(
     config: &ConversionConfig,
     metadata: Option<&SourceMetadata>,
 ) -> bool {
-    config.audio_codec == "mp2"
+    !config.processing_mode.copies_audio()
+        && config.audio_codec == "mp2"
         && metadata.is_some_and(|metadata| {
             metadata.audio_tracks.iter().any(|track| {
                 config.selected_audio_tracks.contains(&track.index)
@@ -210,7 +211,7 @@ pub fn audio_track_options(
                     index_label: format!("#{}", track.index),
                     codec: display_source_value(Some(&track.codec)),
                     detail: audio_track_detail(track),
-                    copy_error: (config.processing_mode == ProcessingMode::Copy
+                    copy_error: (config.processing_mode.copies_audio()
                         && config.selected_audio_tracks.contains(&track.index))
                     .then(|| audio_copy_error_for_track(&config.container, metadata, track))
                     .flatten(),

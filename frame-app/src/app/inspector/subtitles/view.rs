@@ -14,7 +14,7 @@ use crate::app::inspector::subtitles::tracks::{
     settings_external_subtitles_section, settings_subtitle_track_button,
 };
 use crate::app::root::FrameRoot;
-use crate::settings::{ConversionConfig, ProcessingMode, SourceMetadata, subtitle_track_options};
+use crate::settings::{ConversionConfig, SourceMetadata, subtitle_track_options};
 use crate::theme;
 use gpui::prelude::*;
 use gpui::{Context, FocusHandle, ScrollHandle, Window};
@@ -201,7 +201,7 @@ pub(super) fn settings_burn_in_subtitles_content(
 ) -> gpui::Div {
     let config = state.config;
     let palette = state.palette;
-    let copy_mode = config.processing_mode == ProcessingMode::Copy;
+    let copy_mode = config.processing_mode.copies_video();
     let burn_in_disabled =
         state.settings_disabled || copy_mode || !state.available_filters.subtitles;
     let mut burn_in_section = settings_field("Burn-in file", palette)

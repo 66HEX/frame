@@ -126,7 +126,7 @@ pub(super) fn check(
     executable: &str,
     cancelled: impl Fn() -> bool,
 ) -> Result<Option<OpusProof>, ConversionError> {
-    if task.config.processing_mode != "copy" || task.config.container != "opus" {
+    if !task.config.copies_audio() || task.config.container != "opus" {
         return Ok(None);
     }
     let selected: BTreeSet<_> = task

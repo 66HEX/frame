@@ -225,6 +225,13 @@ impl FrameRoot {
                 bitrate: Some("12000000".to_string()),
                 video_codec: Some("prores".to_string()),
                 audio_codec: Some("aac".to_string()),
+                audio_tracks: vec![crate::settings::AudioTrack {
+                    index: 1,
+                    codec: "aac".into(),
+                    channels: Some("2".into()),
+                    sample_rate: Some("48000".into()),
+                    ..Default::default()
+                }],
                 resolution: Some("3840x2160".to_string()),
                 frame_rate: Some(24.0),
                 width: Some(3840),

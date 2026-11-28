@@ -422,6 +422,38 @@ pub struct ConversionConfig {
     pub gif_loop: u16,
 }
 
+impl ConversionConfig {
+    /// Whether the selected video stream is passed through as encoded packets.
+    #[must_use]
+    pub fn copies_video(&self) -> bool {
+        matches!(self.processing_mode.trim(), "copy" | "copyVideo")
+    }
+
+    /// Whether every selected audio stream is passed through as encoded packets.
+    #[must_use]
+    pub fn copies_audio(&self) -> bool {
+        matches!(self.processing_mode.trim(), "copy" | "copyAudio")
+    }
+
+    pub fn set_video_copy(&mut self, copy: bool) {
+        self.set_stream_modes(copy, self.copies_audio());
+    }
+
+    pub fn set_audio_copy(&mut self, copy: bool) {
+        self.set_stream_modes(self.copies_video(), copy);
+    }
+
+    fn set_stream_modes(&mut self, video_copy: bool, audio_copy: bool) {
+        let mode = match (video_copy, audio_copy) {
+            (false, false) => "reencode",
+            (true, true) => "copy",
+            (true, false) => "copyVideo",
+            (false, true) => "copyAudio",
+        };
+        mode.clone_into(&mut self.processing_mode);
+    }
+}
+
 fn default_rotation() -> String {
     "0".to_string()
 }
@@ -745,6 +777,32 @@ mod tests {
         assert!(config.external_subtitle_tracks.is_empty());
         assert_eq!(config.metadata.service_name, None);
         assert_eq!(config.metadata.service_provider, None);
+    }
+
+    #[test]
+    fn stream_modes_round_trip_and_changing_one_preserves_the_other() {
+        for (video, audio, saved) in [
+            (false, false, "reencode"),
+            (true, true, "copy"),
+            (false, true, "copyAudio"),
+            (true, false, "copyVideo"),
+        ] {
+            let mut config: ConversionConfig =
+                serde_json::from_value(minimal_config_json()).unwrap();
+            config.set_video_copy(video);
+            config.set_audio_copy(audio);
+            let json = serde_json::to_value(&config).unwrap();
+            assert_eq!(json["processingMode"], saved);
+            let mut restored: ConversionConfig = serde_json::from_value(json).unwrap();
+            assert_eq!(
+                (restored.copies_video(), restored.copies_audio()),
+                (video, audio)
+            );
+            restored.set_audio_copy(!audio);
+            assert_eq!(restored.copies_video(), video);
+            restored.set_video_copy(!video);
+            assert_eq!(restored.copies_audio(), !audio);
+        }
     }
 
     #[test]

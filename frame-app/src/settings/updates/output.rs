@@ -23,7 +23,7 @@ pub fn apply_processing_mode(
     metadata: Option<&SourceMetadata>,
     mode: ProcessingMode,
 ) -> bool {
-    if mode == ProcessingMode::Copy && source_kind_for(metadata) == SourceKind::Image {
+    if mode != ProcessingMode::Reencode && source_kind_for(metadata) == SourceKind::Image {
         return false;
     }
 
@@ -36,7 +36,7 @@ pub fn apply_output_container(config: &mut ConversionConfig, container: &str) ->
     let mut changed = !config.container.eq_ignore_ascii_case(container);
     config.container = container.to_ascii_lowercase();
 
-    if config.processing_mode != ProcessingMode::Copy
+    if !config.processing_mode.copies_audio()
         && container_supports_audio(&config.container)
         && !is_audio_codec_allowed_for_container(&config.container, &config.audio_codec)
     {

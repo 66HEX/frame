@@ -59,29 +59,6 @@ fn text_with_demux_flags(
     String::from_utf8(bytes).map_err(|error| error.to_string())
 }
 
-fn packets(tools: &Toolchain, path: &Path, selector: &str) -> TestResult<serde_json::Value> {
-    let bytes = run_tool_output(
-        &tools.ffprobe,
-        &args(&[
-            "-v",
-            "error",
-            "-select_streams",
-            selector,
-            "-show_packets",
-            "-show_data_hash",
-            "sha256",
-            "-show_entries",
-            "packet=pts,dts,duration,size,data_hash",
-            "-of",
-            "json",
-            &path_arg(path),
-        ]),
-    )?;
-    let json: serde_json::Value =
-        serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
-    Ok(json["packets"].clone())
-}
-
 fn text_formats(tools: &Toolchain, srt: &Path) -> TestResult<Vec<PathBuf>> {
     let mut paths = vec![srt.to_path_buf()];
     for extension in ["ass", "vtt"] {

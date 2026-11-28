@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Video and Audio Modes:** Choose which streams to re-encode and which to copy. For example, resize the video while keeping the original audio tracks. Resolves [#306](https://github.com/66HEX/frame/issues/306).
 - **MPEG-PS Source Files:** Adds `.mpg` and `.mpeg` video files to the supported source extensions for drag-and-drop and the file picker. Resolves [#270](https://github.com/66HEX/frame/issues/270).
 
 ### Changed

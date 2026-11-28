@@ -193,3 +193,86 @@ fn headless_qa_exports_through_the_app_runner_and_reports_the_actual_result() {
         "only sentinel and completed result remain"
     );
 }
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn headless_qa_applies_independent_modes_to_video_and_audio() {
+    let sandbox = Sandbox::new();
+    let input = sandbox.0.join("source.mkv");
+    let generated = Command::new(frame_app::runtime_binaries::ffmpeg_executable())
+        .args([
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=96x64:duration=0.6",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=duration=0.6",
+            "-c:v",
+            "mpeg2video",
+            "-c:a",
+            "mp2",
+        ])
+        .arg(&input)
+        .output()
+        .unwrap();
+    assert!(
+        generated.status.success(),
+        "{}",
+        String::from_utf8_lossy(&generated.stderr)
+    );
+
+    for (mode, expected_video, expected_audio) in [
+        ("copyAudio", "h264", "mp2"),
+        ("copyVideo", "mpeg2video", "flac"),
+    ] {
+        let request = sandbox.0.join(format!("{mode}.json"));
+        let output_name = format!("{mode}.mkv");
+        fs::write(
+            &request,
+            serde_json::to_vec(&serde_json::json!({
+                "input": input,
+                "outputDirectory": sandbox.0,
+                "outputName": output_name,
+                "config": {
+                    "container": "mkv", "processingMode": mode, "videoCodec": "libx264",
+                    "audioCodec": "flac", "selectedAudioTracks": [1]
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let run = run_qa("--export", &request);
+        assert!(
+            run.status.success(),
+            "{mode}: {} {}",
+            String::from_utf8_lossy(&run.stderr),
+            String::from_utf8_lossy(&run.stdout)
+        );
+        let probe = Command::new(frame_app::runtime_binaries::ffprobe_executable())
+            .args([
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=codec_name",
+                "-of",
+                "json",
+            ])
+            .arg(sandbox.0.join(output_name))
+            .output()
+            .unwrap();
+        assert!(
+            probe.status.success(),
+            "{}",
+            String::from_utf8_lossy(&probe.stderr)
+        );
+        let info: serde_json::Value = serde_json::from_slice(&probe.stdout).unwrap();
+        let streams = info["streams"].as_array().unwrap();
+        assert_eq!(streams.len(), 2);
+        assert_eq!(streams[0]["codec_name"], expected_video, "{mode}");
+        assert_eq!(streams[1]["codec_name"], expected_audio, "{mode}");
+    }
+}

@@ -1,6 +1,7 @@
 use crate::VisualFixture;
 use crate::app::{FrameRoot, SettingsSubtitleMode};
 use crate::appearance::{ColorTheme, ScalePreset};
+use crate::settings::ProcessingMode;
 use gpui::{Entity, Modifiers, TestAppContext, VisualTestContext, px, size};
 
 struct SelectCase {
@@ -465,40 +466,30 @@ fn selecting_the_current_font_or_size_still_closes_the_menu() {
 fn processing_tabs_activate_on_arrow_focus_and_wrap() {
     let case = SelectCase {
         fixture: VisualFixture::SettingsOutput,
-        trigger: "output-mode-reencode",
+        trigger: "output-video-mode-reencode",
         panel: "unused",
     };
     let mut app = TestAppContext::single();
     let (root, cx) = select_window(&mut app, &case, ColorTheme::Dark, ScalePreset::Percent100);
     click(cx, case.trigger);
-    let original = root.read_with(cx, |root, _| {
-        root.selected_config().unwrap().processing_mode
-    });
+    let mode = |cx: &mut VisualTestContext| {
+        root.read_with(cx, |root, _| {
+            root.selected_config().unwrap().processing_mode
+        })
+    };
+    assert_eq!(mode(cx), ProcessingMode::Reencode);
     press(cx, "right");
-    assert_ne!(
-        root.read_with(cx, |root, _| root
-            .selected_config()
-            .unwrap()
-            .processing_mode),
-        original
-    );
+    assert_eq!(mode(cx), ProcessingMode::CopyVideo);
     press(cx, "enter");
-    assert_ne!(
-        root.read_with(cx, |root, _| root
-            .selected_config()
-            .unwrap()
-            .processing_mode),
-        original
-    );
+    assert_eq!(mode(cx), ProcessingMode::CopyVideo);
     press(cx, "right");
-    press(cx, "enter");
-    assert_eq!(
-        root.read_with(cx, |root, _| root
-            .selected_config()
-            .unwrap()
-            .processing_mode),
-        original
-    );
+    assert_eq!(mode(cx), ProcessingMode::Reencode);
+    click(cx, "output-audio-mode-copy");
+    assert_eq!(mode(cx), ProcessingMode::CopyAudio);
+    click(cx, "output-video-mode-copy");
+    assert_eq!(mode(cx), ProcessingMode::Copy);
+    click(cx, "output-audio-mode-reencode");
+    assert_eq!(mode(cx), ProcessingMode::CopyVideo);
 }
 
 #[test]

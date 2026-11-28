@@ -151,15 +151,7 @@ fn run_prepared_conversion_task_with_control(
     if let Some(observer) =
         build_alac_copy_observer(&task.file_path, &output_path, &task.config, &probe)?
     {
-        // This scoped branch is full Copy to MOV/MP4/M4A; GIF and hardware
-        // encoding checks are dormant, but selectable subtitle BSFs still apply.
-        if !super::subtitles::check_subtitle_trim_with_control(
-            &task.config,
-            &executable,
-            &task.id,
-            controller,
-            emit,
-        )? {
+        if !check_export_capabilities(task, &probe, &executable, controller, emit)? {
             return Ok(());
         }
         return super::alac::run(
@@ -197,17 +189,7 @@ fn run_prepared_conversion_task_with_control(
     };
     prepared.opus_proof = opus_proof;
 
-    if !super::subtitles::check_subtitle_trim_with_control(
-        &task.config,
-        &executable,
-        &task.id,
-        controller,
-        emit,
-    )? {
-        return Ok(());
-    }
-
-    if !check_hardware_encoder(task, &probe, &executable, controller, emit)? {
+    if !check_export_capabilities(task, &probe, &executable, controller, emit)? {
         return Ok(());
     }
 
@@ -615,6 +597,25 @@ fn finish_final_conversion(
     outcome.result?;
     emit(ConversionEvent::completed(task.id.clone(), output_path));
     Ok(())
+}
+
+fn check_export_capabilities(
+    task: &ConversionTask,
+    probe: &ProbeMetadata,
+    executable: &str,
+    controller: &ConversionProcessController,
+    emit: &mut impl FnMut(ConversionEvent),
+) -> Result<bool, ConversionError> {
+    if !super::subtitles::check_subtitle_trim_with_control(
+        &task.config,
+        executable,
+        &task.id,
+        controller,
+        emit,
+    )? {
+        return Ok(false);
+    }
+    check_hardware_encoder(task, probe, executable, controller, emit)
 }
 
 fn check_hardware_encoder(

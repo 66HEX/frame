@@ -231,13 +231,12 @@ pub fn build_audio_effect_filters(config: &ConversionConfig) -> Vec<String> {
 /// Returns [`ConversionError`] when a filter is active for an incompatible
 /// output mode or when a value is outside the accepted UI range.
 pub fn validate_media_filters(config: &ConversionConfig) -> Result<(), ConversionError> {
-    let is_copy = config.processing_mode == "copy";
     let is_audio_only = crate::utils::is_audio_only_container(&config.container);
     let is_image = is_image_container(&config.container);
     let supports_audio = container_supports_audio(&config.container);
 
-    if is_copy
-        && (has_active_video_filters(&config.video_filters) || has_active_audio_filters(config))
+    if (config.copies_video() && has_active_video_filters(&config.video_filters))
+        || (config.copies_audio() && has_active_audio_filters(config))
     {
         return Err(ConversionError::InvalidInput(
             "Media filters require re-encode mode; disable filters before stream copy".to_string(),

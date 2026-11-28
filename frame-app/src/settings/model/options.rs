@@ -1,10 +1,7 @@
-use crate::settings::model::processing::ProcessingMode;
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OutputModeOption {
-    pub mode: ProcessingMode,
+    pub copy: bool,
     pub label: &'static str,
-    pub hint: &'static str,
     pub is_selected: bool,
     pub is_disabled: bool,
 }

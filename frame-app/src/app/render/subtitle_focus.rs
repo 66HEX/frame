@@ -2,8 +2,7 @@ use crate::app::accessibility::FrameFocusKey;
 use crate::app::inspector::subtitles::state::SettingsSubtitlePopover;
 use crate::app::root::FrameRoot;
 use crate::settings::{
-    ConversionConfig, ProcessingMode, SettingsTab, subtitle_font_options,
-    subtitle_font_size_options,
+    ConversionConfig, SettingsTab, subtitle_font_options, subtitle_font_size_options,
 };
 use gpui::{Context, FocusHandle, Window};
 
@@ -57,7 +56,7 @@ impl FrameRoot {
             subtitle_font_color_focus,
             subtitle_outline_color_focus,
         } = input;
-        let subtitles_copy_mode = selected_config_snapshot.processing_mode == ProcessingMode::Copy;
+        let subtitles_copy_mode = selected_config_snapshot.processing_mode.copies_video();
         let subtitles_tab_active = self.settings_ui.active_tab == SettingsTab::Output
             && self
                 .settings_ui

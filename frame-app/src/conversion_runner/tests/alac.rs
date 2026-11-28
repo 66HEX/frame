@@ -162,14 +162,28 @@ fn atom_payload(bytes: &mut [u8], kind: [u8; 4]) -> &mut [u8] {
     &mut bytes[found.expect("missing fixture atom")]
 }
 
+fn audio_track_media(mut atoms: &mut [u8]) -> &mut [u8] {
+    while !atoms.is_empty() {
+        let size = u32::from_be_bytes(atoms[..4].try_into().unwrap()) as usize;
+        assert!(size >= 8 && size <= atoms.len());
+        let (atom, remaining) = atoms.split_at_mut(size);
+        if &atom[4..8] == b"trak" {
+            let media = atom_payload(&mut atom[8..], *b"mdia");
+            if &atom_payload(media, *b"hdlr")[8..12] == b"soun" {
+                return media;
+            }
+        }
+        atoms = remaining;
+    }
+    panic!("missing fixture audio stream")
+}
+
 fn zero_terminal_duration(source: &Path, samples: u32) {
     // Matroska's DefaultDuration changed in FFmpeg 9. Keep repair coverage
     // independent of muxer defaults by changing only this M4A fixture's timing.
     let mut bytes = fs::read(source).unwrap();
     let moov = atom_payload(&mut bytes, *b"moov");
-    let trak = atom_payload(moov, *b"trak");
-    let mdia = atom_payload(trak, *b"mdia");
-    assert_eq!(&atom_payload(mdia, *b"hdlr")[8..12], b"soun");
+    let mdia = audio_track_media(moov);
     let minf = atom_payload(mdia, *b"minf");
     let stbl = atom_payload(minf, *b"stbl");
     let stts = atom_payload(stbl, *b"stts");
@@ -451,4 +465,67 @@ fn alac_published_task_should_remain_cancellable_while_its_batch_retry_is_queued
     assert_samples(&decoded(&sandbox.path("ordinary-a.m4a"), 0), &expected);
     run_conversion_task_with_control(retry, &controller, &mut |_| {}).unwrap();
     assert_samples(&decoded(&sandbox.path("retry-b.m4a"), 0), &expected);
+}
+
+#[test]
+#[ignore = "requires media worker and reference fixture tools"]
+fn mixed_video_encoding_preserves_repaired_duplicate_alac_tracks() {
+    let sandbox = ConversionRunnerSandbox::new("mixed-alac-repair");
+    let (audio, expected) = generate_alac(&sandbox, 5000, "m4a", false);
+    let input = sandbox.path("video-source.mov");
+    let generate = crate::process_launch::output(
+        Command::new(crate::runtime_binaries::ffmpeg_executable())
+            .args([
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=size=32x32:rate=10:duration=0.2",
+                "-i",
+            ])
+            .arg(&audio)
+            .args([
+                "-map", "0:v", "-map", "1:a", "-c:v", "mpeg4", "-c:a", "copy", "-n",
+            ])
+            .arg(&input),
+    )
+    .unwrap();
+    assert!(
+        generate.status.success(),
+        "{}",
+        String::from_utf8_lossy(&generate.stderr)
+    );
+    zero_terminal_duration(&input, 5000);
+    let name = "mixed.mov";
+    let mut job = task(&sandbox, &input, name, true);
+    job.config = core_config_from_gpui(&GpuiConversionConfig {
+        container: "mov".into(),
+        processing_mode: ProcessingMode::CopyAudio,
+        video_codec: "libx264".into(),
+        selected_audio_tracks: vec![1, 1],
+        ..GpuiConversionConfig::default()
+    });
+    let mut events = Vec::new();
+    run_conversion_task(job, |event| events.push(event))
+        .unwrap_or_else(|error| panic!("{error}: {events:?}"));
+    assert!(
+        has_log(&events, "output verified; preparing publication"),
+        "{events:?}"
+    );
+    let output = sandbox.path(name);
+    let metadata = crate::source_metadata::probe_source_metadata(output.to_str().unwrap()).unwrap();
+    assert_eq!(metadata.video_codec.as_deref(), Some("h264"));
+    let original = packets(&input, 0);
+    for ordinal in 0..2 {
+        assert_samples(&decoded(&output, ordinal), &expected);
+        let copied = packets(&output, ordinal);
+        assert_eq!(copied.len(), original.len());
+        assert!(
+            copied
+                .iter()
+                .zip(&original)
+                .all(|(a, b)| a["data_hash"] == b["data_hash"])
+        );
+    }
 }

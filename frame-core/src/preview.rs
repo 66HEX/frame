@@ -121,7 +121,7 @@ fn build_preview_args_with_frame_policy(
     let fps = effective_preview_fps(config, options.fps);
     let geometry = preview_geometry(config, options)?;
     let frame_bytes = frame_bytes(geometry.preview_width, geometry.preview_height)?;
-    let base = match output_raster_policy(&config.container, config.processing_mode == "copy") {
+    let base = match output_raster_policy(&config.container, config.copies_video()) {
         OutputRasterPolicy::Source => VisualFilterBase::Source,
         OutputRasterPolicy::Exact => VisualFilterBase::Image,
         OutputRasterPolicy::Even => VisualFilterBase::Video,
@@ -402,7 +402,7 @@ fn audio_preview_duration(options: &PreviewAudioFfmpegOptions) -> Option<f64> {
 }
 
 fn effective_preview_fps(config: &ConversionConfig, preview_fps: u32) -> u32 {
-    if config.processing_mode == "copy" {
+    if config.copies_video() {
         return preview_fps;
     }
     config
@@ -456,8 +456,7 @@ fn export_dimensions(
         })?,
     };
 
-    if output_raster_policy(&config.container, config.processing_mode == "copy")
-        == OutputRasterPolicy::Source
+    if output_raster_policy(&config.container, config.copies_video()) == OutputRasterPolicy::Source
     {
         return Ok(Dimensions {
             width: source_width,
@@ -1104,6 +1103,30 @@ mod tests {
                 .any(|args| args == ["-af", "volume=0.500"])
         );
         assert_eq!(plan.args.last(), Some(&"pipe:1".to_string()));
+    }
+
+    #[test]
+    fn mixed_modes_preview_only_the_effects_enabled_for_each_stream() {
+        let mut config = default_config();
+        config.flip_horizontal = true;
+        config.fps = "15".into();
+        config.audio_volume = 50.0;
+        for (video_copy, audio_copy) in [(false, true), (true, false)] {
+            config.set_video_copy(video_copy);
+            config.set_audio_copy(audio_copy);
+            let video = build_ffmpeg_preview_args("in", &config, &default_options()).unwrap();
+            assert_eq!(
+                video.args.iter().any(|arg| arg.contains("hflip")),
+                !video_copy
+            );
+            assert_eq!(video.fps, if video_copy { 30 } else { 15 });
+            let audio =
+                build_ffmpeg_preview_audio_args("in", &config, &default_audio_options()).unwrap();
+            assert_eq!(
+                audio.args.iter().any(|arg| arg == "volume=0.500"),
+                !audio_copy
+            );
+        }
     }
 
     #[test]
