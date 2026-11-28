@@ -149,6 +149,15 @@ static int open_subtitle_decoder(ConvertTrack *t) {
     return 0;
 }
 
+static int share_local_container(const ConvertTrack *t) {
+    const char *protocol = avio_find_protocol_name(t->source->path);
+    if (!protocol || strcmp(protocol,"file") || !t->input->pb || !t->input->pb->seekable) return 0;
+    static const char *const containers[] = {"mov","matroska","mpegts","mpeg","nut","avi","asf","ogg","mxf",NULL};
+    for (const char *const *name=containers; *name; ++name)
+        if (av_match_name(*name,t->input->iformat->name)) return 1;
+    return 0;
+}
+
 static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *codec) {
     AVBPrint tail;
     av_bprint_init(&tail, 128, AV_BPRINT_SIZE_UNLIMITED);
@@ -158,8 +167,13 @@ static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *cod
             t->kind == 'a' ? frame_plan_opt(p, "af") : frame_plan_opt(p, "filter_complex");
         if (!graph && t->kind == 'v')
             graph = frame_plan_opt(p, "vf");
+        if (!t->source->shared_file && t->source->mapped_count > 1 && share_local_container(t)) {
+            err = frame_media_file_open(&t->source->shared_file,t->source->path);
+        }
         FrameRenderPlan request = {
             .path = t->source->path,
+            .shared_file = t->source->shared_file,
+            .threads = t->kind == 'a' && t->source->mapped_count > 1 ? 1 : 0,
             .overlay = t->kind == 'v' && graph && strstr(graph, "[1:v") && p->sources_len > 1
                            ? p->sources[1].path
                            : NULL,
@@ -174,7 +188,7 @@ static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *cod
             .strict = t->strict,
             .hardware_device = t->kind == 'v' ? frame_plan_opt(p, "hwaccel") : NULL,
         };
-        err = frame_render_open(&t->render, &request);
+        if (err >= 0) err = frame_render_open(&t->render, &request);
     }
     av_bprint_finalize(&tail, NULL);
     if (err < 0)
@@ -275,6 +289,11 @@ int frame_prepare_encoder(const ConvertPlan *p, ConvertTrack *t, AVFormatContext
     int err = t->kind == 's' ? open_subtitle_decoder(t) : open_render(p, t, codec);
     if (err < 0 || (err = open_codec(p, t, codec)) < 0)
         return err;
+    if (t->kind == 'a' && t->encoder->frame_size) {
+        t->audio_input = av_frame_alloc();
+        if (!t->audio_input)
+            return AVERROR(ENOMEM);
+    }
     if (t->kind == 'v') {
         FrameCadence *c = &t->cadence;
         c->previous = av_frame_alloc();
@@ -293,11 +312,8 @@ int frame_prepare_encoder(const ConvertPlan *p, ConvertTrack *t, AVFormatContext
     return avcodec_parameters_from_context(t->dst->codecpar, t->encoder);
 }
 
-static int encode_subtitle(ConvertTrack *t, AVPacket *output) {
+int frame_encode_subtitle(ConvertTrack *t, AVPacket *output) {
     int err;
-    for (;;) {
-        if ((err = frame_read_selected(t, t->raw)) < 0)
-            return err;
         AVSubtitle sub = {0};
         int got = 0;
         err = avcodec_decode_subtitle2(t->subdecoder, &sub, &got, t->raw);
@@ -329,14 +345,67 @@ static int encode_subtitle(ConvertTrack *t, AVPacket *output) {
         }
         avsubtitle_free(&sub);
         av_packet_unref(t->raw);
-        if (err < 0 || got)
-            return err < 0 ? err : 0;
+        return err < 0 ? err : got ? 0 : AVERROR(EAGAIN);
+}
+
+/* Keep the unconsumed input outside libavfilter. A format change rebuilds the
+ * graph, but the encoder still needs every sample in its partially filled block. */
+static int read_audio_block(ConvertTrack *t) {
+    AVCodecContext *ctx = t->encoder;
+    AVFrame *block = t->frame, *in = t->audio_input;
+    int filled = 0;
+    if (t->audio_eof)
+        return AVERROR_EOF;
+    while (filled < ctx->frame_size) {
+        if (t->consumed_samples == in->nb_samples) {
+            if (t->audio_eof)
+                break;
+            av_frame_unref(in);
+            int rc = frame_render_next(t->render, in, &t->audio_input_tb);
+            if (rc == AVERROR_EOF) {
+                t->audio_eof = 1;
+                break;
+            }
+            if (rc < 0)
+                return rc;
+            if (in->format != ctx->sample_fmt || in->sample_rate != ctx->sample_rate ||
+                av_channel_layout_compare(&in->ch_layout, &ctx->ch_layout))
+                return AVERROR_INPUT_CHANGED;
+            t->consumed_samples = 0;
+        }
+        if (!filled) {
+            int rc = av_frame_copy_props(block, in);
+            if (rc < 0 || (rc = av_channel_layout_copy(&block->ch_layout, &ctx->ch_layout)) < 0)
+                return rc;
+            block->format = ctx->sample_fmt;
+            block->sample_rate = ctx->sample_rate;
+            block->nb_samples = ctx->frame_size;
+            block->time_base = ctx->time_base;
+            block->pts =
+                in->pts == AV_NOPTS_VALUE
+                    ? AV_NOPTS_VALUE
+                    : av_sat_add64(av_rescale_q(in->pts, t->audio_input_tb, ctx->time_base),
+                                   t->consumed_samples);
+            if ((rc = av_frame_get_buffer(block, 0)) < 0)
+                return rc;
+        }
+        int take = FFMIN(ctx->frame_size - filled, in->nb_samples - t->consumed_samples);
+        int rc =
+            av_samples_copy(block->extended_data, in->extended_data, filled, t->consumed_samples,
+                            take, ctx->ch_layout.nb_channels, ctx->sample_fmt);
+        if (rc < 0)
+            return rc;
+        filled += take;
+        t->consumed_samples += take;
     }
+    if (!filled)
+        return AVERROR_EOF;
+    block->nb_samples = filled;
+    block->duration = filled;
+    return 0;
 }
 
 int frame_read_encoded(ConvertTrack *t, AVPacket *packet) {
-    if (t->kind == 's')
-        return encode_subtitle(t, packet);
     for (;;) {
         int err = avcodec_receive_packet(t->encoder, packet);
         if (err != AVERROR(EAGAIN))
@@ -349,9 +418,10 @@ int frame_read_encoded(ConvertTrack *t, AVPacket *packet) {
         else if (t->kind == 'v') {
             err = frame_cadence_next(t);
             tb = t->encoder->time_base;
-        } else if (t->kind == 'a' && t->encoder->frame_size > 0)
-            err = frame_render_samples(t->render, t->frame, &tb, t->encoder->frame_size);
-        else
+        } else if (t->audio_input) {
+            err = read_audio_block(t);
+            tb = t->encoder->time_base;
+        } else
             err = frame_render_next(t->render, t->frame, &tb);
         if (err == AVERROR_EOF) {
             t->source_done = 1;

@@ -42,6 +42,9 @@ pub fn media_worker_executable() -> String {
         .ok()
         .and_then(|exe| {
             let dir = exe.parent()?;
+            if dir.join(name).is_file() {
+                return Some(path_to_string(&dir.join(name)));
+            }
             let dir = if dir
                 .file_name()
                 .is_some_and(|n| n == "deps" || n == "examples")

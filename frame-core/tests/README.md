@@ -1,8 +1,9 @@
 # Frame media integration tests
 
-This directory contains integration tests that run real FFmpeg/FFprobe commands
-against tiny synthetic media files. They are intentionally separate from the
-unit tests that only validate argument construction.
+These tests run Frame’s conversion plans through the linked-library worker on
+small media fixtures. FFmpeg and FFprobe generate reference inputs and
+independently decode and inspect the outputs. See the [migration matrix](../../MEDIA_MIGRATION.md)
+for coverage by feature and package.
 
 Run the fast frame-core suite:
 
@@ -13,6 +14,7 @@ cargo test --locked -p frame-core
 Run the real media suite:
 
 ```sh
+cargo build --locked -p frame-media
 cargo test --locked -p frame-core --test media_integration -- --ignored --test-threads=1
 ```
 
@@ -24,7 +26,7 @@ cargo test --locked -p frame-app \
   -- --ignored --test-threads=1
 ```
 
-The media suite discovers tools in this order:
+Set `FRAME_TEST_MEDIA_WORKER` to exercise a relocated worker. The media suite discovers reference tools in this order.
 
 1. `FRAME_TEST_FFMPEG` and `FRAME_TEST_FFPROBE`
 2. bundled binaries under `frame-app/resources/binaries`

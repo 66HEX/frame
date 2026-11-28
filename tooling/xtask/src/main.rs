@@ -50,6 +50,7 @@ const ACTIONLINT_VERSION: &str = "1.7.12";
 const ACTIONLINT_LINUX_X86_64_SHA256: &str =
     "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8";
 
+const ACTION_CACHE_SHA: &str = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9";
 const ACTION_CHECKOUT_SHA: &str = "3d3c42e5aac5ba805825da76410c181273ba90b1";
 const ACTION_UPLOAD_ARTIFACT_SHA: &str = "cf430e030ddbb5b0abf93d22962f4752f3646cd9";
 const ACTION_DOWNLOAD_ARTIFACT_SHA: &str = "9000827ccba6bdab643e8b6fd33ac0654aef8333";
@@ -1922,6 +1923,14 @@ fn pin_workflow_tools(workflow: &mut String) {
 fn pin_workflow_actions(workflow: &mut String) {
     let action_replacements = [
         (
+            "actions/cache/restore@v6.1.0",
+            format!("actions/cache/restore@{ACTION_CACHE_SHA} # v6.1.0"),
+        ),
+        (
+            "actions/cache/save@v6.1.0",
+            format!("actions/cache/save@{ACTION_CACHE_SHA} # v6.1.0"),
+        ),
+        (
             "actions/checkout@v4",
             format!("actions/checkout@{ACTION_CHECKOUT_SHA} # v7.0.1"),
         ),
@@ -2102,9 +2111,7 @@ __CI_WORKER_TESTS__
     - name: ci::run_documented_gate
       run: cargo xtask ci
 __CI_MEDIA_TESTS__
-    - name: ci::test_conversion_runner
-      run: cargo test --locked -p frame-app conversion_runner::tests -- --ignored --test-threads=1
-    timeout-minutes: 60
+    timeout-minutes: 150
   cargo_check_macos:
     name: cargo check macos
     runs-on: macos-15
@@ -2119,7 +2126,7 @@ __CI_WORKER_TESTS__
     - name: ci::check_macos
       run: cargo check --manifest-path frame-app/Cargo.toml --locked
 __CI_MEDIA_TESTS__
-    timeout-minutes: 60
+    timeout-minutes: 150
   cargo_check_windows:
     name: cargo check windows
     runs-on: windows-2022
@@ -2141,7 +2148,7 @@ __CI_WORKER_TESTS__
     - name: ci::test_windows_process_launch
       run: 'cargo test --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --release --locked --lib process_launch::windows_tests:: -- --test-threads=1'
 __CI_MEDIA_TESTS__
-    timeout-minutes: 90
+    timeout-minutes: 150
   media_other_architectures:
     strategy:
       fail-fast: false
@@ -2155,30 +2162,61 @@ __CI_MEDIA_TESTS__
         persist-credentials: false
     - name: steps::setup_rust
       run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
+__CI_OTHER_LINUX_SETUP__
 __CI_WORKER_TESTS__
 __CI_MEDIA_TESTS__
-    timeout-minutes: 90
+    timeout-minutes: 150
 "
         .replace("__CI_WORKER_TESTS__", CI_WORKER_TESTS)
         .replace("__CI_LINUX_SETUP__", &linux_ci_setup_step())
+        .replace(
+            "__CI_OTHER_LINUX_SETUP__",
+            &linux_ci_setup_step().replace("      run: |", "      if: runner.os == 'Linux'\n      run: |"),
+        )
         .replace("__CI_MEDIA_TESTS__", ci_media_test_steps()),
     )
 }
 
-const CI_WORKER_TESTS: &str = "    - name: ci::setup_media_sdk
+const CI_WORKER_TESTS: &str = "    - name: ci::restore_sdk_cache
+      id: sdk-cache
+      if: runner.os == 'macOS'
+      uses: actions/cache/restore@v6.1.0
+      with:
+        path: target/media-sdk/archives
+        key: libav-macos-${{ runner.arch }}-${{ hashFiles('packaging/media/**', 'script/media-worker.py') }}
+        restore-keys: libav-macos-${{ runner.arch }}-
+    - name: ci::setup_media_sdk
       run: python script/media-worker.py setup-ci
+    - name: ci::save_sdk_cache
+      if: runner.os == 'macOS' && steps.sdk-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6.1.0
+      with:
+        path: target/media-sdk/archives
+        key: ${{ steps.sdk-cache.outputs.cache-primary-key }}
     - name: ci::build_media_worker
       run: cargo build --locked --package frame-media
     - name: ci::test_media_worker
       run: cargo test --locked --package frame-media
+    - name: ci::build_app_qa
+      run: cargo build --locked --package frame-app --features qa-harness --bin frame-qa
     - name: ci::test_worker_packaging
+      env:
+        FRAME_TEST_QA_RELOCATION: '1'
       run: python -B -m unittest discover -s script/tests -p test_media_worker.py -v";
 
 const fn ci_media_test_steps() -> &'static str {
     "    - name: ci::setup_ffmpeg
       run: cargo xtask setup-ffmpeg
     - name: ci::test_media_conversions
-      run: cargo test --locked -p frame-core --test media_integration -- --ignored --test-threads=1"
+      run: cargo test --locked -p frame-core --test media_integration -- --ignored --test-threads=1
+    - name: ci::test_app
+      run: cargo test --locked -p frame-app --lib -- --test-threads=1
+    - name: ci::test_conversion_runner
+      run: cargo test --locked -p frame-app --lib conversion_runner -- --ignored --test-threads=1
+    - name: ci::test_frame_export
+      run: cargo test --locked -p frame-app --lib frame_export -- --ignored --test-threads=1
+    - name: ci::test_app_package_pipeline
+      run: cargo test --locked -p frame-app --features qa-harness --test qa_harness -- --include-ignored --test-threads=1"
 }
 
 fn hevc_comparison_workflow() -> String {
@@ -3696,7 +3734,7 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
           # Preserve downstream changes, including nixfmt's shared cargoFlags list.
           perl -0pi -e 's/(cargo(?:Build|Test)?Flags\s*=\s*\[[^\]]*?"frame-app")(?![^\]]*"frame-media")/$1 "--package" "frame-media"/gs' "$package_path"
           perl -0pi -e 's/(\bbuildInputs\s*=\s*\[)(?![^\]]*\bffmpeg\b)/$1 ffmpeg/gs' "$package_path"
-          sed -i '/--prefix PATH : ${lib.makeBinPath \[ ffmpeg \]}/d; /--set FRAME_USE_SYSTEM_MEDIA_TOOLS 1/d' "$package_path"
+          sed -i '/--prefix PATH : [$]{lib.makeBinPath \[ ffmpeg \]}/d; /--set FRAME_USE_SYSTEM_MEDIA_TOOLS 1/d' "$package_path"
           grep -q '"frame-media"' "$package_path"
         else
           mkdir -p "$(dirname "$package_path")"

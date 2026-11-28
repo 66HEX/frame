@@ -35,9 +35,12 @@ static int input_for_map(ConvertTrack *t, const ConvertPlan *p, const char *map)
         return AVERROR(EINVAL);
     t->input_num = (int)source;
     t->source = &p->sources[source];
-    int err = avformat_open_input(&t->input, t->source->path, NULL, NULL);
-    if (err < 0 || (err = avformat_find_stream_info(t->input, NULL)) < 0)
-        return err;
+    int err;
+    if (!t->source->input) {
+        err = avformat_open_input(&t->source->input,t->source->path,NULL,NULL);
+        if (err < 0 || (err = avformat_find_stream_info(t->source->input,NULL)) < 0) return err;
+    }
+    t->input = t->source->input;
     const char *selector = end + 1;
     for (unsigned i = 0; i < t->input->nb_streams; ++i) {
         AVStream *stream = t->input->streams[i];
@@ -78,26 +81,10 @@ static int input_for_map(ConvertTrack *t, const ConvertPlan *p, const char *map)
     return 0;
 }
 
-static int prepare_clock(ConvertTrack *t, const ConvertPlan *p) {
-    int err = frame_clock_init(&t->clock, t->input, t->source->mapped, t->source->mapped_count);
-    if (err < 0)
-        return err;
-    int64_t seek_at = av_sat_add64(
-        t->source->seek, t->input->start_time == AV_NOPTS_VALUE ? 0 : t->input->start_time);
-    if (t->source->seek > 0 && (t->input_num == 0 || t->kind != 's')) {
-        err = avformat_seek_file(t->input, -1, INT64_MIN, seek_at, seek_at, 0);
-        if (err < 0)
-            return err;
-    }
-    int64_t origin =
-        frame_clock_origin(t->input, t->source->mapped, t->source->mapped_count, t->source->seek);
-    t->origin = av_rescale_q(origin, AV_TIME_BASE_Q, t->src->time_base);
-    t->duration =
-        p->duration < 0 ? -1 : av_rescale_q(p->duration, AV_TIME_BASE_Q, t->src->time_base);
-    return 0;
-}
-
 static int configure_track(const ConvertPlan *p, ConvertTrack *t, AVFormatContext *out) {
+    t->source->origin_us = frame_clock_origin(t->input,t->source->mapped,t->source->mapped_count,t->source->seek);
+    t->origin = av_rescale_q(t->source->origin_us,AV_TIME_BASE_Q,t->src->time_base);
+    t->duration = p->duration < 0 ? -1 : av_rescale_q(p->duration,AV_TIME_BASE_Q,t->src->time_base);
     t->strict = frame_plan_opt(p, "xerror") != NULL;
     t->next = av_packet_alloc();
     t->raw = av_packet_alloc();
@@ -172,79 +159,6 @@ static int configure_track(const ConvertPlan *p, ConvertTrack *t, AVFormatContex
     return 0;
 }
 
-/* Return the next packet of a mapped stream, in its source time base relative
- * to the shared input origin. Negative decode timestamps are required for
- * B-frames and audio priming. The muxer decides how to represent them. */
-int frame_read_selected(ConvertTrack *t, AVPacket *packet) {
-    for (;;) {
-        av_packet_unref(packet);
-        int err = av_read_frame(t->input, packet);
-        if (err < 0)
-            return err;
-        frame_clock_packet(&t->clock, t->input, packet);
-        if (packet->stream_index != t->src->index)
-            continue;
-        if (t->strict && (packet->flags & AV_PKT_FLAG_CORRUPT)) {
-            av_log(t->input, AV_LOG_ERROR, "Corrupt packet in selected stream %d\n", t->src->index);
-            return AVERROR_INVALIDDATA;
-        }
-        if (!t->encoder && !t->seen_key) {
-            if (!(packet->flags & AV_PKT_FLAG_KEY))
-                continue;
-            t->seen_key = 1;
-        }
-        if (packet->pts != AV_NOPTS_VALUE)
-            packet->pts = av_sat_sub64(packet->pts, t->origin);
-        if (packet->dts != AV_NOPTS_VALUE)
-            packet->dts = av_sat_sub64(packet->dts, t->origin);
-        int64_t clock = packet->dts == AV_NOPTS_VALUE ? packet->pts : packet->dts;
-        if (t->duration >= 0 && clock != AV_NOPTS_VALUE && clock >= t->duration) {
-            av_packet_unref(packet);
-            return AVERROR_EOF;
-        }
-        packet->pos = -1;
-        return 0;
-    }
-}
-
-static int read_output_packet(ConvertTrack *t) {
-    for (;;) {
-        if (t->bsf) {
-            int err = av_bsf_receive_packet(t->bsf, t->next);
-            if (err != AVERROR(EAGAIN))
-                return err;
-            if (t->codec_done)
-                return AVERROR_BUG;
-        }
-        AVPacket *dest = t->bsf ? t->filtered_input : t->next;
-        int err = t->encoder ? frame_read_encoded(t, dest) : frame_read_selected(t, dest);
-        if (!t->bsf || (err < 0 && err != AVERROR_EOF))
-            return err;
-        t->codec_done = err == AVERROR_EOF;
-        err = av_bsf_send_packet(t->bsf, t->codec_done ? NULL : dest);
-        if (err < 0)
-            return err;
-    }
-}
-
-static AVRational output_tb(const ConvertTrack *t) {
-    return t->bsf ? t->bsf->time_base_out : t->packet_tb;
-}
-
-static int64_t clock_us(const ConvertTrack *t) {
-    const int64_t stamp = t->next->dts != AV_NOPTS_VALUE ? t->next->dts : t->next->pts;
-    return stamp == AV_NOPTS_VALUE ? INT64_MIN : av_rescale_q(stamp, output_tb(t), AV_TIME_BASE_Q);
-}
-
-static int fill_track(ConvertTrack *t) {
-    int err = read_output_packet(t);
-    if (err == AVERROR_EOF) {
-        t->done = 1;
-        return 0;
-    }
-    return err;
-}
-
 static int copy_chapters(const ConvertPlan *p, const AVFormatContext *input, AVFormatContext *out) {
     if (!input->nb_chapters)
         return 0;
@@ -267,11 +181,33 @@ static int copy_chapters(const ConvertPlan *p, const AVFormatContext *input, AVF
         dst->time_base = src->time_base;
         dst->start = FFMAX(0, start);
         dst->end = end;
-        int err = av_dict_copy(&dst->metadata, src->metadata, 0);
+        int err =
+            frame_plan_opt(p, "map_metadata") ? 0 : av_dict_copy(&dst->metadata, src->metadata, 0);
         if (err < 0)
             return err;
     }
     return 0;
+}
+
+/* A human-selected default always wins. Otherwise players should start with
+ * the first eligible mapped stream when several tracks share a media type. */
+static void set_implicit_defaults(const ConvertPlan *p, ConvertTrack *tracks, int count) {
+    int counts[AVMEDIA_TYPE_NB] = {0};
+    AVStream *first[AVMEDIA_TYPE_NB] = {0};
+    int marked[AVMEDIA_TYPE_NB] = {0};
+    for (int i = 0; i < count; ++i) {
+        if (frame_track_opt(p, &tracks[i], "disposition"))
+            return;
+        AVStream *stream = tracks[i].dst;
+        enum AVMediaType type = stream->codecpar->codec_type;
+        counts[type]++;
+        marked[type] |= stream->disposition & AV_DISPOSITION_DEFAULT;
+        if (!first[type] && !(stream->disposition & AV_DISPOSITION_ATTACHED_PIC))
+            first[type] = stream;
+    }
+    for (int type = 0; type < AVMEDIA_TYPE_NB; ++type)
+        if (counts[type] > 1 && first[type] && !marked[type])
+            first[type]->disposition |= AV_DISPOSITION_DEFAULT;
 }
 
 static int setup_muxer(const ConvertPlan *p, AVFormatContext *out, ConvertTrack *tracks, int count,
@@ -360,7 +296,6 @@ static int convert(const ConvertPlan *p, AVFormatContext **outp, ConvertTrack *t
         ConvertTrack *track = &tracks[(*count)++];
         err = input_for_map(track, p, p->options[i].value);
         if (err == AVERROR_STREAM_NOT_FOUND && strchr(p->options[i].value, '?')) {
-            avformat_close_input(&track->input);
             memset(track, 0, sizeof(*track));
             (*count)--;
             continue;
@@ -374,9 +309,7 @@ static int convert(const ConvertPlan *p, AVFormatContext **outp, ConvertTrack *t
     if (progress && frame_output_open(io, progress, 1, 1) < 0)
         return AVERROR(EIO);
     for (int i = 0; i < *count; ++i) {
-        err = prepare_clock(&tracks[i], p);
-        if (err >= 0)
-            err = configure_track(p, &tracks[i], out);
+        err = configure_track(p, &tracks[i], out);
         if (err == AVERROR_EOF && *count == 1 && !strcmp(out->oformat->name, "null"))
             return 0;
         if (err < 0)
@@ -384,37 +317,10 @@ static int convert(const ConvertPlan *p, AVFormatContext **outp, ConvertTrack *t
     }
     if (!*count)
         return AVERROR_STREAM_NOT_FOUND;
+    set_implicit_defaults(p, tracks, *count);
     if ((err = setup_muxer(p, out, tracks, *count, io, pb)) < 0)
         return err;
-    for (int i = 0; i < *count; ++i)
-        if ((err = fill_track(&tracks[i])) < 0)
-            return err;
-    int64_t video_frames = 0;
-    for (;;) {
-        ConvertTrack *earliest = NULL;
-        for (int i = 0; i < *count; ++i) {
-            if (!tracks[i].done && (!earliest || clock_us(&tracks[i]) < clock_us(earliest)))
-                earliest = &tracks[i];
-        }
-        if (!earliest)
-            break;
-        AVPacket *pkt = earliest->next;
-        int64_t presentation = pkt->pts == AV_NOPTS_VALUE ? pkt->dts : pkt->pts;
-        int64_t stamp = presentation == AV_NOPTS_VALUE
-                            ? 0
-                            : av_rescale_q(av_sat_add64(presentation, FFMAX(0, pkt->duration)),
-                                           output_tb(earliest), AV_TIME_BASE_Q);
-        av_packet_rescale_ts(pkt, output_tb(earliest), earliest->dst->time_base);
-        pkt->stream_index = earliest->dst->index;
-        pkt->pos = -1;
-        if ((err = av_interleaved_write_frame(out, pkt)) < 0)
-            return err;
-        if (earliest->kind == 'v' && !earliest->ordinal)
-            ++video_frames;
-        frame_output_stats(io, video_frames, stamp);
-        if ((err = fill_track(earliest)) < 0)
-            return err;
-    }
+    if ((err = frame_mux_packets(p,tracks,*count,out,io)) < 0) return err;
     err = av_write_trailer(out);
     if (*pb) {
         avio_flush(*pb);
@@ -447,14 +353,13 @@ int frame_convert(int argc, const char *const *argv, void *io) {
         av_packet_free(&t->raw);
         av_packet_free(&t->filtered_input);
         av_frame_free(&t->frame);
+        av_frame_free(&t->audio_input);
         av_frame_free(&t->cadence.previous);
         av_frame_free(&t->cadence.current);
         av_bsf_free(&t->bsf);
         frame_render_close(&t->render);
         avcodec_free_context(&t->encoder);
         avcodec_free_context(&t->subdecoder);
-        frame_clock_free(&t->clock);
-        avformat_close_input(&t->input);
     }
     av_free(tracks);
     if (pb) {
@@ -462,8 +367,15 @@ int frame_convert(int argc, const char *const *argv, void *io) {
         avio_context_free(&pb);
     }
     avformat_free_context(out);
-    for (int i = 0; i < p.sources_len; i++)
-        av_free(p.sources[i].mapped);
+    for (int i=0;i<p.sources_len;++i) {
+        Source *source = &p.sources[i];
+        frame_clock_free(&source->clock);
+        av_packet_free(&source->pending);
+        av_free(source->mapped);
+        av_free(source->first_track);
+        avformat_close_input(&source->input);
+        frame_media_file_close(&source->shared_file);
+    }
     av_free(p.sources);
     av_free(p.options);
     return err;

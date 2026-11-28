@@ -3815,6 +3815,7 @@ fn bundled_tool_candidates(tool: &str) -> Vec<PathBuf> {
         ("macos", "aarch64") => &["aarch64-apple-darwin"],
         ("macos", "x86_64") => &["x86_64-apple-darwin"],
         ("linux", "x86_64") => &["x86_64-unknown-linux-gnu"],
+        ("linux", "aarch64") => &["aarch64-unknown-linux-gnu"],
         ("windows", "x86_64") => &["x86_64-pc-windows-msvc.exe"],
         _ => &[],
     };

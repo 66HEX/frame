@@ -115,7 +115,7 @@ if [[ "$package_only" = false ]]; then
 fi
 
 if [[ "$package_only" = true ]]; then
-	python3 "$repo_root/script/media-worker.py" verify --target "$target_triple" --bin-dir "$app_bundle/Contents/MacOS" --package-root "$app_bundle"
+	python3 "$repo_root/script/media-worker.py" verify --target "$target_triple" --bin-dir "$app_bundle/Contents/MacOS" --lib-dir "$app_bundle/Contents/Frameworks" --package-root "$app_bundle"
 fi
 
 if [[ "$build_only" = true ]]; then
@@ -209,6 +209,8 @@ if [[ "$can_notarize" = true ]]; then
 	rm "$notarization_key_file"
 	"$xcode_bin_dir_path/stapler" staple "$dmg_file_path"
 fi
+
+python3 "$repo_root/script/media-worker.py" verify-macos-images --dmg "$dmg_file_path" --archive "$app_zip_file_path"
 
 if [[ "$local_install" = true ]]; then
 	open "$dmg_file_path"

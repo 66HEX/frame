@@ -388,3 +388,95 @@ fn check_first_dynamic_snapshot(
     }
     Ok(())
 }
+
+#[test]
+#[ignore = "requires the worker and reference media tools"]
+fn playback_reconfigures_a_changing_raster_and_overlay_without_losing_the_clip() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("changing_raster")?;
+    let mut sequence = Vec::new();
+    for (i, (width, height, rgb)) in [
+        (128, 96, [255, 0, 0]),
+        (160, 80, [0, 255, 0]),
+        (96, 64, [0, 0, 255]),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let path = write_png(
+            &tools,
+            &sandbox,
+            &format!("frame-{i}"),
+            (width, height),
+            "rgb24",
+            &rgb.repeat((width * height) as usize),
+        )?;
+        sequence.extend(fs::read(path).map_err(|err| err.to_string())?);
+    }
+    let variable_overlay = sandbox.path("sequence.png");
+    fs::write(&variable_overlay, sequence).map_err(|err| err.to_string())?;
+    let movie = sandbox.path("variable.mov");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-framerate",
+            "25",
+            "-i",
+            &path_arg(&sandbox.path("frame-%d.png")),
+            "-c:v",
+            "copy",
+            &path_arg(&movie),
+        ]),
+    )?;
+    let solid = sandbox.path("solid.mp4");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=black:s=128x96:r=25:d=0.5",
+            "-c:v",
+            "libx264",
+            &path_arg(&solid),
+        ]),
+    )?;
+    for (input, overlay) in [
+        (&movie, sandbox.path("frame-2.png")),
+        (&solid, variable_overlay),
+    ] {
+        let mut config = video_config("mp4", "libx264", "aac");
+        config.overlay = Some(overlay_config(&overlay, 1.0, 0.25));
+        let options = PreviewFfmpegOptions {
+            start_seconds: 0.0,
+            end_seconds: Some(0.12),
+            source_width: Some(128),
+            source_height: Some(96),
+            source_is_palette: false,
+            source_sample_aspect_ratio: None,
+            source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+            preview_burn_clock: None,
+            max_width: 128,
+            max_height: 96,
+            fps: 25,
+            realtime: false,
+            precise_seek: true,
+            source_is_image: false,
+        };
+        let plan = build_ffmpeg_preview_args(&path_arg(input), &config, &options)
+            .map_err(|err| err.to_string())?;
+        let expected = run_tool_output(&tools.ffmpeg, &plan.args)?;
+        let actual = tools.native("preview", &plan.args)?;
+        assert_eq!(expected.len(), 3 * plan.frame_bytes);
+        assert_bytes_match(
+            &actual,
+            &expected,
+            "three filtered frames after reconfiguration",
+        )?;
+    }
+    Ok(())
+}

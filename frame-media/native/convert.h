@@ -2,6 +2,7 @@
 #define FRAME_CONVERT_H
 #include "media_clock.h"
 #include "render.h"
+#include "shared_input.h"
 #include <errno.h>
 #include <inttypes.h>
 #include <libavcodec/avcodec.h>
@@ -26,6 +27,13 @@ typedef struct {
     int64_t seek;
     int *mapped;
     int mapped_count;
+    AVFormatContext *input;
+    AVPacket *pending;
+    FramePacketClock clock;
+    int *first_track, active;
+    unsigned stream_count;
+    int64_t origin_us;
+    FrameMediaFile *shared_file;
 } Source;
 typedef struct {
     Option *options;
@@ -45,7 +53,7 @@ typedef struct {
     AVFormatContext *input;
     AVStream *src, *dst;
     Source *source;
-    FramePacketClock clock;
+    int next_track;
     char kind;
     int ordinal, input_num;
     int64_t origin, duration, frame_limit, frames;
@@ -53,7 +61,9 @@ typedef struct {
     AVRational packet_tb;
     FrameRenderer *render;
     AVCodecContext *encoder, *subdecoder;
-    AVFrame *frame;
+    AVFrame *frame, *audio_input;
+    AVRational audio_input_tb;
+    int consumed_samples, audio_eof;
     FrameCadence cadence;
     AVBSFContext *bsf;
     int source_done, codec_done, done, seen_key, strict;
@@ -67,7 +77,8 @@ int frame_prepare_encoder(const ConvertPlan *plan, ConvertTrack *track, AVFormat
                           const char *codec);
 int frame_cadence_next(ConvertTrack *track);
 int frame_read_encoded(ConvertTrack *track, AVPacket *packet);
-int frame_read_selected(ConvertTrack *track, AVPacket *packet);
+int frame_encode_subtitle(ConvertTrack *track, AVPacket *output);
+int frame_mux_packets(const ConvertPlan *plan,ConvertTrack *tracks,int count,AVFormatContext *out,void *io);
 extern int frame_output_open(void *io, const char *path, int overwrite, int progress);
 extern int frame_output_write(void *io, const uint8_t *buffer, int size);
 extern int64_t frame_output_seek(void *io, int64_t offset, int whence);

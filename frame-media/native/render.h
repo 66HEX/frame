@@ -22,12 +22,12 @@ typedef struct FrameRenderPlan {
     const int *mapped_streams;
     int mapped_count;
     int strict;
+    struct FrameMediaFile *shared_file;
 } FrameRenderPlan;
 
 typedef struct FrameRenderer FrameRenderer;
 int frame_render_open(FrameRenderer **result, const FrameRenderPlan *plan);
 int frame_render_next(FrameRenderer *renderer, AVFrame *frame, AVRational *time_base);
 AVFilterContext *frame_render_sink(FrameRenderer *renderer);
-int frame_render_samples(FrameRenderer *renderer, AVFrame *frame, AVRational *time_base, int samples);
 void frame_render_close(FrameRenderer **renderer);
 #endif
