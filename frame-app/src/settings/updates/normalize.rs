@@ -232,7 +232,7 @@ fn normalize_video_config_values(config: &mut ConversionConfig, metadata: Option
     {
         config.preset = first_allowed_video_preset(&config.video_codec).to_string();
     }
-    if config.video_codec == "mpeg2video" {
+    if frame_core::codec::requires_video_bitrate(&config.video_codec) {
         config.video_bitrate_mode = "bitrate".to_string();
     }
 

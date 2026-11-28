@@ -103,6 +103,7 @@ pub(in crate::app) fn settings_video_tab(
     let controls = crate::app::inspector::panel::settings_fields_grid()
         .child(settings_video_pixel_format_section(
             config,
+            hardware_capabilities,
             settings_disabled,
             palette,
             window,
@@ -110,7 +111,8 @@ pub(in crate::app) fn settings_video_tab(
         ))
         .when(
             !is_videotoolbox_video_codec(&config.video_codec)
-                && !matches!(config.video_codec.as_str(), "mpeg2video" | "prores"),
+                && !frame_core::codec::requires_video_bitrate(&config.video_codec)
+                && config.video_codec != "prores",
             |this| {
                 this.child(settings_video_preset_section(
                     config,

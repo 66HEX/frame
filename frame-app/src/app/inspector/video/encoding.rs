@@ -146,6 +146,7 @@ fn compact_encoder_reason(reason: &'static str) -> &'static str {
 
 pub(super) fn settings_video_pixel_format_section(
     config: &ConversionConfig,
+    hardware: &HardwareCapabilities,
     settings_disabled: bool,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
@@ -154,11 +155,19 @@ pub(super) fn settings_video_pixel_format_section(
     let mut list = Vec::new();
     for option in video_pixel_format_options(config) {
         let pixel_format = option.id;
-        let enabled = !settings_disabled && !option.is_disabled;
+        let profile_reason = HardwareEncoder::from_name(&config.video_codec)
+            .filter(|encoder| encoder.probes_main10() && pixel_format == "yuv420p10le")
+            .and_then(|encoder| {
+                hardware.disabled_reason(
+                    crate::capabilities::HardwareProbePolicy::new(encoder, false)
+                        .for_pixel_format(pixel_format),
+                )
+            });
+        let enabled = !settings_disabled && !option.is_disabled && profile_reason.is_none();
         list.push(FrameOption::with_caption(
             format!("video-pixel-format-{pixel_format}"),
             option.label,
-            option.caption,
+            profile_reason.unwrap_or(option.caption),
             option.is_selected,
             enabled,
             move |root, _window, cx| {
@@ -241,7 +250,7 @@ pub(super) fn settings_video_quality_section(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let mut section = settings_field("Quality control", palette);
-    if config.video_codec != "mpeg2video" {
+    if !frame_core::codec::requires_video_bitrate(&config.video_codec) {
         section = section.child(settings_video_bitrate_mode_grid(
             config,
             settings_disabled,
@@ -251,7 +260,9 @@ pub(super) fn settings_video_quality_section(
         ));
     }
 
-    if config.video_bitrate_mode == "crf" && config.video_codec != "mpeg2video" {
+    if config.video_bitrate_mode == "crf"
+        && !frame_core::codec::requires_video_bitrate(&config.video_codec)
+    {
         let is_hardware = is_hardware_video_codec(&config.video_codec);
         section = section.child(settings_video_range_field(
             if is_hardware {

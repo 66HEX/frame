@@ -60,6 +60,11 @@ impl HardwareEncoder {
     }
 
     #[must_use]
+    pub const fn probes_main10(self) -> bool {
+        matches!(self, Self::HevcVaapi | Self::Av1Vaapi | Self::HevcAmf)
+    }
+
+    #[must_use]
     pub const fn compiled(self, encoders: &AvailableEncoders) -> bool {
         match self {
             Self::H264Videotoolbox => encoders.h264_videotoolbox,
@@ -79,6 +84,7 @@ impl HardwareEncoder {
 pub struct HardwareProbePolicy {
     pub encoder: HardwareEncoder,
     pub allow_software: bool,
+    ten_bit: bool,
 }
 
 impl HardwareProbePolicy {
@@ -87,7 +93,16 @@ impl HardwareProbePolicy {
         Self {
             encoder,
             allow_software: encoder.videotoolbox() && allow_software,
+            ten_bit: false,
         }
+    }
+}
+
+impl HardwareProbePolicy {
+    #[must_use]
+    pub fn for_pixel_format(mut self, format: &str) -> Self {
+        self.ten_bit = self.encoder.probes_main10() && matches!(format, "yuv420p10le" | "p010le");
+        self
     }
 }
 
@@ -246,7 +261,7 @@ fn probe_args(policy: HardwareProbePolicy) -> Vec<std::ffi::OsString> {
         "-c:v",
         policy.encoder.name(),
         "-pix_fmt",
-        "yuv420p",
+        if policy.ten_bit { "p010le" } else { "yuv420p" },
     ]
     .into_iter()
     .map(std::ffi::OsString::from)
@@ -359,14 +374,18 @@ fn probe_hardware_encoder_with_limits(
             .map_or_else(
                 || probe_args(policy),
                 |operation| {
-                    [
+                    let mut args: Vec<_> = [
                         operation,
                         "hardware",
                         policy.encoder.name(),
                         if policy.allow_software { "1" } else { "0" },
                     ]
                     .map(Into::into)
-                    .into()
+                    .into();
+                    if policy.ten_bit {
+                        args.push("p010le".into());
+                    }
+                    args
                 },
             );
     let input = probe_input();
@@ -420,6 +439,13 @@ pub fn detect_hardware_capabilities(
             HardwareProbePolicy::new(encoder, false),
             || false,
         ));
+        if encoder.probes_main10() && reports.last().is_some_and(HardwareProbeReport::available) {
+            reports.push(probe_hardware_encoder(
+                executable,
+                HardwareProbePolicy::new(encoder, false).for_pixel_format("p010le"),
+                || false,
+            ));
+        }
         if encoder.videotoolbox() {
             reports.push(probe_hardware_encoder(
                 executable,

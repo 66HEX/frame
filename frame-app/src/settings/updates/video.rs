@@ -190,7 +190,9 @@ pub fn apply_video_preset(config: &mut ConversionConfig, preset: &str) -> bool {
 
 pub fn apply_video_bitrate_mode(config: &mut ConversionConfig, mode: &str) -> bool {
     let mode = mode.to_ascii_lowercase();
-    if !matches!(mode.as_str(), "crf" | "bitrate") {
+    if !matches!(mode.as_str(), "crf" | "bitrate")
+        || (mode == "crf" && frame_core::codec::requires_video_bitrate(&config.video_codec))
+    {
         return false;
     }
 

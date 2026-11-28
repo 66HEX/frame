@@ -310,3 +310,19 @@ fn two_pass_round_trips_through_presets_and_only_applies_to_eligible_video() {
         }
     }
 }
+
+#[test]
+fn vaapi_and_amf_use_target_bitrate_without_losing_the_decode_choice() {
+    for codec in ["h264_vaapi", "hevc_vaapi", "av1_vaapi", "hevc_amf"] {
+        let mut config = ConversionConfig::default();
+        assert!(apply_video_encoder_choice(&mut config, codec, false));
+        assert_eq!(config.video_bitrate_mode, "bitrate");
+        assert!(!apply_video_bitrate_mode(&mut config, "crf"));
+        apply_hw_decode(&mut config, true);
+        normalize_video_config(&mut config, None);
+        assert!(config.hw_decode);
+        assert!(!config.video_two_pass_available());
+        assert!(is_video_codec_allowed_for_container("mkv", codec));
+        assert!(!is_video_codec_allowed_for_container("webm", codec));
+    }
+}
