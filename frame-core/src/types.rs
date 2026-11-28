@@ -258,6 +258,9 @@ pub struct SubtitleTrack {
 #[derive(Debug, Serialize, Deserialize, Default, Clone, Eq, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct AudioTrackOverride {
+    /// Requested output Hz when audio is re-encoded; absent uses automatic negotiation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sample_rate: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub language: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

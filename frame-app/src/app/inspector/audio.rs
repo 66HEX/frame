@@ -1,3 +1,4 @@
+mod sample_rate;
 mod tracks;
 pub(in crate::app) use tracks::TrackEditor;
 

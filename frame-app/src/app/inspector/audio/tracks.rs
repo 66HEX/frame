@@ -14,6 +14,8 @@ use gpui::{Context, Div, FocusHandle, Window, div, prelude::*};
 pub(in crate::app) struct TrackEditor<'a> {
     pub(in crate::app) index: Option<u32>,
     pub(in crate::app) language: Option<&'a FocusHandle>,
+    pub(in crate::app) sample_rate: Option<&'a FocusHandle>,
+    pub(in crate::app) custom_rate: bool,
     pub(in crate::app) title: Option<&'a FocusHandle>,
 }
 
@@ -56,7 +58,9 @@ impl FrameRoot {
     }
 
     fn set_audio_editor(&mut self, index: Option<u32>) {
+        self.settings_ui.custom_audio_rate = false;
         for kind in [
+            FrameTextInputKind::AudioSampleRate,
             FrameTextInputKind::AudioTrackLanguage,
             FrameTextInputKind::AudioTrackTitle,
         ] {
@@ -69,7 +73,7 @@ impl FrameRoot {
             .map(|(id, index)| (id.to_owned(), index));
     }
 
-    fn edited_audio_track(&self) -> Option<(&ConversionConfig, &AudioTrack)> {
+    pub(super) fn edited_audio_track(&self) -> Option<(&ConversionConfig, &AudioTrack)> {
         let (id, index) = self.settings_ui.audio_editor.as_ref()?;
         let file = self.file_queue.selected_file()?;
         if file.id != *id || !file.config.selected_audio_tracks.contains(index) {
@@ -158,13 +162,13 @@ pub(super) fn track_editor(
         return section;
     };
     let support = audio_track_metadata_support(&config.container);
-    if !(support.language || support.title || support.default_flag) {
-        return section;
-    }
     let index = track.index;
     if let Some(selector) = track_selector(metadata, config, index, enabled, palette, window, cx) {
         section = section.child(selector);
     }
+    section = section.child(super::sample_rate::field(
+        config, track, editor, enabled, palette, window, cx,
+    ));
     let mut fields = div()
         .grid()
         .grid_cols(if support.language && support.title {

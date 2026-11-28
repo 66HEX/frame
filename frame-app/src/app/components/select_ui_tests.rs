@@ -976,3 +976,106 @@ fn changing_files_while_editing_audio_never_redirects_pending_input_to_another_s
     });
     assert!(cx.debug_bounds(case.trigger).is_none());
 }
+
+#[test]
+fn sample_rate_select_supports_custom_pcm_and_keyboard_presets_without_metadata_fields() {
+    use crate::app::input::FrameTextInputKind::AudioSampleRate;
+    let case = SelectCase {
+        fixture: VisualFixture::SettingsAudioSampleRate,
+        trigger: "audio-track-sample-rate",
+        panel: "audio-track-sample-rate-options",
+    };
+    let mut app = TestAppContext::single();
+    let (root, cx) = select_window(&mut app, &case, ColorTheme::Dark, ScalePreset::Percent100);
+    let select_all = if cfg!(target_os = "macos") {
+        "cmd-a"
+    } else {
+        "ctrl-a"
+    };
+    let selected = |cx: &mut VisualTestContext| {
+        root.read_with(cx, |root, _| {
+            root.selected_config()
+                .unwrap()
+                .audio_track_overrides
+                .get(&0)
+                .and_then(|edit| edit.sample_rate)
+        })
+    };
+    assert!(cx.debug_bounds("audio-track-language").is_none());
+    assert_eq!(selected(cx), Some(44_100));
+    click(cx, case.trigger);
+    press(cx, "c");
+    press(cx, "enter");
+    assert!(cx.debug_bounds("audio-track-custom-rate").is_some());
+    press(cx, "tab");
+    press(cx, select_all);
+    cx.simulate_input("0");
+    draw(cx);
+    assert!(root.read_with(cx, |root, _| {
+        crate::settings::audio_settings_error(
+            root.selected_config().unwrap(),
+            root.selected_source_metadata().as_ref(),
+        )
+        .is_some_and(|reason| reason.contains("0 Hz"))
+    }));
+    press(cx, select_all);
+    cx.simulate_input("44056");
+    draw(cx);
+    assert_eq!(selected(cx), Some(44_056));
+    assert_eq!(
+        root.read_with(cx, |root, _| root.text_input_value(AudioSampleRate)),
+        "44056"
+    );
+    click(cx, case.trigger);
+    press(cx, "a");
+    press(cx, "enter");
+    assert!(cx.debug_bounds("audio-track-custom-rate").is_none());
+    assert_eq!(selected(cx), None);
+    click(cx, case.trigger);
+    press(cx, "4");
+    press(cx, "8");
+    press(cx, "enter");
+    assert_eq!(selected(cx), Some(48_000));
+}
+
+#[test]
+fn sample_rate_editor_is_scoped_to_the_selected_source_and_audio_processing_mode() {
+    use crate::settings::ProcessingMode;
+    let case = SelectCase {
+        fixture: VisualFixture::SettingsAudioTracks,
+        trigger: "audio-track-sample-rate",
+        panel: "audio-track-sample-rate-options",
+    };
+    let mut app = TestAppContext::single();
+    let (root, cx) = select_window(&mut app, &case, ColorTheme::Dark, ScalePreset::Percent100);
+    click(cx, case.trigger);
+    assert!(
+        cx.debug_bounds(case.panel).is_none(),
+        "copy audio keeps its source frequency"
+    );
+    root.update(cx, |root, cx| {
+        root.update_selected_config(|config| {
+            config.processing_mode = ProcessingMode::CopyVideo;
+            config.audio_codec = "aac".into();
+            true
+        });
+        cx.notify();
+    });
+    draw(cx);
+    click(cx, case.trigger);
+    press(cx, "4");
+    press(cx, "4");
+    press(cx, "1");
+    press(cx, "enter");
+    click(cx, "audio-metadata-track");
+    click(cx, "audio-metadata-track-2");
+    click(cx, case.trigger);
+    press(cx, "4");
+    press(cx, "8");
+    press(cx, "enter");
+    root.read_with(cx, |root, _| {
+        let config = root.selected_config().unwrap();
+        assert_eq!(config.audio_track_overrides[&1].sample_rate, Some(44_100));
+        assert_eq!(config.audio_track_overrides[&2].sample_rate, Some(48_000));
+    });
+}

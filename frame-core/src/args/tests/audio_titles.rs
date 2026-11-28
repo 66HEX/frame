@@ -165,6 +165,7 @@ fn audio_edits_follow_source_indices_and_preserve_policy_for_every_output_ordina
     config.audio_track_overrides.insert(
         3,
         AudioTrackOverride {
+            sample_rate: None,
             language: Some(" POL ".into()),
             title: Some("Żółć = ♥".into()),
             is_default: Some(true),
@@ -173,6 +174,7 @@ fn audio_edits_follow_source_indices_and_preserve_policy_for_every_output_ordina
     config.audio_track_overrides.insert(
         1,
         AudioTrackOverride {
+            sample_rate: None,
             language: Some(String::new()),
             title: Some(String::new()),
             is_default: None,

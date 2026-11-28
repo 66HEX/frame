@@ -209,6 +209,7 @@ fn edited_audio_metadata_round_trips_without_losing_original_dispositions() -> T
             config.audio_track_overrides.insert(
                 1,
                 AudioTrackOverride {
+                    sample_rate: None,
                     title: Some(String::new()),
                     language: Some(String::new()),
                     is_default: None,
@@ -217,6 +218,7 @@ fn edited_audio_metadata_round_trips_without_losing_original_dispositions() -> T
             config.audio_track_overrides.insert(
                 2,
                 AudioTrackOverride {
+                    sample_rate: None,
                     title: Some("Nowy ♥ = mix".into()),
                     language: Some("pl-PL".into()),
                     is_default: Some(true),
@@ -299,6 +301,7 @@ fn mp4_family_stores_edited_track_names_and_selects_an_eligible_default() -> Tes
         config.audio_track_overrides.insert(
             1,
             AudioTrackOverride {
+                sample_rate: None,
                 language: Some("deu".into()),
                 title: Some(String::new()),
                 is_default: Some(false),
@@ -307,6 +310,7 @@ fn mp4_family_stores_edited_track_names_and_selects_an_eligible_default() -> Tes
         config.audio_track_overrides.insert(
             3,
             AudioTrackOverride {
+                sample_rate: None,
                 language: Some("pol".into()),
                 title: Some("Dialog ♥".into()),
                 is_default: None,
@@ -355,6 +359,7 @@ fn webm_ogg_transport_and_single_audio_muxers_apply_their_supported_track_fields
         config.audio_track_overrides.insert(
             1,
             AudioTrackOverride {
+                sample_rate: None,
                 language: Some("pol".into()),
                 title: Some("Commentary".into()),
                 is_default: Some(true),

@@ -2,6 +2,12 @@
 
 use crate::media_rules::is_audio_stream_codec_allowed;
 
+mod sample_rate;
+pub use sample_rate::{
+    audio_sample_rate_custom, audio_sample_rate_encoding_error, audio_sample_rate_error,
+    audio_sample_rates,
+};
+
 mod track_metadata;
 pub use track_metadata::{
     audio_track_default_actions, audio_track_default_error, audio_track_language_value,

@@ -21,6 +21,7 @@ impl FrameRoot {
                 .file_queue
                 .selected_file()
                 .map_or_else(String::new, |file| file.output_name.clone()),
+            FrameTextInputKind::AudioSampleRate => self.audio_sample_rate_input_value(),
             FrameTextInputKind::AudioBitrate => self
                 .file_queue
                 .selected_file()
@@ -148,6 +149,7 @@ impl FrameRoot {
                 self.file_queue.set_selected_output_name_from_input(&next);
                 Some(next)
             }
+            FrameTextInputKind::AudioSampleRate => self.write_audio_sample_rate_input(candidate),
             FrameTextInputKind::AudioBitrate => {
                 if self.file_queue.selected_file_locked() {
                     return None;

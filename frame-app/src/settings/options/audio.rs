@@ -102,6 +102,22 @@ pub fn audio_settings_error(
     ) {
         return Some(reason);
     }
+    if !config.processing_mode.copies_audio() {
+        for index in &config.selected_audio_tracks {
+            if let Some(rate) = config
+                .audio_track_overrides
+                .get(index)
+                .and_then(|edit| edit.sample_rate)
+                && let Some(reason) = audio_track_sample_rate_error(
+                    config,
+                    metadata.and_then(|source| source.audio_track(*index)),
+                    rate,
+                )
+            {
+                return Some(format!("Track #{index}: {reason}"));
+            }
+        }
+    }
     let metadata = metadata?;
     for track in metadata
         .audio_tracks
@@ -263,4 +279,23 @@ pub fn audio_track_is_default(
                 .and_then(|edit| edit.is_default)
         })
         .unwrap_or(track.is_default)
+}
+
+#[must_use]
+pub fn audio_track_sample_rate_error(
+    config: &ConversionConfig,
+    track: Option<&AudioTrack>,
+    rate: u32,
+) -> Option<String> {
+    let channels = effective_audio_channels(
+        &config.audio_channels,
+        track.and_then(|source| source.channels.as_deref()?.parse().ok()),
+    );
+    frame_core::audio_rules::audio_sample_rate_encoding_error(
+        &config.container,
+        &config.audio_codec,
+        rate,
+        &config.audio_bitrate,
+        channels,
+    )
 }

@@ -215,3 +215,28 @@ pub fn apply_audio_track_default(config: &mut ConversionConfig, index: u32, valu
     *current = Some(value);
     changed
 }
+
+/// Store the per-source draft unchanged so validation can explain a rate the current encoder cannot use.
+pub fn apply_audio_sample_rate(
+    config: &mut ConversionConfig,
+    index: u32,
+    rate: Option<u32>,
+) -> bool {
+    if config.processing_mode.copies_audio()
+        || !container_supports_audio(&config.container)
+        || !config.selected_audio_tracks.contains(&index)
+        || config
+            .audio_track_overrides
+            .get(&index)
+            .and_then(|edit| edit.sample_rate)
+            == rate
+    {
+        return false;
+    }
+    let edit = config.audio_track_overrides.entry(index).or_default();
+    edit.sample_rate = rate;
+    if *edit == frame_core::types::AudioTrackOverride::default() {
+        config.audio_track_overrides.remove(&index);
+    }
+    true
+}

@@ -56,6 +56,7 @@ fn prepared_queue_restores_full_config_selection_and_folder_without_starting() {
             language: Some(String::new()),
             title: Some("Director commentary".into()),
             is_default: Some(true),
+            sample_rate: Some(44_100),
         },
     );
     file.output_name = "prepared-cut".into();

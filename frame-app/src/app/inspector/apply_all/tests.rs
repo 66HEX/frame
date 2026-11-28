@@ -36,6 +36,7 @@ fn add_target(root: &mut FrameRoot, id: &str, status: FileStatus, kind: SourceKi
         3,
         frame_core::types::AudioTrackOverride {
             title: Some(id.to_owned()),
+            sample_rate: Some(if id == "donor" { 24_000 } else { 48_000 }),
             ..Default::default()
         },
     );

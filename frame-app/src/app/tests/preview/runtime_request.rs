@@ -226,7 +226,9 @@ fn preview_runtime_key_tracks_visual_config_but_ignores_encoder_quality() {
         config.crf = 18;
         config.video_bitrate_mode = "bitrate".into();
         config.video_two_pass = true;
-        config.audio_track_overrides.entry(1).or_default().title = Some("Commentary".into());
+        let edit = config.audio_track_overrides.entry(1).or_default();
+        edit.title = Some("Commentary".into());
+        edit.sample_rate = Some(24_000);
         true
     });
     let quality_request = root

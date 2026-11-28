@@ -46,6 +46,10 @@ Check the exported file at a normal listening level. Changing channels or gain c
   caption="Choose the audio tracks and encoding settings for the output."
 />
 
+## Set the sample rate
+
+Select an included audio track and choose **Sample rate** to resample it during export. For example, you can export a commentary track at 32 kHz and a music track at 48 kHz in one MKV. The available rates depend on the audio codec and container. Choose **Custom** to enter a rate in Hz when the format supports it. **Automatic** keeps the source rate when the encoder supports it. Opus files use a 48 kHz playback clock. Stream copy keeps the original samples and sample rate.
+
 ## Audio filters
 
 Frame provides normalization, limiting, compression, bass and treble adjustment, high-pass and low-pass filters, noise reduction, de-essing, and stereo-width controls.

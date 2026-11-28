@@ -197,3 +197,36 @@ fn copy_and_completion_preserve_non_utf8_paths_and_quiet_output() {
             .ends_with("progress=end\n")
     );
 }
+
+#[test]
+fn explicit_audio_rate_rejects_invalid_and_unrepresentable_values_before_encoding() {
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("tone.wav");
+    wav(&source);
+    for (codec, ext, rate) in [
+        ("aac", "m4a", "12345"),
+        ("flac", "flac", "1048576"),
+        ("libopus", "opus", "24000"),
+        ("pcm_s16le", "wav", "2147483647"),
+        ("pcm_s16le", "wav", "48000bad"),
+    ] {
+        let out = dir.path().join(format!("output.{ext}"));
+        let result = worker(
+            "convert",
+            [
+                OsStr::new("-i"),
+                source.as_os_str(),
+                "-map".as_ref(),
+                "0:0".as_ref(),
+                "-c:a".as_ref(),
+                codec.as_ref(),
+                "-ar:a:0".as_ref(),
+                rate.as_ref(),
+                out.as_os_str(),
+            ],
+        );
+        assert!(!result.status.success(), "{codec}/{rate}");
+        let msg = String::from_utf8_lossy(&result.stderr);
+        assert!(msg.contains(rate), "{msg}");
+    }
+}

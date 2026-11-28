@@ -176,6 +176,8 @@ impl Render for FrameRoot {
                 let audio_bitrate_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::AudioBitrate, cx);
                 self.sync_audio_editor(&selected_config_snapshot, source_metadata.as_ref());
+                let sample_rate_focus =
+                    self.ensure_text_input_focus(FrameTextInputKind::AudioSampleRate, cx);
                 let audio_language_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::AudioTrackLanguage, cx);
                 let audio_title_focus =
@@ -279,6 +281,8 @@ impl Render for FrameRoot {
                             .audio_editor
                             .as_ref()
                             .map(|(_, index)| *index),
+                        sample_rate: Some(&sample_rate_focus),
+                        custom_rate: self.settings_ui.custom_audio_rate,
                         language: Some(&audio_language_focus),
                         title: Some(&audio_title_focus),
                     },

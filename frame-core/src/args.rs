@@ -105,6 +105,23 @@ fn validate_audio_encoding_tracks(
     }
     for track in collect_selected_audio_tracks(config, probe)? {
         let source_channels = track.channels.parse::<u16>().ok();
+        if let Some(rate) = config
+            .audio_track_overrides
+            .get(&track.index)
+            .and_then(|edit| edit.sample_rate)
+            && let Some(reason) = crate::audio_rules::audio_sample_rate_encoding_error(
+                &config.container,
+                &config.audio_codec,
+                rate,
+                &config.audio_bitrate,
+                effective_audio_channels(&config.audio_channels, source_channels),
+            )
+        {
+            return Err(ConversionError::InvalidInput(format!(
+                "Audio track #{}: {reason}",
+                track.index
+            )));
+        }
         if config.audio_codec == "libopus" {
             let channels = effective_audio_channels(&config.audio_channels, source_channels);
             let layout = (config.audio_channels == "original")
@@ -839,12 +856,20 @@ fn build_output_args(
             .iter()
             .enumerate()
         {
-            if mp3_requires_mp4_resampling(
-                &config.container,
-                &config.audio_codec,
-                track.sample_rate.as_deref(),
-            ) {
-                args.extend([format!("-ar:a:{output_index}"), "16000".to_string()]);
+            let requested = config
+                .audio_track_overrides
+                .get(&track.index)
+                .and_then(|edit| edit.sample_rate);
+            let rate = requested.or_else(|| {
+                mp3_requires_mp4_resampling(
+                    &config.container,
+                    &config.audio_codec,
+                    track.sample_rate.as_deref(),
+                )
+                .then_some(16000)
+            });
+            if let Some(rate) = rate {
+                args.extend([format!("-ar:a:{output_index}"), rate.to_string()]);
             }
         }
         let audio_filters = build_audio_filters(config);
@@ -1283,6 +1308,26 @@ pub fn validate_task_input(
     }
     validate_audio_track_count(config)?;
 
+    if !config.copies_audio() && container_supports_audio(&config.container) {
+        for index in &config.selected_audio_tracks {
+            if let Some(rate) = config
+                .audio_track_overrides
+                .get(index)
+                .and_then(|edit| edit.sample_rate)
+                && let Some(reason) = crate::audio_rules::audio_sample_rate_encoding_error(
+                    &config.container,
+                    &config.audio_codec,
+                    rate,
+                    &config.audio_bitrate,
+                    effective_audio_channels(&config.audio_channels, None),
+                )
+            {
+                return Err(ConversionError::InvalidInput(format!(
+                    "Audio track #{index}: {reason}"
+                )));
+            }
+        }
+    }
     validate_audio_track_metadata(config)?;
     let processing_mode = config.processing_mode.trim();
 
@@ -1700,6 +1745,7 @@ mod tests {
     mod alac_observer;
     mod audio_titles;
     mod mixed_modes;
+    mod sample_rates;
     use crate::filters::EVEN_DIMENSIONS_FILTER;
     use crate::types::OverlayConfig;
     use std::{

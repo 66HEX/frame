@@ -271,7 +271,7 @@ fn probe_streams(path: &Path) -> Vec<serde_json::Value> {
             "error",
             "-count_frames",
             "-show_entries",
-            "stream=codec_name,nb_read_frames:stream_tags=title,language:stream_disposition=default,comment",
+            "stream=codec_name,nb_read_frames,sample_rate:stream_tags=title,language:stream_disposition=default,comment",
             "-of",
             "json",
         ])
@@ -339,11 +339,8 @@ fn headless_two_pass_export_publishes_the_selected_trim_with_audio() {
     assert_eq!(fs::read_dir(out).unwrap().count(), 1);
 }
 
-#[test]
-#[ignore = "requires FFmpeg/FFprobe and the Frame media worker; run with --ignored"]
-fn headless_copy_writes_audio_labels_and_moves_default_to_the_selected_track() {
-    let sandbox = Sandbox::new();
-    let input = generate_av_source(&sandbox);
+fn generate_multitrack_source(sandbox: &Sandbox) -> PathBuf {
+    let input = generate_av_source(sandbox);
     let bilingual = sandbox.0.join("bilingual.mkv");
     let source = Command::new(frame_app::runtime_binaries::ffmpeg_executable())
         .args(["-v", "error", "-i"])
@@ -374,7 +371,14 @@ fn headless_copy_writes_audio_labels_and_moves_default_to_the_selected_track() {
         "{}",
         String::from_utf8_lossy(&source.stderr)
     );
+    bilingual
+}
 
+#[test]
+#[ignore = "requires FFmpeg/FFprobe and the Frame media worker; run with --ignored"]
+fn headless_copy_writes_audio_labels_and_moves_default_to_the_selected_track() {
+    let sandbox = Sandbox::new();
+    let bilingual = generate_multitrack_source(&sandbox);
     let request = sandbox.0.join("track-names.json");
     fs::write(
         &request,
@@ -407,4 +411,38 @@ fn headless_copy_writes_audio_labels_and_moves_default_to_the_selected_track() {
     assert_eq!(streams[2]["tags"]["language"], "eng");
     assert_eq!(streams[2]["disposition"]["default"], 0);
     assert_eq!(streams[2]["disposition"]["comment"], 1);
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe and the Frame media worker; run with --ignored"]
+fn headless_export_resamples_each_selected_audio_stream_at_its_requested_rate() {
+    let sandbox = Sandbox::new();
+    let input = generate_multitrack_source(&sandbox);
+    let request = sandbox.0.join("resample.json");
+    fs::write(
+        &request,
+        serde_json::to_vec(&serde_json::json!({
+            "input": input, "outputDirectory": sandbox.0, "outputName": "rates.mkv",
+            "config": {
+                "container": "mkv", "processingMode": "copyVideo", "audioCodec": "flac",
+                "selectedAudioTracks": [2, 1, 2],
+                "audioTrackOverrides": { "1": {"sampleRate": 96000}, "2": {"sampleRate": 32000} }
+            }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let result = run_qa("--export", &request);
+    assert!(
+        result.status.success(),
+        "{} {}",
+        String::from_utf8_lossy(&result.stderr),
+        String::from_utf8_lossy(&result.stdout)
+    );
+    let streams = probe_streams(&sandbox.0.join("rates.mkv"));
+    assert_eq!(streams.len(), 4);
+    for (audio, rate) in streams[1..].iter().zip(["32000", "96000", "32000"]) {
+        assert_eq!(audio["codec_name"], "flac");
+        assert_eq!(audio["sample_rate"], rate);
+    }
 }

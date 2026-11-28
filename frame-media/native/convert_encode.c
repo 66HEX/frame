@@ -13,8 +13,45 @@ const AVCodec *frame_find_encoder(const char *name) {
     return codec;
 }
 
+static int audio_output_rate(const char *requested, int source_rate, const AVCodec *codec,
+                             const int *rates, const char *muxer, int channels) {
+    if (requested) {
+        char *end;
+        errno = 0;
+        long value = strtol(requested, &end, 10);
+        if (errno || end == requested || *end || value <= 0 || value > INT_MAX) {
+            fprintf(stderr, "Invalid audio sample rate '%s': expected positive Hz\n", requested);
+            return AVERROR(EINVAL);
+        }
+        int supported = !rates;
+        for (const int *rate = rates; rate && *rate; ++rate)
+            supported |= *rate == value;
+        // Match each encoded output rate before opening its resampler. RIFF
+        // and ALAC write byte/bit-rate fields using signed integer products.
+        if (value > INT_MAX / 2 ||
+            (codec->id == AV_CODEC_ID_FLAC && value >= (1 << 20)) ||
+            (codec->id == AV_CODEC_ID_OPUS && value != 48000) ||
+            (codec->id == AV_CODEC_ID_ALAC && value > INT_MAX / 24 / channels) ||
+            (codec->id == AV_CODEC_ID_PCM_S16LE && !strcmp(muxer, "wav") &&
+             value > INT_MAX / 2 / channels))
+            supported = 0;
+        if (!supported) {
+            fprintf(stderr, "Encoder %s cannot export audio at %ld Hz\n", codec->name, value);
+            return AVERROR(EINVAL);
+        }
+        return (int)value;
+    }
+    if (!rates || !*rates)
+        return source_rate;
+    int closest = *rates;
+    for (const int *rate = rates + 1; *rate; ++rate)
+        if (llabs((int64_t)*rate - source_rate) < llabs((int64_t)closest - source_rate))
+            closest = *rate;
+    return closest;
+}
+
 static int append_constraints(const ConvertPlan *p, const ConvertTrack *t, const AVCodec *codec,
-                              AVBPrint *tail) {
+                              const char *muxer, AVBPrint *tail) {
     const AVCodecParameters *src = t->src->codecpar;
     int err;
     if (t->kind == 'v') {
@@ -75,23 +112,18 @@ static int append_constraints(const ConvertPlan *p, const ConvertTrack *t, const
         rates = codec->supported_samplerates;
 #endif
         const char *ar = frame_track_opt(p, t, "ar");
-        int sample_rate = ar ? atoi(ar) : src->sample_rate;
-        if (rates && !ar && *rates) {
-            int closest = rates[0];
-            for (const int *rate = rates; *rate; rate++)
-                if (abs(*rate - sample_rate) < abs(closest - sample_rate))
-                    closest = *rate;
-            sample_rate = closest;
-        }
+        const char *channels = frame_track_opt(p, t, "ac");
+        int channel_count = channels ? atoi(channels) : src->ch_layout.nb_channels;
+        int sample_rate = audio_output_rate(ar, src->sample_rate, codec, rates, muxer,
+                                            FFMAX(channel_count, 1));
         if (sample_rate <= 0)
-            return AVERROR_INVALIDDATA;
+            return sample_rate < 0 ? sample_rate : AVERROR_INVALIDDATA;
         av_bprintf(tail, "aformat=sample_rates=%d", sample_rate);
         if (fmts) {
             av_bprintf(tail, ":sample_fmts=");
             for (int i = 0; fmts[i] != AV_SAMPLE_FMT_NONE; i++)
                 av_bprintf(tail, "%s%s", i ? "|" : "", av_get_sample_fmt_name(fmts[i]));
         }
-        const char *channels = frame_track_opt(p, t, "ac");
         if (channels) {
             if (strcmp(channels, "1") && strcmp(channels, "2"))
                 return AVERROR(EINVAL);
@@ -164,10 +196,10 @@ static int share_local_container(const ConvertTrack *t) {
     return 1;
 }
 
-static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *codec) {
+static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *codec, const char *muxer) {
     AVBPrint tail;
     av_bprint_init(&tail, 128, AV_BPRINT_SIZE_UNLIMITED);
-    int err = append_constraints(p, t, codec, &tail);
+    int err = append_constraints(p, t, codec, muxer, &tail);
     if (err >= 0) {
         const char *graph =
             t->kind == 'a' ? frame_plan_opt(p, "af") : frame_plan_opt(p, "filter_complex");
@@ -334,7 +366,7 @@ int frame_prepare_encoder(const ConvertPlan *p, ConvertTrack *t, AVFormatContext
         return AVERROR(ENOMEM);
     if (out->oformat->flags & AVFMT_GLOBALHEADER)
         t->encoder->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
-    int err = t->kind == 's' ? open_subtitle_decoder(t) : open_render(p, t, codec);
+    int err = t->kind == 's' ? open_subtitle_decoder(t) : open_render(p, t, codec, out->oformat->name);
     if (err < 0 || (err = open_codec(p, t, codec)) < 0)
         return err;
     if (t->kind == 'a' && t->encoder->frame_size) {

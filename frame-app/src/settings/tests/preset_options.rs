@@ -293,6 +293,7 @@ fn create_custom_preset_omits_source_specific_track_state() {
             1,
             frame_core::types::AudioTrackOverride {
                 title: Some("private track".into()),
+                sample_rate: Some(96_000),
                 ..Default::default()
             },
         )]

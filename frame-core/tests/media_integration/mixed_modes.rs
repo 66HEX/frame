@@ -143,6 +143,7 @@ fn alac_copy_observer_accepts_real_reencoded_video_and_duplicate_audio_maps() ->
     config.audio_track_overrides.insert(
         1,
         frame_core::types::AudioTrackOverride {
+            sample_rate: None,
             language: Some("pol".into()),
             title: Some("Source mix".into()),
             is_default: Some(true),

@@ -42,6 +42,8 @@ mod mixed_modes;
 mod overlay_depth;
 #[path = "media_integration/registry.rs"]
 mod registry;
+#[path = "media_integration/sample_rates.rs"]
+mod sample_rates;
 #[path = "media_integration/subtitle_trim.rs"]
 mod subtitle_trim;
 #[path = "media_integration/tiff.rs"]

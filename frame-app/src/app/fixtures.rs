@@ -110,6 +110,18 @@ impl FrameRoot {
                 self.preview_ui.transport.hovered = true;
                 self.preview_ui.transport.open = fixture == Some(VisualFixture::PreviewTrim);
             }
+            Some(VisualFixture::SettingsAudioSampleRate) => {
+                self.apply_settings_audio_fixture();
+                let file = self.file_queue.selected_file_mut().unwrap();
+                file.config.container = "wav".into();
+                file.config.audio_codec = "pcm_s16le".into();
+                file.config.selected_audio_tracks = vec![0];
+                file.config
+                    .audio_track_overrides
+                    .entry(0)
+                    .or_default()
+                    .sample_rate = Some(44_100);
+            }
             Some(VisualFixture::SettingsAudioTracks) => self.apply_audio_tracks_fixture(),
             Some(VisualFixture::SettingsAudio) => self.apply_settings_audio_fixture(),
             Some(VisualFixture::SettingsAudioFilters) => {

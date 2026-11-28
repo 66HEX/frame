@@ -270,3 +270,41 @@ fn validates_only_exported_audio_tags_and_projects_default_for_the_selected_cont
     config.selected_audio_tracks = vec![2];
     assert!(audio_settings_error(&config, Some(&metadata)).is_none());
 }
+
+#[test]
+fn sample_rate_overrides_remain_bound_to_selected_encoded_audio_across_mode_and_codec_changes() {
+    let mut config = ConversionConfig {
+        container: "mkv".into(),
+        audio_codec: "pcm_s16le".into(),
+        selected_audio_tracks: vec![2, 1, 2],
+        ..ConversionConfig::default()
+    };
+    assert!(apply_audio_sample_rate(&mut config, 2, Some(44_056)));
+    assert!(apply_audio_sample_rate(&mut config, 1, Some(48_000)));
+    assert!(!apply_audio_sample_rate(&mut config, 99, Some(44_100)));
+    let metadata = metadata_with_tracks();
+    assert!(audio_settings_error(&config, Some(&metadata)).is_none());
+    config.processing_mode = ProcessingMode::CopyAudio;
+    assert!(!apply_audio_sample_rate(&mut config, 2, None));
+    assert!(audio_settings_error(&config, Some(&metadata)).is_none());
+    config.processing_mode = ProcessingMode::CopyVideo;
+    apply_audio_codec(&mut config, "aac");
+    assert!(
+        audio_settings_error(&config, Some(&metadata))
+            .unwrap()
+            .contains("#2")
+    );
+    toggle_audio_track_selection(&mut config, 2);
+    assert!(audio_settings_error(&config, Some(&metadata)).is_none());
+    toggle_audio_track_selection(&mut config, 2);
+    assert_eq!(config.audio_track_overrides[&2].sample_rate, Some(44_056));
+    assert!(apply_audio_sample_rate(&mut config, 2, None));
+    assert!(!config.audio_track_overrides.contains_key(&2));
+    config.audio_track_overrides.get_mut(&1).unwrap().title = Some("Main".into());
+    assert!(apply_audio_sample_rate(&mut config, 1, None));
+    assert_eq!(
+        config.audio_track_overrides[&1].title.as_deref(),
+        Some("Main")
+    );
+    assert!(audio_settings_error(&config, Some(&metadata)).is_none());
+}
