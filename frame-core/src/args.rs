@@ -784,13 +784,10 @@ pub fn build_ffmpeg_args_with_gif_policy(
     } else {
         add_video_codec_args(&mut args, config);
         // Stock x265 builds can crash with automatic SIMD on narrow frames.
-        // SSE2 passed all Frame presets with stock FFmpeg 8.1.2 and 9.0.2:
-        // https://github.com/66HEX/frame/actions/runs/43091762760
-        // Use the final padded raster so wider exports retain automatic SIMD.
-        if cfg!(all(
-            target_arch = "x86_64",
-            any(target_os = "linux", target_os = "windows")
-        )) && config.video_codec == "libx265"
+        // This also affects the Intel macOS library build. Use the final
+        // padded raster so wider exports retain automatic SIMD.
+        if cfg!(target_arch = "x86_64")
+            && config.video_codec == "libx265"
             && let Some((width, height)) = filter_context.source_dimensions
             && output_dimensions(config, width, height, probe.pixel_format.as_deref())
                 .is_some_and(|(width, _)| width < 64)
@@ -2858,11 +2855,9 @@ mod tests {
 
     #[test]
     fn x265_sse2_uses_the_final_padded_width() {
-        let supported_platform = cfg!(all(
-            target_arch = "x86_64",
-            any(target_os = "linux", target_os = "windows")
-        ));
+        let supported_platform = cfg!(target_arch = "x86_64");
         for (width, height, rotation, crop_width, canvas_width, narrow) in [
+            (48, 32, "0", None, None, true),
             (62, 96, "0", None, None, true),
             (63, 96, "0", None, None, false),
             (96, 48, "90", None, None, true),
