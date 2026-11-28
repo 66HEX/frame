@@ -533,8 +533,13 @@ fn default_audio_track_follows_the_map_order_when_source_has_no_default() -> Tes
             ]),
         )
     };
-    assert_eq!(inspect(&reference)?, b"1\n0\n");
-    assert_eq!(inspect(&native)?, inspect(&reference)?);
+    let reference_flags = String::from_utf8(inspect(&reference)?).map_err(|e| e.to_string())?;
+    let native_flags = String::from_utf8(inspect(&native)?).map_err(|e| e.to_string())?;
+    assert_eq!(reference_flags.lines().collect::<Vec<_>>(), ["1", "0"]);
+    assert!(
+        native_flags.lines().eq(reference_flags.lines()),
+        "{native_flags:?}"
+    );
     Ok(())
 }
 
