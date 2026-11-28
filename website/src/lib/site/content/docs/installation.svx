@@ -8,7 +8,7 @@ Download the current release from [Frame on GitHub](https://github.com/66HEX/fra
 
 ## macOS
 
-Use the Apple Silicon package for an M-series Mac, or the Intel package for an Intel Mac. Open the DMG and move Frame to Applications.
+Frame requires macOS Monterey 12.0 or later. Choose the Apple Silicon package for an M-series Mac or the Intel package for an Intel Mac. Open the DMG and move Frame to Applications.
 
 You can also install through the Frame Homebrew tap:
 

@@ -50,8 +50,8 @@ The following features extend that baseline on the same worker.
 | --- | --- | --- |
 | Linux x86_64 GNU | Managed tarball, AppImage, development Flatpak, production Flathub, Nixpkgs | Native worker and media suite, relocated tar/AppImage, sandbox install, Nix build |
 | Linux aarch64 GNU | Same package families as Linux x86_64 | Native ARM worker and media suite, relocated packages and sandbox smoke |
-| macOS aarch64 | App ZIP and DMG, worker in Contents/MacOS, libraries in Contents/Frameworks | Native suite, relocated application, strict VideoToolbox encode, deployment-target check |
-| macOS x86_64 | App ZIP and DMG with Intel SDK | Intel suite, relocated application and deployment-target check |
+| macOS 12.0+ (Apple Silicon, aarch64) | App ZIP and DMG, worker in Contents/MacOS, libraries in Contents/Frameworks | Native suite, relocated application, strict VideoToolbox encode, deployment-target check |
+| macOS 12.0+ (Intel, x86_64) | App ZIP and DMG with Intel SDK | Intel suite, relocated application and deployment-target check |
 | Windows x86_64 MSVC | Inno installer, worker and DLLs adjacent to the application | Native suite, clean installed launch, pause/cancel and job teardown. NVENC needs an NVIDIA device. |
 
 ## Verification evidence

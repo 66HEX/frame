@@ -164,7 +164,8 @@ The website's original history is preserved under the signed Git tag
 ### Download Prebuilt Binaries
 
 The easiest way to get started is to download the latest release for your
-platform directly from GitHub.
+platform directly from GitHub. Frame requires macOS Monterey 12.0 or later
+on both Intel and Apple Silicon Macs.
 
 [**Download Latest Release**](https://github.com/66HEX/frame/releases)
 
