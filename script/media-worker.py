@@ -188,7 +188,9 @@ def smoke(worker, lib_dir):
         if sys.platform == "darwin":
             required.extend(["h264_videotoolbox", "hevc_videotoolbox"])
         if sys.platform == "win32":
-            required.extend(["h264_nvenc", "hevc_nvenc", "av1_nvenc"])
+            required.extend(["h264_nvenc", "hevc_nvenc", "av1_nvenc", "hevc_amf"])
+        if sys.platform.startswith("linux"):
+            required.extend(["h264_vaapi", "hevc_vaapi", "av1_vaapi"])
         for codec in required:
             if not re.search(r"\b" + re.escape(codec) + r"\b", encoders):
                 raise ValueError(f"SDK missing encoder {codec}")
@@ -308,6 +310,7 @@ def main():
     if args.action == "setup-ci":
         with open(os.environ["GITHUB_ENV"], "a", encoding="utf8") as output:
             print(f"FFMPEG_DIR={sdk}", file=output)
+            print("FRAME_TEST_REQUIRE_JXL=1", file=output)
             if target.endswith("linux-gnu"):
                 print(f"LD_LIBRARY_PATH={sdk / 'lib'}", file=output)
                 print(f"LIBRARY_PATH={sdk / 'lib'}", file=output)

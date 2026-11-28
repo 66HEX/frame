@@ -53,6 +53,10 @@ def smoke():
             current = inventory_names(option, invoke(worker, "capabilities", option).decode())
             if not previous or current != previous:
                 raise ValueError(f"{option} inventory differs: missing {previous-current}, extra {current-previous}")
+            if option == "-encoders":
+                missing = {"libjxl", "h264_vaapi", "hevc_vaapi", "av1_vaapi"} - current
+                if missing:
+                    raise ValueError(f"Missing Frame export encoders in the Flatpak runtime: {sorted(missing)}")
             print(f"{len(current)} {option[1:]} match the Flatpak runtime", flush=True)
 
         paths = invoke(worker, "capabilities", "libraries").rstrip(b"\x00").split(b"\x00")
