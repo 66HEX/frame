@@ -23,7 +23,6 @@ const WELCOME_HEADING_SIZE: f32 = 20.0;
 
 pub(super) fn workspace_view(
     file_queue: &FileQueue,
-    encoding_stats: Option<&frame_core::types::EncodingStats>,
     file_list_scroll_handle: &UniformListScrollHandle,
     settings: &SettingsRenderState<'_>,
     preview_props: PreviewPanelProps<'_>,
@@ -34,16 +33,6 @@ pub(super) fn workspace_view(
         return welcome_view(settings.palette, window, cx);
     }
 
-    let stats = file_queue.selected_file().and_then(|file| {
-        crate::app::queue::encoding_stats::panel(file, encoding_stats, settings.palette, window, cx)
-    });
-    let queue_rows = if stats.is_none() {
-        FILE_LIST_ROW_SPAN
-    } else if window.viewport_size().height < theme::ui_rem(680.0).to_pixels(window.rem_size()) {
-        8
-    } else {
-        5
-    };
     div()
         .grid()
         .grid_cols(WORKSPACE_COLUMNS)
@@ -58,7 +47,7 @@ pub(super) fn workspace_view(
                 .size_full()
                 .child(
                     preview_panel(file_queue, settings, preview_props, window, cx)
-                        .row_span(LEFT_GRID_ROWS - queue_rows),
+                        .row_span(LEFT_GRID_ROWS - FILE_LIST_ROW_SPAN),
                 )
                 .child(
                     file_list_panel(
@@ -68,8 +57,7 @@ pub(super) fn workspace_view(
                         window,
                         cx,
                     )
-                    .children(stats)
-                    .row_span(queue_rows),
+                    .row_span(FILE_LIST_ROW_SPAN),
                 ),
         )
         .child(settings_panel_for_selection(

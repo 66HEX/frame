@@ -34,6 +34,10 @@ impl FrameRoot {
             return root.child(source_export);
         }
 
+        if let Some(statistics) = self.render_encoding_stats_overlay(palette, window, cx) {
+            return root.child(statistics);
+        }
+
         if self.settings_ui.is_present {
             let update_install_ready = self.can_install_downloaded_update();
             let theme_popover_active = self.settings_ui.theme_popover.is_open();

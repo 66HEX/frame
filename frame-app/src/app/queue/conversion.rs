@@ -270,8 +270,12 @@ impl FrameRoot {
     }
 
     pub(in crate::app) fn apply_conversion_event(&mut self, event: ConversionEvent) {
+        let dialog_updated = self.encoding_stats_dialog.follows_event(&event);
         self.conversion_events
             .apply_conversion_event(&mut self.file_queue, event);
+        if dialog_updated {
+            self.refresh_encoding_stats_dialog();
+        }
         self.refresh_processing_state_from_queue();
     }
 

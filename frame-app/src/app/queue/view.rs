@@ -515,6 +515,9 @@ pub(in crate::app) fn row_actions_cell(
             cx.stop_propagation();
         }));
 
+    if let Some(button) = row_stats_button(file, return_focus, palette, window, cx) {
+        cell = cell.child(button);
+    }
     for action in [ResultAction::Open, ResultAction::Reveal] {
         if let Some(button) = row_result_action_button(
             &file_id,
@@ -545,6 +548,44 @@ pub(in crate::app) fn row_actions_cell(
     }
 
     cell
+}
+
+fn row_stats_button(
+    file: &FileItem,
+    return_focus: &QueueReturnFocus,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> Option<gpui::Stateful<gpui::Div>> {
+    let focus = row_action_focus(&file.id, "stats", window, cx);
+    if !file.status.has_encoding_statistics() {
+        if focus.is_focused(window) {
+            return_focus.list.focus(window, cx);
+        }
+        return None;
+    }
+    let id = file.id.clone();
+    let button_id = element_id("file-row-action-stats", &id);
+    let list_focus = return_focus.list.clone();
+    Some(
+        row_action_button(
+            button_id.clone(),
+            button_id,
+            assets::ICON_LAYOUT_LIST,
+            "Show encoding statistics",
+            true,
+            RowActionTone::Normal,
+            Some(&focus),
+            palette,
+            window,
+            cx,
+        )
+        .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
+            cx.stop_propagation();
+            focus.focus(window, cx);
+            root.open_encoding_stats(&id, &list_focus, window, cx);
+        })),
+    )
 }
 
 fn row_result_action_button(

@@ -360,9 +360,6 @@ impl Render for FrameRoot {
                 };
                 content.child(workspace_view(
                     &self.file_queue,
-                    self.file_queue
-                        .selected_file_id()
-                        .and_then(|id| self.conversion_events.encoding_stats_for(id)),
                     &self.file_list_scroll_handle,
                     &settings,
                     PreviewPanelProps {
@@ -449,6 +446,7 @@ impl Render for FrameRoot {
                 .into_any_element()
             });
 
+        let stats_present = self.encoding_stats_dialog.presence.is_present();
         let mut root = div()
             .id(APP_ROOT_FOCUS_ID)
             .size_full()
@@ -493,19 +491,33 @@ impl Render for FrameRoot {
             )
             .on_drop(cx.listener(|root, paths: &ExternalPaths, _window, cx| {
                 cx.stop_propagation();
+                if root.encoding_stats_dialog.presence.is_present() {
+                    return;
+                }
                 root.close_drag_drop_overlay();
                 Self::import_source_paths(paths.paths().to_vec(), cx);
                 cx.notify();
             }))
             .on_drag_move(cx.listener(
                 |root, _event: &DragMoveEvent<ExternalPaths>, _window, cx| {
-                    if !root.update_installation_in_progress() && root.open_drag_drop_overlay() {
+                    if !root.encoding_stats_dialog.presence.is_present()
+                        && !root.update_installation_in_progress()
+                        && root.open_drag_drop_overlay()
+                    {
                         cx.notify();
                     }
                 },
             ))
-            .child(titlebar(state, source_activity, palette, window, cx))
-            .child(content)
+            .child(
+                titlebar(state, source_activity, palette, window, cx)
+                    .id("frame-titlebar-content")
+                    .when(stats_present, gpui::StatefulInteractiveElement::aria_hidden),
+            )
+            .child(
+                content
+                    .id("frame-main-content")
+                    .when(stats_present, gpui::StatefulInteractiveElement::aria_hidden),
+            )
             .child(FileDropLifecycleProbe { owner: cx.entity() });
 
         root = self.render_overlays(root, palette, window, cx);

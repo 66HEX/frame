@@ -8,6 +8,7 @@ use crate::app::model::{
     ActiveView, FrameAppState, active_view_from_env_value, visual_fixture_from_env_value,
 };
 use crate::app::preview::state::PreviewUiState;
+use crate::app::queue::encoding_stats::EncodingStatsDialog;
 use crate::app::queue::state::DragDropUiState;
 use crate::app::updates::state::UpdateUiState;
 use crate::app_persistence::{AppPersistence, AppSettings};
@@ -43,6 +44,7 @@ pub struct FrameRoot {
     pub(in crate::app) file_queue: FileQueue,
     pub(in crate::app) file_list_scroll_handle: UniformListScrollHandle,
     pub(in crate::app) conversion_events: ConversionEventState,
+    pub(in crate::app) encoding_stats_dialog: EncodingStatsDialog,
     pub(in crate::app) logs_scroll_handle: UniformListScrollHandle,
     pub(in crate::app) last_log_scroll_target: Option<LogScrollTarget>,
     pub(in crate::app) logs_keyboard_scroll_top: usize,
@@ -240,6 +242,7 @@ impl FrameRoot {
             file_queue: FileQueue::new(),
             file_list_scroll_handle: UniformListScrollHandle::new(),
             conversion_events: ConversionEventState::new(),
+            encoding_stats_dialog: EncodingStatsDialog::default(),
             logs_scroll_handle: UniformListScrollHandle::new(),
             last_log_scroll_target: None,
             logs_keyboard_scroll_top: 0,
