@@ -209,6 +209,16 @@ fn audio_codec_container_registry_produces_decodable_selected_tracks() -> TestRe
     let rules = rules();
     let encoders = String::from_utf8(tools.native("capabilities", &["-encoders".into()])?)
         .map_err(|e| e.to_string())?;
+    let fdk_available = encoders
+        .lines()
+        .any(|line| line.split_whitespace().nth(1) == Some("libfdk_aac"));
+    let only_fdk = env::var("FRAME_TEST_ONLY_FDK_AAC").as_deref() == Ok("1");
+    if only_fdk && !fdk_available {
+        return Err(
+            "The selected media SDK does not provide the required libfdk_aac encoder".into(),
+        );
+    }
+    let mut fdk_outputs = Vec::new();
     for container in media_rules::all_containers() {
         let Some(codecs) = rules["containerAudioCodecCompatibility"]
             [frame_core::container::media_rules_key(container)]
@@ -217,11 +227,7 @@ fn audio_codec_container_registry_produces_decodable_selected_tracks() -> TestRe
         };
         for entry in codecs {
             let audio = entry.as_str().unwrap();
-            if audio == "libfdk_aac"
-                && !encoders
-                    .lines()
-                    .any(|line| line.split_whitespace().nth(1) == Some(audio))
-            {
+            if (audio == "libfdk_aac" && !fdk_available) || (only_fdk && audio != "libfdk_aac") {
                 continue;
             }
             let video = if container == "webm" {
@@ -233,19 +239,39 @@ fn audio_codec_container_registry_produces_decodable_selected_tracks() -> TestRe
             config.audio_bitrate = "192".into();
             config.selected_audio_tracks = vec![1];
             config.audio_channels = "stereo".into();
-            let output = sandbox.path(&format!("{audio}.{container}"));
-            convert(&tools, &input, &output, &config)
-                .map_err(|e| format!("{container}/{audio}: {e}"))?;
-            let metadata = probe_media(&tools, &output)?;
-            assert_eq!(
-                metadata.audio_codec.as_deref(),
-                Some(expected_codec(audio)),
-                "{}",
-                output.display()
-            );
-            assert_eq!(metadata.audio_tracks.len(), 1);
-            decode_media(&tools, &output)?;
+            let modes: &[&str] = if audio == "libfdk_aac" {
+                &["bitrate", "vbr"]
+            } else {
+                &["bitrate"]
+            };
+            for mode in modes {
+                config.audio_bitrate_mode = (*mode).into();
+                let output = sandbox.path(&format!("{audio}-{mode}.{container}"));
+                convert(&tools, &input, &output, &config)
+                    .map_err(|e| format!("{container}/{audio}/{mode}: {e}"))?;
+                let metadata = probe_media(&tools, &output)?;
+                assert_eq!(
+                    metadata.audio_codec.as_deref(),
+                    Some(expected_codec(audio)),
+                    "{}",
+                    output.display()
+                );
+                assert_eq!(metadata.audio_tracks.len(), 1);
+                decode_media(&tools, &output)?;
+            }
+            if audio == "libfdk_aac" {
+                fdk_outputs.push(container.as_str());
+            }
         }
+    }
+    if only_fdk {
+        for expected in ["mp4", "mkv", "mov", "m2t", "m4a"] {
+            assert!(
+                fdk_outputs.contains(&expected),
+                "missing FDK AAC output {expected}"
+            );
+        }
+        eprintln!("FDK AAC bitrate and VBR exports decoded for {fdk_outputs:?}");
     }
     Ok(())
 }
