@@ -67,3 +67,33 @@ fn normalize_video_config_repairs_invalid_image_encoding_values() {
     assert_eq!(config.image_png_prediction, "paeth");
     assert_eq!(config.image_tiff_compression, "packbits");
 }
+
+#[test]
+fn saved_jpeg_xl_preset_restores_the_compression_mode() {
+    let image = SourceMetadata {
+        media_kind: Some(SourceKind::Image),
+        ..SourceMetadata::default()
+    };
+    let mut config = ConversionConfig::default();
+    assert!(apply_output_container(&mut config, "jxl"));
+    normalize_output_config(&mut config, Some(&image));
+    assert_eq!(config.video_codec, "libjxl");
+    assert!(config.image_jxl_lossless);
+
+    config.image_jxl_lossless = false;
+    let preset = create_custom_preset("photo-jxl".into(), "Photo", &config);
+    let stored = serde_json::to_value(preset).unwrap();
+    let restored = serde_json::from_value(stored.clone()).unwrap();
+    let mut next_image = ConversionConfig::default();
+    assert!(apply_preset(&mut next_image, &restored, Some(&image)));
+    assert_eq!(next_image.container, "jxl");
+    assert!(!next_image.image_jxl_lossless);
+
+    let mut legacy = stored;
+    legacy["config"]
+        .as_object_mut()
+        .unwrap()
+        .remove("imageJxlLossless");
+    let restored: PresetDefinition = serde_json::from_value(legacy).unwrap();
+    assert!(restored.config.image_jxl_lossless);
+}
