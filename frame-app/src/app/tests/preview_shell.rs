@@ -107,6 +107,7 @@ pub(super) fn settings_state<'a>(
         subtitle_font_color_hsv_draft: hex_to_subtitle_hsv(DEFAULT_SUBTITLE_FONT_COLOR),
         subtitle_outline_color_hsv_draft: hex_to_subtitle_hsv(DEFAULT_SUBTITLE_OUTLINE_COLOR),
         preset_name: "",
+        preset_enables_audio: false,
         preset_name_focus: None,
         presets: &[],
         applied_preset_id: None,

@@ -425,3 +425,41 @@ fn output_confirmation_can_apply_only_to_selected_files() {
         );
     });
 }
+
+#[test]
+fn preset_audio_control_defaults_to_source_and_saves_the_explicit_choice() {
+    let mut app = TestAppContext::single();
+    let (root, cx) = window(&mut app, ColorTheme::Dark, ScalePreset::Percent100);
+    root.update(cx, |root, cx| {
+        root.settings_ui.active_tab = SettingsTab::Presets;
+        root.settings_ui.preset_name_draft = "Keep each selection".into();
+        cx.notify();
+    });
+    draw(cx);
+    let bounds = cx
+        .debug_bounds("settings-preset-enable-audio-indicator")
+        .unwrap();
+    cx.simulate_click(bounds.center(), Modifiers::default());
+    draw(cx);
+    let save = cx.debug_bounds("settings-save-preset").unwrap();
+    cx.simulate_click(save.center(), Modifiers::default());
+    draw(cx);
+    root.update(cx, |root, _| {
+        let saved = root
+            .presets
+            .iter()
+            .find(|preset| preset.name == "Keep each selection")
+            .unwrap();
+        assert!(!saved.enable_source_audio);
+        assert!(root.settings_ui.preset_audio_draft.is_none());
+        root.settings_ui.preset_name_draft = "Enable audio".into();
+        assert!(root.save_preset_from_draft());
+        assert!(
+            root.presets
+                .iter()
+                .find(|preset| preset.name == "Enable audio")
+                .unwrap()
+                .enable_source_audio
+        );
+    });
+}

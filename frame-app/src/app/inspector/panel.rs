@@ -257,6 +257,7 @@ pub(in crate::app) fn settings_tab_content(
                 metadata: settings.metadata,
                 settings_disabled: settings.settings_disabled,
                 preset_name: settings.preset_name,
+                preset_enables_audio: settings.preset_enables_audio,
                 preset_name_focus: settings.preset_name_focus,
                 presets: settings.presets,
                 applied_preset_id: settings.applied_preset_id,

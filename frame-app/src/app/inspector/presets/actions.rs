@@ -17,7 +17,9 @@ impl FrameRoot {
         };
 
         let (id, next_sequence) = self.next_custom_preset_identity();
-        self.presets.push(create_custom_preset(id, name, &config));
+        let mut preset = create_custom_preset(id, name, &config);
+        preset.enable_source_audio = self.settings_ui.preset_enables_source_audio(&config);
+        self.presets.push(preset);
         if self.persist_app_settings().is_err() {
             self.presets.pop();
             return false;
@@ -25,6 +27,7 @@ impl FrameRoot {
 
         self.settings_ui.next_custom_preset_sequence = next_sequence;
         self.settings_ui.preset_name_draft.clear();
+        self.settings_ui.preset_audio_draft = None;
         true
     }
 
@@ -69,7 +72,12 @@ impl FrameRoot {
         let Some(metadata) = self.source_metadata.ready_metadata_for(&file_id).cloned() else {
             return false;
         };
-        if !crate::settings::preset_is_compatible(&preset, Some(&metadata)) {
+        if !crate::settings::preset_is_compatible(&preset, Some(&metadata))
+            || self.selected_config().is_none_or(|target| {
+                crate::settings::preset_audio_unavailable(&preset, target, Some(&metadata))
+                    .is_some()
+            })
+        {
             return false;
         }
         let changed =

@@ -60,6 +60,7 @@ struct ApplyAllSnapshot {
     targets: Vec<FileIdentity>,
     scope: BatchScope,
     skipped: usize,
+    audio_skip_reasons: std::collections::BTreeSet<&'static str>,
 }
 
 // These necessary conditions avoid cloning large configurations for obvious rejects.
@@ -293,6 +294,7 @@ impl FrameRoot {
     ) -> ApplyAllSnapshot {
         let mut policy = CandidatePolicy::new(&preset.config, preset.enable_source_audio);
         let mut considered = 0;
+        let mut audio_skip_reasons = std::collections::BTreeSet::new();
         let targets = self
             .file_queue
             .files()
@@ -306,15 +308,25 @@ impl FrameRoot {
                     return None;
                 }
                 let metadata = self.source_metadata.ready_metadata_for(&target.id)?;
-                (policy.may_apply(&target.config, metadata)
-                    && candidate_for(preset, &target.config, metadata).is_some())
-                .then(|| FileIdentity::from(target))
+                if policy.may_apply(&target.config, metadata)
+                    && candidate_for(preset, &target.config, metadata).is_some()
+                {
+                    Some(FileIdentity::from(target))
+                } else {
+                    if let Some(reason) =
+                        preset_audio_unavailable(preset, &target.config, Some(metadata))
+                    {
+                        audio_skip_reasons.insert(reason);
+                    }
+                    None
+                }
             })
             .collect::<Vec<_>>();
         ApplyAllSnapshot {
             donor: donor.map(FileIdentity::from),
             preset: preset.clone(),
             skipped: considered - targets.len(),
+            audio_skip_reasons,
             targets,
             scope: BatchScope::All,
         }
@@ -342,6 +354,7 @@ impl FrameRoot {
             targets,
             scope: BatchScope::Selected,
             skipped,
+            audio_skip_reasons: all.audio_skip_reasons.clone(),
             donor: all.donor.clone(),
             preset: all.preset.clone(),
         }
@@ -452,7 +465,22 @@ impl FrameRoot {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        let reasons = all
+            .audio_skip_reasons
+            .iter()
+            .copied()
+            .collect::<Vec<_>>()
+            .join(". ");
         if all.targets.is_empty() {
+            if !reasons.is_empty() {
+                let _dismissed = window.prompt(
+                    PromptLevel::Info,
+                    "No files can use this preset",
+                    Some(&reasons),
+                    &[PromptButton::ok("OK")],
+                    cx,
+                );
+            }
             return;
         }
         let selected = self.selected_batch_snapshot(&all);
@@ -461,11 +489,15 @@ impl FrameRoot {
             let noun = if count == 1 { "file" } else { "files" };
             format!("{count} {noun}; {} skipped.", snapshot.skipped)
         };
-        let detail = format!(
+        let mut detail = format!(
             "Replace output settings.\nSelected for conversion: {}\nAll files: {}",
             describe(&selected),
             describe(&all),
         );
+        if !reasons.is_empty() {
+            detail.push_str("\nSkipped audio: ");
+            detail.push_str(&reasons);
+        }
         let title = if all.donor.is_some() {
             "Apply output settings?".to_string()
         } else {

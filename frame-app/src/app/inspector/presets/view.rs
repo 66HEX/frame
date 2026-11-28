@@ -1,6 +1,6 @@
 use crate::app::components::{
     FRAME_ICON_BUTTON_SM_SIZE, FRAME_ICON_SM_SIZE, FrameIconButtonSize, FrameIconButtonVariant,
-    frame_icon_button, frame_list_item, frame_text_button,
+    frame_checkbox_row, frame_icon_button, frame_list_item, frame_text_button,
 };
 use crate::app::input::{FrameTextInputKind, FrameTextInputSpec, frame_text_input};
 use crate::app::primitives::{ButtonVariant, color};
@@ -20,6 +20,7 @@ pub(in crate::app) struct SettingsPresetsTabState<'a> {
     pub(in crate::app) metadata: Option<&'a SourceMetadata>,
     pub(in crate::app) settings_disabled: bool,
     pub(in crate::app) preset_name: &'a str,
+    pub(in crate::app) preset_enables_audio: bool,
     pub(in crate::app) preset_name_focus: Option<&'a FocusHandle>,
     pub(in crate::app) presets: &'a [PresetDefinition],
     pub(in crate::app) applied_preset_id: Option<&'a str>,
@@ -58,6 +59,26 @@ pub(in crate::app) fn settings_presets_tab(
             window,
             cx,
         ))
+        .when(
+            crate::settings::container_supports_audio(&state.config.container),
+            |group| {
+                let checked = state.preset_enables_audio;
+                group.child(frame_checkbox_row(
+                    "settings-preset-enable-audio",
+                    "Enable source audio",
+                    "Select the first audio track when a file has none selected.",
+                    checked,
+                    state.settings_disabled,
+                    palette,
+                    window,
+                    cx,
+                    move |root, _, _, cx| {
+                        root.settings_ui.preset_audio_draft = Some(!checked);
+                        cx.notify();
+                    },
+                ))
+            },
+        )
         .child(list)
 }
 

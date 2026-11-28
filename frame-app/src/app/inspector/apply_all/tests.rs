@@ -927,6 +927,12 @@ fn named_audio_preset_qualifies_targets_with_the_tracks_it_will_actually_copy() 
     assert!(included("aac"));
     assert!(!included("incompatible"));
     assert!(!included("silent"));
+    assert!(
+        snapshot
+            .audio_skip_reasons
+            .contains("Incompatible audio for copying")
+    );
+    assert!(snapshot.audio_skip_reasons.contains("No source audio"));
     assert!(root.apply_all_snapshot(&snapshot));
     assert_eq!(
         root.file_queue

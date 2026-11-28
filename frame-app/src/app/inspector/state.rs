@@ -34,6 +34,7 @@ pub(in crate::app) struct SettingsUiState {
     pub(in crate::app) audio_editor: Option<(String, u32)>,
     pub(in crate::app) custom_audio_rate: bool,
     pub(in crate::app) preset_name_draft: String,
+    pub(in crate::app) preset_audio_draft: Option<bool>,
     pub(in crate::app) next_custom_preset_sequence: u64,
     pub(in crate::app) applied_presets: std::collections::HashMap<String, AppliedPreset>,
 }
@@ -57,9 +58,19 @@ impl Default for SettingsUiState {
             audio_editor: None,
             custom_audio_rate: false,
             preset_name_draft: String::new(),
+            preset_audio_draft: None,
             next_custom_preset_sequence: 0,
             applied_presets: std::collections::HashMap::new(),
         }
+    }
+}
+
+impl SettingsUiState {
+    pub(in crate::app) fn preset_enables_source_audio(&self, config: &ConversionConfig) -> bool {
+        crate::settings::container_supports_audio(&config.container)
+            && self
+                .preset_audio_draft
+                .unwrap_or(!config.selected_audio_tracks.is_empty())
     }
 }
 
@@ -99,6 +110,7 @@ pub(in crate::app) struct SettingsRenderState<'a> {
     pub(in crate::app) subtitle_font_color_hsv_draft: SettingsSubtitleHsv,
     pub(in crate::app) subtitle_outline_color_hsv_draft: SettingsSubtitleHsv,
     pub(in crate::app) preset_name: &'a str,
+    pub(in crate::app) preset_enables_audio: bool,
     pub(in crate::app) preset_name_focus: Option<&'a FocusHandle>,
     pub(in crate::app) presets: &'a [PresetDefinition],
     pub(in crate::app) applied_preset_id: Option<&'a str>,
