@@ -196,6 +196,12 @@ def smoke(worker, lib_dir):
         info = json.loads(invoke(["probe", "metadata", fixture]))
         if info["streams"][0]["codec_name"] != "pcm_s16le":
             raise ValueError("Packaged worker failed PCM probe")
+        copied = Path(temporary) / "remuxed.wav"
+        invoke(["convert", "-loglevel", "error", "-i", fixture, "-map", "0:0",
+                "-c", "copy", "-n", copied])
+        with wave.open(str(copied), "rb") as result:
+            if result.getnframes() != 800 or result.readframes(800) != bytes(1600):
+                raise ValueError("Packaged conversion changed the PCM fixture")
 
 
 def bundle(target, sdk, bin_dir, lib_dir, profile):

@@ -151,11 +151,17 @@ static int open_subtitle_decoder(ConvertTrack *t) {
 
 static int share_local_container(const ConvertTrack *t) {
     const char *protocol = avio_find_protocol_name(t->source->path);
-    if (!protocol || strcmp(protocol,"file") || !t->input->pb || !t->input->pb->seekable) return 0;
-    static const char *const containers[] = {"mov","matroska","mpegts","mpeg","nut","avi","asf","ogg","mxf",NULL};
-    for (const char *const *name=containers; *name; ++name)
-        if (av_match_name(*name,t->input->iformat->name)) return 1;
-    return 0;
+    if (!protocol || strcmp(protocol, "file") || !t->input->pb || !t->input->pb->seekable)
+        return 0;
+    // The AVIO cursor represents one seekable file. Manifest demuxers keep
+    // ownership of their nested inputs and the protocols that resolve them.
+    if (t->input->iformat->flags & AVFMT_NOFILE)
+        return 0;
+    static const char *const manifests[] = {"hls", "dash", "concat", "sdp", NULL};
+    for (const char *const *name = manifests; *name; ++name)
+        if (av_match_name(*name, t->input->iformat->name))
+            return 0;
+    return 1;
 }
 
 static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *codec) {
@@ -168,7 +174,7 @@ static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *cod
         if (!graph && t->kind == 'v')
             graph = frame_plan_opt(p, "vf");
         if (!t->source->shared_file && t->source->mapped_count > 1 && share_local_container(t)) {
-            err = frame_media_file_open(&t->source->shared_file,t->source->path);
+            err = frame_media_file_open(&t->source->shared_file, t->source->path);
         }
         FrameRenderPlan request = {
             .path = t->source->path,
@@ -188,7 +194,17 @@ static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *cod
             .strict = t->strict,
             .hardware_device = t->kind == 'v' ? frame_plan_opt(p, "hwaccel") : NULL,
         };
-        if (err >= 0) err = frame_render_open(&t->render, &request);
+        if (err >= 0) {
+            err = frame_render_open(&t->render, &request);
+            // An accurate seek past EOF still has a valid stream description.
+            // Configure the encoder from its first frame and drain an empty
+            // interval so the container gets its normal header and trailer.
+            if (err == AVERROR_EOF && request.start_us > 0) {
+                request.start_us = 0;
+                request.duration_us = 0;
+                err = frame_render_open(&t->render, &request);
+            }
+        }
     }
     av_bprint_finalize(&tail, NULL);
     if (err < 0)
@@ -314,38 +330,37 @@ int frame_prepare_encoder(const ConvertPlan *p, ConvertTrack *t, AVFormatContext
 
 int frame_encode_subtitle(ConvertTrack *t, AVPacket *output) {
     int err;
-        AVSubtitle sub = {0};
-        int got = 0;
-        err = avcodec_decode_subtitle2(t->subdecoder, &sub, &got, t->raw);
-        if (err >= 0 && got) {
-            /* DVB full-frame bitmaps can exceed a megabyte. The advertised
-             * encoder interface takes a caller-owned buffer, not an AVPacket. */
-            const int capacity = 4 * 1024 * 1024;
-            err = av_new_packet(output, capacity);
+    AVSubtitle sub = {0};
+    int got = 0;
+    err = avcodec_decode_subtitle2(t->subdecoder, &sub, &got, t->raw);
+    if (err >= 0 && got) {
+        /* DVB full-frame bitmaps can exceed a megabyte. The advertised
+         * encoder interface takes a caller-owned buffer, not an AVPacket. */
+        const int capacity = 4 * 1024 * 1024;
+        err = av_new_packet(output, capacity);
+        if (err >= 0) {
+            int64_t pts = t->raw->pts;
+            int64_t duration = t->raw->duration;
+            if (sub.end_display_time > sub.start_display_time && sub.end_display_time < UINT32_MAX)
+                duration = av_rescale_q(sub.end_display_time - sub.start_display_time,
+                                        (AVRational){1, 1000}, t->src->time_base);
+            if (pts != AV_NOPTS_VALUE)
+                pts +=
+                    av_rescale_q(sub.start_display_time, (AVRational){1, 1000}, t->src->time_base);
+            sub.start_display_time = 0;
+            err = avcodec_encode_subtitle(t->encoder, output->data, capacity, &sub);
             if (err >= 0) {
-                int64_t pts = t->raw->pts;
-                int64_t duration = t->raw->duration;
-                if (sub.end_display_time > sub.start_display_time &&
-                    sub.end_display_time < UINT32_MAX)
-                    duration = av_rescale_q(sub.end_display_time - sub.start_display_time,
-                                            (AVRational){1, 1000}, t->src->time_base);
-                if (pts != AV_NOPTS_VALUE)
-                    pts += av_rescale_q(sub.start_display_time, (AVRational){1, 1000},
-                                        t->src->time_base);
-                sub.start_display_time = 0;
-                err = avcodec_encode_subtitle(t->encoder, output->data, capacity, &sub);
-                if (err >= 0) {
-                    av_shrink_packet(output, err);
-                    output->pts = output->dts = pts;
-                    output->duration = duration;
-                    output->flags |= AV_PKT_FLAG_KEY;
-                    av_packet_rescale_ts(output, t->src->time_base, t->packet_tb);
-                }
+                av_shrink_packet(output, err);
+                output->pts = output->dts = pts;
+                output->duration = duration;
+                output->flags |= AV_PKT_FLAG_KEY;
+                av_packet_rescale_ts(output, t->src->time_base, t->packet_tb);
             }
         }
-        avsubtitle_free(&sub);
-        av_packet_unref(t->raw);
-        return err < 0 ? err : got ? 0 : AVERROR(EAGAIN);
+    }
+    avsubtitle_free(&sub);
+    av_packet_unref(t->raw);
+    return err < 0 ? err : got ? 0 : AVERROR(EAGAIN);
 }
 
 /* Keep the unconsumed input outside libavfilter. A format change rebuilds the

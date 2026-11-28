@@ -9,7 +9,7 @@ use gpui::{Context, Window};
 
 impl FrameRoot {
     pub(in crate::app) fn prompt_subtitle_burn_file(&self, window: &Window, cx: &Context<Self>) {
-        if self.file_queue.selected_file_locked() {
+        if self.file_queue.selected_file_locked() || !self.available_filters.subtitles {
             return;
         }
 

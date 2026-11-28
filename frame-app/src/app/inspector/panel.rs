@@ -348,6 +348,7 @@ fn settings_output_section(
         )),
         OutputSection::Subtitles => content.child(settings_subtitles_tab(
             SettingsSubtitlesTabState {
+                available_filters: settings.available_filters,
                 config: settings.config,
                 metadata: settings.metadata,
                 settings_disabled: settings.settings_disabled,

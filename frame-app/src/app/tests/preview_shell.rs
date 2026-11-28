@@ -30,6 +30,7 @@ fn empty_filters() -> &'static AvailableFilters {
         vignette: false,
         bwdif: false,
         deshake: false,
+        subtitles: false,
         highpass: false,
         lowpass: false,
         afftdn: false,

@@ -66,7 +66,7 @@ typedef struct {
     int consumed_samples, audio_eof;
     FrameCadence cadence;
     AVBSFContext *bsf;
-    int source_done, codec_done, done, seen_key, strict;
+    int source_done, done, seen_key, strict;
 } ConvertTrack;
 
 int frame_convert_parse(ConvertPlan *plan, int argc, const char *const *argv);
@@ -78,7 +78,8 @@ int frame_prepare_encoder(const ConvertPlan *plan, ConvertTrack *track, AVFormat
 int frame_cadence_next(ConvertTrack *track);
 int frame_read_encoded(ConvertTrack *track, AVPacket *packet);
 int frame_encode_subtitle(ConvertTrack *track, AVPacket *output);
-int frame_mux_packets(const ConvertPlan *plan,ConvertTrack *tracks,int count,AVFormatContext *out,void *io);
+int frame_mux_packets(const ConvertPlan *plan, ConvertTrack *tracks, int count,
+                      AVFormatContext *out, void *io);
 extern int frame_output_open(void *io, const char *path, int overwrite, int progress);
 extern int frame_output_write(void *io, const uint8_t *buffer, int size);
 extern int64_t frame_output_seek(void *io, int64_t offset, int whence);

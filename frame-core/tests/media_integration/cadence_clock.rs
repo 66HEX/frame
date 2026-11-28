@@ -9,13 +9,26 @@ fn export_pair(
     container: &str,
     plan: &[String],
 ) -> TestResult<[PathBuf; 2]> {
+    export_pair_with_reference_options(tools, sandbox, name, container, plan, &[])
+}
+
+fn export_pair_with_reference_options(
+    tools: &Toolchain,
+    sandbox: &Sandbox,
+    name: &str,
+    container: &str,
+    plan: &[String],
+    reference_options: &[&str],
+) -> TestResult<[PathBuf; 2]> {
     let reference = sandbox.path(&format!("{name}-reference.{container}"));
     let native = sandbox.path(&format!("{name}-native.{container}"));
-    let mut args = plan.to_vec();
-    args.extend(["-n".into(), path_arg(&reference)]);
-    run_tool(&tools.ffmpeg, &args)?;
-    *args.last_mut().unwrap() = path_arg(&native);
-    tools.native("convert", &args)?;
+    let mut reference_args = plan.to_vec();
+    reference_args.extend(args(reference_options));
+    reference_args.extend(["-n".into(), path_arg(&reference)]);
+    run_tool(&tools.ffmpeg, &reference_args)?;
+    let mut native_args = plan.to_vec();
+    native_args.extend(["-n".into(), path_arg(&native)]);
+    tools.native("convert", &native_args)?;
     Ok([reference, native])
 }
 
@@ -398,9 +411,9 @@ fn chapter_tags_follow_metadata_policy_and_keep_the_chapter_interval() -> TestRe
 fn heic_heif_and_avif_stills_match_reference_rgb_pixels() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("heif_family_import")?;
-    let heic = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/input.heic");
-    let heif = sandbox.path("input.heif");
-    fs::copy(&heic, &heif).map_err(|e| e.to_string())?;
+    let still = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/input.heic");
+    let alternate_extension = sandbox.path("input.heif");
+    fs::copy(&still, &alternate_extension).map_err(|e| e.to_string())?;
     let avif = sandbox.path("input.avif");
     run_tool(
         &tools.ffmpeg,
@@ -422,7 +435,7 @@ fn heic_heif_and_avif_stills_match_reference_rgb_pixels() -> TestResult {
             &path_arg(&avif),
         ]),
     )?;
-    for path in [&heic, &heif, &avif] {
+    for path in [&still, &alternate_extension, &avif] {
         let output = sandbox.path(&format!(
             "{}.png",
             path.file_name().unwrap().to_string_lossy()
@@ -522,5 +535,211 @@ fn default_audio_track_follows_the_map_order_when_source_has_no_default() -> Tes
     };
     assert_eq!(inspect(&reference)?, b"1\n0\n");
     assert_eq!(inspect(&native)?, inspect(&reference)?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires fixture tools; run with --ignored"]
+fn many_mapped_streams_share_input_descriptors() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("mapped_descriptors")?;
+    let source = sandbox.path("80-tracks.mkv");
+    let mut generate = args(&["-f", "lavfi", "-i", "sine=d=0.03"]);
+    for _ in 0..80 {
+        generate.extend(args(&["-map", "0:a:0"]));
+    }
+    generate.extend(args(&["-c:a", "aac", &path_arg(&source)]));
+    run_tool(&tools.ffmpeg, &generate)?;
+    let wave = sandbox.path("tone.wav");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=d=0.03",
+            "-c:a",
+            "pcm_s16le",
+            &path_arg(&wave),
+        ]),
+    )?;
+    let worker = tools.worker.as_ref().unwrap();
+    for codec in ["copy", "flac"] {
+        for (input, duplicate, input_codec) in [
+            (&source, false, "aac"),
+            (&source, true, "aac"),
+            (&wave, true, "pcm_s16le"),
+        ] {
+            let output = sandbox.path(&format!("{input_codec}-{codec}-{duplicate}.mkv"));
+            #[cfg(unix)]
+            let mut command = {
+                let mut cmd = Command::new("sh");
+                cmd.args(["-c", r#"ulimit -n 64 && exec "$@""#, "frame-test"])
+                    .arg(worker);
+                cmd
+            };
+            #[cfg(not(unix))]
+            let mut command = Command::new(worker);
+            command
+                .args(["convert", "-loglevel", "error", "-i"])
+                .arg(input);
+            for i in 0..80 {
+                command
+                    .arg("-map")
+                    .arg(format!("0:{}", if duplicate { 0 } else { i }));
+            }
+            let result = command
+                .args(["-c:a", codec, "-n"])
+                .arg(&output)
+                .output()
+                .map_err(|e| e.to_string())?;
+            assert!(
+                result.status.success(),
+                "{codec} duplicate={duplicate}: {}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+            let streams = probe_media(&tools, &output)?.audio_tracks;
+            assert_eq!(streams.len(), 80);
+            assert!(
+                streams
+                    .iter()
+                    .all(|s| s.codec == if codec == "copy" { input_codec } else { "flac" })
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires fixture tools; run with --ignored"]
+fn changing_audio_format_keeps_samples_in_partial_encoder_blocks() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("dynamic_audio_blocks")?;
+    let mut adts = Vec::new();
+    for (rate, channels, hz) in [(44100, 1, 440), (48000, 2, 880)] {
+        let part = sandbox.path(&format!("{rate}.aac"));
+        run_tool(
+            &tools.ffmpeg,
+            &args(&[
+                "-f",
+                "lavfi",
+                "-i",
+                &format!("sine=frequency={hz}:duration=1.6:sample_rate={rate}"),
+                "-ac",
+                &channels.to_string(),
+                "-c:a",
+                "aac",
+                "-f",
+                "adts",
+                &path_arg(&part),
+            ]),
+        )?;
+        adts.extend(fs::read(part).map_err(|e| e.to_string())?);
+    }
+    let elementary = sandbox.path("changes.aac");
+    fs::write(&elementary, adts).map_err(|e| e.to_string())?;
+    let source = sandbox.path("changes.m2t");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-i",
+            &path_arg(&elementary),
+            "-c:a",
+            "copy",
+            "-f",
+            "mpegts",
+            &path_arg(&source),
+        ]),
+    )?;
+    for (name, filter) in [
+        ("plain", "anull"),
+        ("limited", "alimiter"),
+        ("normalized", "loudnorm=I=-16:TP=-1.5:LRA=11"),
+    ] {
+        let [reference, native] = export_pair_with_reference_options(
+            &tools,
+            &sandbox,
+            name,
+            "m4a",
+            &args(&[
+                "-i",
+                &path_arg(&source),
+                "-map",
+                "0:0",
+                "-af",
+                filter,
+                "-ar",
+                "48000",
+                "-ac",
+                "2",
+                "-c:a",
+                "aac",
+            ]),
+            // Older MOV muxers round the entire track start to milliseconds.
+            // Use sample resolution to compare the actual audio clock.
+            &["-movie_timescale", "48000"],
+        )?;
+        let decode = |p: &Path| {
+            run_tool_output(
+                &tools.ffmpeg,
+                &args(&["-v", "error", "-i", &path_arg(p), "-f", "s16le", "pipe:1"]),
+            )
+        };
+        let actual = decode(&native)?;
+        let expected = decode(&reference)?;
+        assert_eq!(actual.len(), expected.len(), "{filter} lost samples");
+        // Each distribution builds its own floating-point AAC encoder. Allow
+        // rounding differences while checking the waveform at every sample.
+        let (mut error_energy, mut signal_energy) = (0_i64, 0_i64);
+        for (sample, reference) in actual.chunks_exact(2).zip(expected.chunks_exact(2)) {
+            let sample = i64::from(i16::from_le_bytes([sample[0], sample[1]]));
+            let reference = i64::from(i16::from_le_bytes([reference[0], reference[1]]));
+            error_energy += (sample - reference).pow(2);
+            signal_energy += reference.pow(2);
+        }
+        assert!(
+            error_energy <= signal_energy / 100,
+            "{filter} waveform changed"
+        );
+        assert_bytes_match(
+            &packet_timing(&tools, &native)?,
+            &packet_timing(&tools, &reference)?,
+            &format!("{filter} packet timing"),
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires fixture tools; run with --ignored"]
+fn export_start_past_eof_writes_a_valid_empty_container() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("seek_past_eof")?;
+    let source = sandbox.path("source.mp4");
+    generate_h264_aac_source(&tools, &source, 0.6, 96, 64)?;
+    let [reference, native] = export_pair(
+        &tools,
+        &sandbox,
+        "empty",
+        "mp4",
+        &args(&[
+            "-ss",
+            "60",
+            "-i",
+            &path_arg(&source),
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a:0",
+            "-c:v",
+            "libx264",
+            "-c:a",
+            "aac",
+        ]),
+    )?;
+    // MOV omits tracks without packets when writing its trailer. Parsing the
+    // empty moov box distinguishes a completed export from an empty file.
+    assert!(packet_timing(&tools, &reference)?.is_empty());
+    assert!(packet_timing(&tools, &native)?.is_empty());
     Ok(())
 }

@@ -1,4 +1,4 @@
-//! Runtime support for the optional single-pass video stabilizer.
+//! Checks optional libav filters required by the selected export.
 
 use super::controller::ConversionProcessController;
 use crate::capabilities::detect_available_filters_with_control;
@@ -25,22 +25,31 @@ fn check_support(
     executable: &str,
     cancelled: impl Fn() -> bool,
 ) -> Result<(), ConversionError> {
-    if !config.video_filters.stabilization_enabled {
+    let subtitles = !frame_core::utils::is_audio_only_container(&config.container)
+        && config
+            .subtitle_burn_path
+            .as_deref()
+            .is_some_and(|path| !path.trim().is_empty());
+    if !config.video_filters.stabilization_enabled && !subtitles {
         return Ok(());
     }
     let available =
         detect_available_filters_with_control(executable, cancelled).map_err(|error| {
             ConversionError::InvalidInput(format!(
-                "Could not verify video stabilization support. Try again before exporting. {error}"
+                "Could not verify export filter support. Try again before exporting. {error}"
             ))
         })?;
-    if available.deshake {
-        Ok(())
-    } else {
-        Err(ConversionError::InvalidInput(
-            "This FFmpeg does not support video stabilization. Disable Stabilize video or use an FFmpeg build with the deshake filter.".into(),
-        ))
+    if subtitles && !available.subtitles {
+        return Err(ConversionError::InvalidInput(
+            "This media runtime does not support subtitle burn-in. Remove the burn-in subtitle file before exporting.".into(),
+        ));
     }
+    if config.video_filters.stabilization_enabled && !available.deshake {
+        return Err(ConversionError::InvalidInput(
+            "This FFmpeg does not support video stabilization. Disable Stabilize video or use an FFmpeg build with the deshake filter.".into(),
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

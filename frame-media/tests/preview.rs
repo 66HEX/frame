@@ -137,3 +137,38 @@ fn lists_the_linked_registries_without_cli_tools_on_path() {
         assert!(std::str::from_utf8(&listing).unwrap().contains(name));
     }
 }
+
+#[test]
+fn midstream_orientation_sei_applies_to_following_frames_until_replaced() {
+    // Two 4-picture H.264 clips of a blue/red split, concatenated without
+    // re-encoding. The second clip carries a single 90-degree orientation SEI.
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../frame-core/tests/fixtures/changing-orientation.mkv");
+    let raw = successful(worker(
+        &source,
+        &[
+            "-threads",
+            "1",
+            "-vf",
+            "scale=96:64,format=bgra",
+            "-fps_mode",
+            "passthrough",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "bgra",
+            "pipe:1",
+        ],
+    ));
+    let pictures: Vec<_> = raw.chunks_exact(96 * 64 * 4).collect();
+    assert_eq!(pictures.len(), 8);
+    for (index, picture) in pictures.iter().enumerate() {
+        let sample = &picture[(12 * 96 + 16) * 4..][..4];
+        let blue = sample[0] > 240 && sample[2] < 8;
+        let red = sample[2] > 240 && sample[0] < 8;
+        assert!(
+            if index < 4 { blue } else { red },
+            "frame {index}: {sample:?}"
+        );
+    }
+}

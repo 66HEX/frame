@@ -456,6 +456,7 @@ impl FrameRoot {
     }
     pub(super) fn apply_settings_subtitles_fixture(&mut self) {
         self.apply_preview_ready_fixture();
+        self.available_filters.subtitles = true;
         self.settings_ui.active_tab = SettingsTab::Output;
         self.settings_ui
             .expanded_output_sections

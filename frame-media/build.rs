@@ -34,6 +34,16 @@ fn main() {
     sources.sort();
     build.files(sources).compile("frame_media_native");
     if let Some(prefix) = &sdk {
+        // macOS strips DYLD_LIBRARY_PATH from subprocesses launched through a
+        // protected system binary, including /bin/sh in the descriptor test.
+        if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos")
+            && env::var("PROFILE").as_deref() == Ok("debug")
+        {
+            println!(
+                "cargo:rustc-link-arg=-Wl,-rpath,{}",
+                prefix.join("lib").display()
+            );
+        }
         println!(
             "cargo:rustc-link-search=native={}",
             prefix.join("lib").display()

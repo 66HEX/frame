@@ -38,28 +38,8 @@ fn hardware_video_codecs_and_explicit_pixel_formats_in_every_container() -> Test
         "hevc_nvenc",
         "av1_nvenc",
     ] {
-        let mut child = Command::new(tools.worker.as_ref().unwrap())
-            .args(["capabilities", "hardware", name, "0"])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        child
-            .stdin
-            .take()
-            .unwrap()
-            .write_all(&[0; 128 * 128 * 3 / 2])
-            .map_err(|e| e.to_string())?;
-        let result = child.wait_with_output().map_err(|e| e.to_string())?;
-        if result.status.success() {
-            assert!(String::from_utf8_lossy(&result.stdout).contains("progress=end"));
+        if hardware_encoder_available(&tools, name)? {
             available.push(name);
-        } else {
-            eprintln!(
-                "{name} unavailable: {}",
-                String::from_utf8_lossy(&result.stderr)
-            );
         }
     }
     if let Ok(required) = env::var("FRAME_TEST_REQUIRED_HW_ENCODERS") {
@@ -74,21 +54,69 @@ fn hardware_video_codecs_and_explicit_pixel_formats_in_every_container() -> Test
     check_video_registry(Some(&available))
 }
 
+pub fn hardware_encoder_available(tools: &Toolchain, name: &str) -> TestResult<bool> {
+    let trial_frame = vec![0; 128 * 128 * 3 / 2];
+    let mut child = Command::new(tools.worker.as_ref().unwrap())
+        .args(["capabilities", "hardware", name, "0"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(&trial_frame)
+        .map_err(|e| e.to_string())?;
+    let result = child.wait_with_output().map_err(|e| e.to_string())?;
+    if result.status.success() {
+        assert!(String::from_utf8_lossy(&result.stdout).contains("progress=end"));
+        return Ok(true);
+    }
+    // An unavailable device is expected on hosted runners. Detect a broken
+    // worker probe if the legacy executable can actually use this encoder.
+    let mut trial = args(&[
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=black:s=128x128:r=1:d=1",
+        "-frames:v",
+        "1",
+        "-c:v",
+        name,
+    ]);
+    if name.ends_with("_videotoolbox") {
+        trial.extend(args(&["-allow_sw", "0"]));
+    }
+    trial.extend(args(&["-f", "null", "-"]));
+    let diagnostic = String::from_utf8_lossy(&result.stderr);
+    if run_tool(&tools.ffmpeg, &trial).is_ok() {
+        return Err(format!(
+            "reference encoder {name} works but the worker probe failed: {diagnostic}"
+        ));
+    }
+    eprintln!("{name} unavailable on this device: {diagnostic}");
+    Ok(false)
+}
+
 fn check_video_registry(hardware: Option<&[&str]>) -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("video-registry")?;
     let input = sandbox.path("source.mp4");
-    generate_h264_aac_source(&tools, &input, 0.25, 128, 96)?;
+    generate_h264_aac_source(&tools, &input, 0.25, 320, 256)?;
     let rules = rules();
     for container in media_rules::all_containers() {
         let Some(encoders) = media_rules::video_codecs_for_container(container) else {
             continue;
         };
         for encoder in encoders {
-            let use_encoder = match hardware {
-                Some(available) => available.contains(&encoder.as_str()),
-                None => !encoder.ends_with("_nvenc") && !encoder.ends_with("_videotoolbox"),
-            };
+            let use_encoder = hardware.map_or_else(
+                || !encoder.ends_with("_nvenc") && !encoder.ends_with("_videotoolbox"),
+                |available| available.contains(&encoder.as_str()),
+            );
             if !use_encoder {
                 continue;
             }
@@ -107,6 +135,9 @@ fn check_video_registry(hardware: Option<&[&str]>) -> TestResult {
                 config.pixel_format = format.into();
                 config.fps = "30".into();
                 config.hw_decode = hardware.is_some();
+                if hardware.is_some() {
+                    config.video_bitrate_mode = "bitrate".into();
+                }
                 if encoder.ends_with("_nvenc") {
                     config.nvenc_spatial_aq = true;
                     config.nvenc_temporal_aq = true;
@@ -135,6 +166,33 @@ fn check_video_registry(hardware: Option<&[&str]>) -> TestResult {
                     );
                 }
                 decode_media(&tools, &output)?;
+                if hardware.is_some() && container == "mp4" && format == "auto" {
+                    // Quality mode is optional on Intel VideoToolbox. A capable
+                    // legacy backend must have a working native counterpart.
+                    config.video_bitrate_mode = "crf".into();
+                    let reference = sandbox.path(&format!("{encoder}-reference.mp4"));
+                    let candidate = sandbox.path(&format!("{encoder}-quality.mp4"));
+                    let plan = build_ffmpeg_args(
+                        &path_arg(&input),
+                        &path_arg(&reference),
+                        &config,
+                        &probe_media(&tools, &input)?,
+                    )
+                    .map_err(|err| err.to_string())?;
+                    let baseline = run_tool(&tools.ffmpeg, &plan);
+                    match convert(&tools, &input, &candidate, &config) {
+                        Ok(()) => decode_media(&tools, &candidate)?,
+                        Err(error)
+                            if baseline
+                                .as_ref()
+                                .is_err_and(|message| message.contains("qscale not available"))
+                                && error.contains("qscale not available") =>
+                        {
+                            eprintln!("{encoder} quality mode unavailable on this device");
+                        }
+                        Err(error) => return Err(error),
+                    }
+                }
             }
         }
     }
