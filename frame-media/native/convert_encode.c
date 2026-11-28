@@ -456,7 +456,8 @@ int frame_prepare_encoder(const ConvertPlan *p, ConvertTrack *t, AVFormatContext
     if (t->kind == 'v') {
         enum AVPixelFormat samples = frame_surface_samples(codec, frame_plan_opt(p, "pix_fmt"),
                                                            t->src->codecpar->format);
-        int rc = frame_hardware_route(&t->route, codec, samples, frame_plan_opt(p, "frame_device"));
+        int rc = frame_hardware_route(&t->route, codec, samples, frame_plan_opt(p, "frame_device"),
+                                      p->first_adapter);
         if (rc < 0) {
             fprintf(stderr, "Cannot open %s on a compatible adapter: %s\n", name, av_err2str(rc));
             return rc;

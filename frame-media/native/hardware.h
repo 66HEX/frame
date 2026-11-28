@@ -14,10 +14,11 @@ typedef struct {
     const char *fallback;
     enum AVPixelFormat sample_format;
     int upload;
+    unsigned adapter_index;
 } FrameHardwareRoute;
 
 int frame_hardware_route(FrameHardwareRoute *route, const AVCodec *encoder,
-                         enum AVPixelFormat samples, const char *requested_device);
+                         enum AVPixelFormat samples, const char *requested_device, unsigned first_adapter);
 /* Returns a libavfilter chain only when every requested operation can keep
  * samples on the decoder's device and the encoder consumes that surface. */
 const char *frame_surface_graph(const AVCodec *codec, const char *backend, const char *graph);

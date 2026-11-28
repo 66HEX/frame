@@ -217,13 +217,13 @@ static int amd_adapter_name(AVBufferRef *ref, char *name, size_t size) {
 }
 
 static int select_radeon(FrameHardwareRoute *r, const AVCodec *codec, const char *pin,
-                         int allow_sw, const uint8_t *input) {
+                         int allow_sw, const uint8_t *input, unsigned first_adapter) {
     static const GUID factory_iid = {0x7b7166ec,0x21c7,0x44ae,{0xb2,0x1a,0xc9,0xae,0x32,0x1a,0xe3,0x69}};
     IDXGIFactory *factory = NULL;
     if (FAILED(CreateDXGIFactory(&factory_iid, (void **)&factory)))
         return AVERROR(ENODEV);
     int err = AVERROR(ENODEV);
-    for (UINT i = 0;; ++i) {
+    for (UINT i = first_adapter;; ++i) {
         IDXGIAdapter *adapter = NULL;
         DXGI_ADAPTER_DESC desc;
         if (FAILED(IDXGIFactory_EnumAdapters(factory, i, &adapter)))
@@ -247,8 +247,10 @@ static int select_radeon(FrameHardwareRoute *r, const AVCodec *codec, const char
             err = AVERROR(ENODEV);
         if (err >= 0)
             err = trial(codec, r, allow_sw, input);
-        if (err >= 0)
+        if (err >= 0) {
+            r->adapter_index = i;
             break;
+        }
         av_buffer_unref(&r->device);
     }
     IDXGIFactory_Release(factory);
@@ -257,8 +259,9 @@ static int select_radeon(FrameHardwareRoute *r, const AVCodec *codec, const char
 #endif
 
 static int select_device(FrameHardwareRoute *r, const AVCodec *codec, const char *pin,
-                         int allow_sw, const uint8_t *input) {
+                         int allow_sw, const uint8_t *input, unsigned first_adapter) {
 #if !defined(__linux__) && !defined(_WIN32)
+    (void)first_adapter;
     (void)allow_sw;
     (void)input;
 #endif
@@ -269,7 +272,7 @@ static int select_device(FrameHardwareRoute *r, const AVCodec *codec, const char
         glob_t nodes = {0};
         int err = AVERROR(ENODEV);
         if (glob("/dev/dri/renderD[0-9]*", 0, NULL, &nodes) == 0) {
-            for (size_t i = 0; i < nodes.gl_pathc; ++i) {
+            for (size_t i = first_adapter; i < nodes.gl_pathc; ++i) {
                 const char *node = nodes.gl_pathv[i];
                 if (pin && strcmp(node, pin))
                     continue;
@@ -281,6 +284,7 @@ static int select_device(FrameHardwareRoute *r, const AVCodec *codec, const char
                 if (err >= 0)
                     err = trial(codec, r, allow_sw, input);
                 if (err >= 0) {
+                    r->adapter_index = (unsigned)i;
                     av_strlcpy(r->device_name, node, sizeof(r->device_name));
                     break;
                 }
@@ -296,7 +300,7 @@ static int select_device(FrameHardwareRoute *r, const AVCodec *codec, const char
     if (!strcmp(codec->name, "hevc_amf")) {
         r->type = AV_HWDEVICE_TYPE_D3D11VA;
 #ifdef _WIN32
-        return select_radeon(r, codec, pin, allow_sw, input);
+        return select_radeon(r, codec, pin, allow_sw, input, first_adapter);
 #else
         return AVERROR(ENOSYS);
 #endif
@@ -308,14 +312,14 @@ static int select_device(FrameHardwareRoute *r, const AVCodec *codec, const char
 }
 
 int frame_hardware_route(FrameHardwareRoute *r, const AVCodec *encoder,
-                         enum AVPixelFormat samples, const char *requested_device) {
+                         enum AVPixelFormat samples, const char *requested_device, unsigned first_adapter) {
     static const uint8_t pattern[128 * 128 * 3 / 2] = {0};
     if ((vaapi(encoder) || !strcmp(encoder->name, "hevc_amf")) && samples == AV_PIX_FMT_NONE)
         return AVERROR(EINVAL);
     r->sample_format = samples;
     r->decoder = "cpu";
     r->filters = "cpu";
-    return select_device(r, encoder, requested_device, 0, pattern);
+    return select_device(r, encoder, requested_device, 0, pattern, first_adapter);
 }
 
 int frame_check_encoder(const char *name, int allow_sw, const char *sample_format,
@@ -331,7 +335,7 @@ int frame_check_encoder(const char *name, int allow_sw, const char *sample_forma
     if (route.sample_format != AV_PIX_FMT_NV12 && route.sample_format != AV_PIX_FMT_P010LE &&
         route.sample_format != AV_PIX_FMT_YUV420P)
         return AVERROR(EINVAL);
-    int err = select_device(&route, codec, NULL, allow_sw, input);
+    int err = select_device(&route, codec, NULL, allow_sw, input, 0);
     if (err >= 0 && !route.device)
         err = trial(codec, &route, allow_sw, input);
     if (err >= 0)

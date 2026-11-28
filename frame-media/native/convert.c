@@ -553,9 +553,15 @@ static int convert(ConvertPlan *p, AVFormatContext **outp, ConvertTrack *tracks,
     return err;
 }
 
-static int execute(int argc, const char *const *argv, void *io, int preflight, int *retry_host) {
-    ConvertPlan p = {.preflight = preflight, .host_filters = *retry_host};
-    *retry_host = 0;
+typedef struct {
+    unsigned first_adapter;
+    int host_filters, retry;
+} RouteAttempt;
+
+static int execute(int argc, const char *const *argv, void *io, int preflight, RouteAttempt *attempt) {
+    ConvertPlan p = {.preflight = preflight, .host_filters = attempt->host_filters,
+                     .first_adapter = attempt->first_adapter};
+    attempt->retry = 0;
     AVIOContext *pb = NULL;
     AVFormatContext *out = NULL;
     ConvertTrack *tracks = NULL;
@@ -573,9 +579,19 @@ static int execute(int argc, const char *const *argv, void *io, int preflight, i
     }
     for (int i = 0; i < count; ++i) {
         ConvertTrack *t = &tracks[i];
-        if (err < 0 && preflight && !p.host_filters && !frame_plan_opt(&p, "frame_filters") &&
-            t->route.filters && strcmp(t->route.filters, "cpu"))
-            *retry_host = 1;
+        if (err < 0 && preflight && t->route.filters) {
+            if (!p.host_filters && !frame_plan_opt(&p, "frame_filters") &&
+                strcmp(t->route.filters, "cpu")) {
+                attempt->host_filters = attempt->retry = 1;
+                attempt->first_adapter = t->route.adapter_index;
+            } else if (t->route.device && !frame_plan_opt(&p, "frame_device")) {
+                // The small registry probe may work while the actual export
+                // dimensions/profile exceed this GPU's limits. Try the next GPU.
+                attempt->first_adapter = t->route.adapter_index + 1;
+                attempt->host_filters = 0;
+                attempt->retry = 1;
+            }
+        }
         free_track(t);
     }
     av_free(tracks);
@@ -600,11 +616,10 @@ static int execute(int argc, const char *const *argv, void *io, int preflight, i
 }
 
 int frame_convert(int argc, const char *const *argv, void *io, int preflight) {
-    int retry_host = 0;
-    int err = execute(argc, argv, io, preflight, &retry_host);
-    // Device filters are optional: negotiate their real pool, graph and first
-    // packet, then retry the same requested encoder with host filters on failure.
-    if (retry_host)
-        err = execute(argc, argv, io, preflight, &retry_host);
+    RouteAttempt attempt = {0};
+    int err;
+    do {
+        err = execute(argc, argv, io, preflight, &attempt);
+    } while (attempt.retry);
     return err;
 }
