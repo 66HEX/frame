@@ -61,6 +61,14 @@ def smoke():
 
         source = directory / "source.ppm"
         source.write_bytes(b"P6\n32 32\n255\n" + bytes([45, 90, 128]) * 1024)
+        jxl = directory / "image.jxl"
+        invoke(worker, "convert", "-i", source, "-map", "0:v:0", "-c:v", "libjxl",
+               "-distance", "0", "-frames:v", "1", "-n", jxl)
+        pixels = invoke("/usr/bin/ffmpeg", "-v", "error", "-i", jxl, "-frames:v", "1",
+                        "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1")
+        if pixels != bytes([45, 90, 128]) * 1024:
+            raise ValueError("Flatpak JPEG XL lossless pixel mismatch")
+
         output = directory / "encoded.mp4"
         invoke(worker, "convert", "-i", source, "-map", "0:v:0", "-c:v", "libx264",
                "-pix_fmt", "yuv420p", "-frames:v", "1", "-n", output)
