@@ -293,11 +293,11 @@ fn strict_packet_observer_rejects_incomplete_input_without_issuing_completion() 
     let index = stream
         .chunks_exact(188)
         .enumerate()
-        .skip(30)
+        .skip(stream.len() / (2 * 188))
         .find(|(_, ts)| ts[0] == 0x47 && ts[1] & 0x5f == 1 && ts[2] == 0 && ts[3] & 0x10 != 0)
         .map(|(index, _)| index)
         .ok_or("missing video payload packet")?;
-    stream.drain(index * 188..(index + 1) * 188);
+    stream[index * 188 + 1] |= 0x80; // MPEG-TS transport error indicator
     let corrupt = sandbox.path("corrupt.ts");
     fs::write(&corrupt, stream).map_err(|e| e.to_string())?;
     let marker = sandbox.path("progress");
@@ -332,5 +332,195 @@ fn strict_packet_observer_rejects_incomplete_input_without_issuing_completion() 
                 .contains("progress=end")
         );
     }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires fixture tools; run with --ignored"]
+fn chapter_tags_follow_metadata_policy_and_keep_the_chapter_interval() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("chapter_metadata")?;
+    let source = sandbox.path("source.mkv");
+    let chapter = sandbox.path("chapter.txt");
+    fs::write(
+        &chapter,
+        b";FFMETADATA1\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=500\ntitle=Private chapter\n",
+    )
+    .map_err(|e| e.to_string())?;
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=s=64x48:r=4:d=1",
+            "-f",
+            "ffmetadata",
+            "-i",
+            &path_arg(&chapter),
+            "-map",
+            "0:v:0",
+            "-map_chapters",
+            "1",
+            "-c:v",
+            "libx264",
+            &path_arg(&source),
+        ]),
+    )?;
+    for mode in ["preserve", "replace", "clean"] {
+        let mut plan = args(&["-i", &path_arg(&source), "-map", "0:0", "-c", "copy"]);
+        if mode != "preserve" {
+            plan.extend(args(&["-map_metadata", "-1"]));
+        }
+        if mode == "replace" {
+            plan.extend(args(&["-metadata", "title=Public"]));
+        }
+        let [reference, native] = export_pair(&tools, &sandbox, mode, "mkv", &plan)?;
+        let inspect = |p: &Path| {
+            run_tool_output(
+                &tools.ffprobe,
+                &args(&["-v", "error", "-show_chapters", "-of", "json", &path_arg(p)]),
+            )
+        };
+        let expected = inspect(&reference)?;
+        assert!(String::from_utf8_lossy(&expected).contains("0.500000"));
+        assert_eq!(
+            String::from_utf8_lossy(&expected).contains("Private chapter"),
+            mode == "preserve"
+        );
+        assert_eq!(inspect(&native)?, expected);
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires HEVC/AV1 fixture tools; run with --ignored"]
+fn heic_heif_and_avif_stills_match_reference_rgb_pixels() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("heif_family_import")?;
+    let heic = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/input.heic");
+    let heif = sandbox.path("input.heif");
+    fs::copy(&heic, &heif).map_err(|e| e.to_string())?;
+    let avif = sandbox.path("input.avif");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=s=128x96:r=1:d=1",
+            "-frames:v",
+            "1",
+            "-c:v",
+            "libsvtav1",
+            "-preset",
+            "10",
+            "-crf",
+            "24",
+            "-f",
+            "avif",
+            &path_arg(&avif),
+        ]),
+    )?;
+    for path in [&heic, &heif, &avif] {
+        let output = sandbox.path(&format!(
+            "{}.png",
+            path.file_name().unwrap().to_string_lossy()
+        ));
+        let mut config = image_config("png", "png");
+        config.pixel_format = "rgb24".into();
+        convert(&tools, path, &output, &config)?;
+        let pixels = |p: &Path| {
+            run_tool_output(
+                &tools.ffmpeg,
+                &args(&[
+                    "-v",
+                    "error",
+                    "-i",
+                    &path_arg(p),
+                    "-map",
+                    "0:v:0",
+                    "-frames:v",
+                    "1",
+                    "-pix_fmt",
+                    "rgb24",
+                    "-f",
+                    "rawvideo",
+                    "pipe:1",
+                ]),
+            )
+        };
+        let expected = pixels(path)?;
+        assert_eq!(expected.len(), 128 * 96 * 3);
+        assert_bytes_match(&pixels(&output)?, &expected, &path_arg(path))?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires fixture tools; run with --ignored"]
+fn default_audio_track_follows_the_map_order_when_source_has_no_default() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("default_audio_disposition")?;
+    let source = sandbox.path("source.mkv");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=s=32x32:r=4:d=0.5",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=d=0.5",
+            "-map",
+            "0:v",
+            "-map",
+            "1:a",
+            "-map",
+            "1:a",
+            "-c:v",
+            "libx264",
+            "-c:a",
+            "aac",
+            "-disposition:a:0",
+            "0",
+            "-disposition:a:1",
+            "0",
+            &path_arg(&source),
+        ]),
+    )?;
+    let plan = args(&[
+        "-i",
+        &path_arg(&source),
+        "-map",
+        "0:0",
+        "-map",
+        "0:2",
+        "-map",
+        "0:1",
+        "-c",
+        "copy",
+    ]);
+    let [reference, native] = export_pair(&tools, &sandbox, "tracks", "mkv", &plan)?;
+    let inspect = |p: &Path| {
+        run_tool_output(
+            &tools.ffprobe,
+            &args(&[
+                "-v",
+                "error",
+                "-select_streams",
+                "a",
+                "-show_entries",
+                "stream_disposition=default",
+                "-of",
+                "csv=p=0",
+                &path_arg(p),
+            ]),
+        )
+    };
+    assert_eq!(inspect(&reference)?, b"1\n0\n");
+    assert_eq!(inspect(&native)?, inspect(&reference)?);
     Ok(())
 }

@@ -59,3 +59,18 @@ cargo test --locked -p frame-app --lib conversion_runner -- --ignored --test-thr
 ```
 
 Record the commit, SDK, tested package and hardware when interpreting a run. A skipped hardware case, a generated workflow or a registry entry alone provides no evidence of a successful encode on that target.
+
+## Running the device matrix on Windows
+
+From a checkout of this branch, use an x64 developer PowerShell with Python and Rust on PATH. The first command downloads the pinned SDK, builds the worker and stages its DLLs. All outputs stay under `target`.
+
+```powershell
+py -3 script/media-worker.py bundle --profile debug --bin-dir target/media-device --lib-dir target/media-device
+$env:FRAME_TEST_MEDIA_WORKER = (Resolve-Path target/media-device/frame-media.exe).Path
+py -3 script/check-media-hardware.py $env:FRAME_TEST_MEDIA_WORKER --require h264_nvenc | Tee-Object target/nvenc-device.json
+cargo xtask setup-ffmpeg
+$env:FRAME_TEST_REQUIRED_HW_ENCODERS = "h264_nvenc"
+cargo test --locked -p frame-core --test media_integration hardware_video_codecs -- --ignored --nocapture
+```
+
+The JSON records GPU model and driver when `nvidia-smi` is available, the tested worker hash, library versions and the decoded picture counts for each working encoder. The Rust test runs the application's plans for each available hardware encoder across the supported containers and bit depths. Its FFmpeg and FFprobe reference executables independently decode and inspect each file. Set `FRAME_TEST_REQUIRED_HW_ENCODERS` to a comma-separated list when a device is known to support additional encoders.

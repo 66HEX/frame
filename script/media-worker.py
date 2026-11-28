@@ -95,9 +95,12 @@ def mac_sdk(target):
             stage.rename(overlay)
     triplet = MAC_TRIPLETS[target]
     installed = CACHE / "installed"
+    archives = CACHE / "archives"
+    archives.mkdir(exist_ok=True)
     subprocess.run([checkout / "vcpkg", "install", f"--x-manifest-root={PORTS}",
                     f"--overlay-triplets={PORTS}", f"--overlay-ports={overlay}", f"--x-install-root={installed}",
-                    "--triplet", triplet], check=True)
+                    "--triplet", triplet], check=True,
+                   env=dict(os.environ, VCPKG_DEFAULT_BINARY_CACHE=str(archives)))
     return installed / triplet
 
 
@@ -157,22 +160,26 @@ def verify_no_cli(package):
             raise ValueError(f"Package includes a legacy CLI: {path.relative_to(package)}")
 
 
-def smoke(worker):
+def smoke(worker, lib_dir):
     env = {k: v for k, v in os.environ.items() if k not in {
         "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "FFMPEG_DIR"}}
     env["PATH"] = ""
     if os.name == "nt":
         # The actual installer lives beside the six DLLs. Exclude developer
         # and runner SDK directories from Windows' fallback search path.
-        env["PATH"] = str(Path(env["SystemRoot"]) / "System32")
+        env["PATH"] = str(Path(os.environ["SystemRoot"]) / "System32")
     with tempfile.TemporaryDirectory() as temporary:
         fixture = Path(temporary) / "relocation test.wav"
         with wave.open(str(fixture), "wb") as output:
             output.setparams((1, 2, 8000, 0, "NONE", ""))
             output.writeframes(bytes(1600))
-        def invoke(args):
+        def invoke(args, text=True):
             return subprocess.check_output([worker.resolve(), *args], cwd=temporary, env=env,
-                                           text=True, timeout=30)
+                                           text=text, timeout=30)
+        loaded = invoke(["capabilities", "libraries"], text=False).rstrip(b"\0").split(b"\0")
+        paths = {Path(os.fsdecode(path)).resolve(strict=True) for path in loaded}
+        if len(paths) != len(LIBRARIES) or any(path.parent != lib_dir.resolve() for path in paths):
+            raise ValueError(f"Worker loaded media libraries outside {lib_dir}: {paths}")
         encoders = invoke(["capabilities", "-encoders"])
         required = ["libx264", "libx265", "libvpx-vp9", "libsvtav1", "libopus", "libmp3lame", "libwebp"]
         if sys.platform == "darwin":
@@ -212,7 +219,7 @@ def bundle(target, sdk, bin_dir, lib_dir, profile):
     installed = [Path(shutil.copy2(path, lib_dir)) for path in runtime_libraries(sdk, target)]
     if target in MAC_TRIPLETS:
         relocate_macos(worker, installed)
-    smoke(worker)
+    smoke(worker, lib_dir)
     notices = bin_dir / "frame-media.LICENSE"
     if (sdk / "LICENSE.txt").is_file():
         shutil.copy2(sdk / "LICENSE.txt", notices)
@@ -226,15 +233,44 @@ def bundle(target, sdk, bin_dir, lib_dir, profile):
                 output.write(path.read_bytes())
 
 
+def verify_macos_images(dmg, archive):
+    def verify_app(root):
+        app = root / "Frame.app"
+        subprocess.run(["codesign", "--verify", "--deep", "--strict", app], check=True)
+        verify_no_cli(app)
+        smoke(app / "Contents/MacOS/frame-media", app / "Contents/Frameworks")
+
+    with tempfile.TemporaryDirectory(prefix="frame-package-") as temporary:
+        root = Path(temporary)
+        mount = root / "dmg"
+        mount.mkdir()
+        subprocess.run(["hdiutil", "attach", "-readonly", "-nobrowse", "-mountpoint",
+                        mount, dmg], check=True, stdout=subprocess.DEVNULL)
+        try:
+            verify_app(mount)
+        finally:
+            subprocess.run(["hdiutil", "detach", mount], check=True, stdout=subprocess.DEVNULL)
+        expanded = root / "zip"
+        subprocess.run(["ditto", "-x", "-k", archive, expanded], check=True)
+        verify_app(expanded)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("setup-ci", "bundle", "verify"))
+    parser.add_argument("action", choices=("setup-ci", "bundle", "verify", "verify-macos-images"))
     parser.add_argument("--target")
+    parser.add_argument("--dmg", type=Path)
+    parser.add_argument("--archive", type=Path)
     parser.add_argument("--bin-dir", type=Path)
     parser.add_argument("--lib-dir", type=Path)
     parser.add_argument("--package-root", type=Path)
     parser.add_argument("--profile", choices=("debug", "release"), default="release")
     args = parser.parse_args()
+    if args.action == "verify-macos-images":
+        if not args.dmg or not args.archive:
+            parser.error("verify-macos-images requires --dmg and --archive")
+        verify_macos_images(args.dmg, args.archive)
+        return
     target = args.target
     if not target:
         target = re.search(r"^host: (.+)$", subprocess.check_output(["rustc", "-vV"], text=True), re.M)[1]
@@ -243,7 +279,9 @@ def main():
     if args.action == "verify":
         if args.package_root:
             verify_no_cli(args.package_root)
-        smoke(args.bin_dir / ("frame-media.exe" if target.endswith("msvc") else "frame-media"))
+        if not args.bin_dir or not args.lib_dir:
+            parser.error("verify requires --bin-dir and --lib-dir")
+        smoke(args.bin_dir / ("frame-media.exe" if target.endswith("msvc") else "frame-media"), args.lib_dir)
         return
     sdk = sdk_for(target)
     if args.action == "setup-ci":

@@ -61,9 +61,12 @@ int frame_preview(const char *path, const char *overlay, const char *graph, cons
     int rc = 0;
     if (start && (rc = av_parse_time(&plan.start_us, start, 1)) < 0) return rc;
     if (duration && (rc = av_parse_time(&plan.duration_us, duration, 1)) < 0) return rc;
+    const int64_t duration_us = plan.duration_us;
+    if (output == RAW_BGRA && !passthrough) plan.duration_us = -1;
     FrameRenderer *renderer = NULL;
     AVFrame *frame = av_frame_alloc();
-    if (!frame) return AVERROR(ENOMEM);
+    AVFrame *previous = av_frame_alloc();
+    if (!frame || !previous) { av_frame_free(&frame); av_frame_free(&previous); return AVERROR(ENOMEM); }
     int64_t count = 0;
     int64_t clock_start = av_gettime_relative();
     rc = frame_render_open(&renderer, &plan);
@@ -84,10 +87,21 @@ int frame_preview(const char *path, const char *overlay, const char *graph, cons
             AVRational rate = av_buffersink_get_frame_rate(frame_render_sink(renderer));
             int64_t tick = !passthrough && rate.num > 0 && frame->pts != AV_NOPTS_VALUE
                 ? av_rescale_q(frame->pts, tb, av_inv_q(rate)) : count;
+            if (!passthrough && duration_us >= 0 && rate.num > 0)
+                limit = FFMIN(limit, av_rescale_q_rnd(duration_us, AV_TIME_BASE_Q, av_inv_q(rate), AV_ROUND_UP));
+            if (!passthrough && duration_us >= 0 && rate.num <= 0 && frame->pts != AV_NOPTS_VALUE &&
+                av_compare_ts(frame->pts, tb, duration_us, AV_TIME_BASE_Q) >= 0) break;
+            int64_t held = previous->buf[0] ? FFMAX(0, av_sat_sub64(av_sat_sub64(tick, count), 1)) : 0;
             int64_t copies = FFMIN(limit - count, FFMAX(1, av_sat_add64(av_sat_sub64(tick, count), 1)));
             for (int64_t i = 0; i < copies && rc >= 0; ++i) {
-                for (int row = 0; rc >= 0 && row < frame->height; ++row)
-                    rc = write_bytes(frame->data[0] + (ptrdiff_t)row * frame->linesize[0], (size_t)frame->width * 4);
+                const AVFrame *picture = i < held ? previous : frame;
+                for (int row = 0; rc >= 0 && row < picture->height; ++row)
+                    rc = write_bytes(picture->data[0] + (ptrdiff_t)row * picture->linesize[0], (size_t)picture->width * 4);
+            }
+            if (copies == 0) break;
+            if (!passthrough) {
+                av_frame_unref(previous);
+                av_frame_move_ref(previous, frame);
             }
             count += copies - 1;
         } else if (output == RAW_AUDIO) {
@@ -103,6 +117,7 @@ int frame_preview(const char *path, const char *overlay, const char *graph, cons
     if (rc >= 0 && progress && printf("frame=%" PRId64 "\nprogress=end\n", count) < 0)
         rc = AVERROR(EIO);
     if (rc >= 0 && fflush(stdout) != 0) rc = AVERROR(EIO);
+    av_frame_free(&previous);
     av_frame_free(&frame);
     frame_render_close(&renderer);
     if (rc < 0) {

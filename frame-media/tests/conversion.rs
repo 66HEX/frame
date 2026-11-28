@@ -161,7 +161,7 @@ fn unknown_export_option_fails_before_creating_output() {
     assert!(!output.exists());
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")] // APFS rejects non-UTF-8 file names.
 #[test]
 fn copy_and_completion_preserve_non_utf8_paths_and_quiet_output() {
     use std::os::unix::ffi::OsStrExt;

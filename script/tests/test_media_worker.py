@@ -1,10 +1,12 @@
 import importlib.util
+import json
 from pathlib import Path
 import os
 import shutil
 import subprocess
 import tempfile
 import unittest
+import wave
 
 SCRIPT = Path(__file__).resolve().parents[1] / "media-worker.py"
 spec = importlib.util.spec_from_file_location("media_worker", SCRIPT)
@@ -95,7 +97,38 @@ class MediaWorkerPackages(unittest.TestCase):
             relocated = root / "moved Frame ü"
             shutil.move(original, relocated)
             name = "frame-media.exe" if host.endswith("msvc") else "frame-media"
-            worker.smoke(relocated / bin_dir.relative_to(original) / name)
+            worker.smoke(relocated / bin_dir.relative_to(original) / name, relocated / lib_dir.relative_to(original))
+            if os.environ.get("FRAME_TEST_QA_RELOCATION") == "1":
+                self.check_relocated_application(relocated / bin_dir.relative_to(original))
+
+    def check_relocated_application(self, bin_dir):
+        name = "frame-qa.exe" if os.name == "nt" else "frame-qa"
+        qa = shutil.copy2(worker.TARGET_DIR / "debug" / name, bin_dir)
+        worker.verify_no_cli(bin_dir.parent)
+        with tempfile.TemporaryDirectory() as temporary:
+            data = Path(temporary)
+            source, request = data / "source ü.wav", data / "export.json"
+            samples = bytes(range(200)) * 20
+            with wave.open(str(source), "wb") as output:
+                output.setparams((1, 2, 8000, 0, "NONE", ""))
+                output.writeframes(samples)
+            request.write_text(json.dumps({
+                "input": str(source), "outputDirectory": str(data), "outputName": "result.wav",
+                "config": {"container": "wav", "audioCodec": "copy", "processingMode": "copy",
+                           "selectedAudioTracks": [0]},
+            }), encoding="utf8")
+            env = dict(os.environ)
+            for key in ("LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "FFMPEG_DIR",
+                        "FRAME_FFMPEG_PATH", "FRAME_FFPROBE_PATH"):
+                env.pop(key, None)
+            env["PATH"] = str(Path(os.environ["SystemRoot"]) / "System32") if os.name == "nt" else ""
+            events = subprocess.check_output([qa, "--export", request], cwd=data, env=env,
+                                             text=True, timeout=60)
+            self.assertTrue(any(json.loads(line).get("event") == "conversion-completed"
+                                for line in events.splitlines() if line.strip()))
+            with wave.open(str(data / "result.wav")) as result:
+                self.assertEqual(result.readframes(result.getnframes()), samples)
+
 
 
 if __name__ == "__main__":

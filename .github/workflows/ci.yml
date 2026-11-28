@@ -37,13 +37,31 @@ jobs:
         sudo find /etc/apt -maxdepth 2 -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -E -i "s|mirror\+file:/etc/apt/apt-mirrors\.txt|${ubuntu_archive}/|g;s|https?://(azure\.)?archive\.ubuntu\.com/ubuntu|${ubuntu_archive}|g" {} +
         sudo apt-get update
         sudo apt-get install -y clang desktop-file-utils libasound2-dev libdrm-dev libfontconfig1-dev libfreetype6-dev libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev pkg-config
+    - name: ci::restore_sdk_cache
+      id: sdk-cache
+      if: runner.os == 'macOS'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: target/media-sdk/archives
+        key: libav-macos-${{ runner.arch }}-${{ hashFiles('packaging/media/**', 'script/media-worker.py') }}
+        restore-keys: libav-macos-${{ runner.arch }}-
     - name: ci::setup_media_sdk
       run: python script/media-worker.py setup-ci
+    - name: ci::save_sdk_cache
+      if: runner.os == 'macOS' && steps.sdk-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: target/media-sdk/archives
+        key: ${{ steps.sdk-cache.outputs.cache-primary-key }}
     - name: ci::build_media_worker
       run: cargo build --locked --package frame-media
     - name: ci::test_media_worker
       run: cargo test --locked --package frame-media
+    - name: ci::build_app_qa
+      run: cargo build --locked --package frame-app --features qa-harness --bin frame-qa
     - name: ci::test_worker_packaging
+      env:
+        FRAME_TEST_QA_RELOCATION: '1'
       run: python -B -m unittest discover -s script/tests -p test_media_worker.py -v
     - name: security::validate_workflow_syntax
       run: |
@@ -79,9 +97,15 @@ jobs:
       run: cargo xtask setup-ffmpeg
     - name: ci::test_media_conversions
       run: cargo test --locked -p frame-core --test media_integration -- --ignored --test-threads=1
+    - name: ci::test_app
+      run: cargo test --locked -p frame-app --lib -- --test-threads=1
     - name: ci::test_conversion_runner
-      run: cargo test --locked -p frame-app conversion_runner::tests -- --ignored --test-threads=1
-    timeout-minutes: 60
+      run: cargo test --locked -p frame-app --lib conversion_runner -- --ignored --test-threads=1
+    - name: ci::test_frame_export
+      run: cargo test --locked -p frame-app --lib frame_export -- --ignored --test-threads=1
+    - name: ci::test_app_package_pipeline
+      run: cargo test --locked -p frame-app --features qa-harness --test qa_harness -- --include-ignored --test-threads=1
+    timeout-minutes: 150
   cargo_check_macos:
     name: cargo check macos
     runs-on: macos-15
@@ -96,13 +120,31 @@ jobs:
         rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
         rustup default 1.95.0
         test "$(rustc --version | awk '{print $2}')" = "1.95.0"
+    - name: ci::restore_sdk_cache
+      id: sdk-cache
+      if: runner.os == 'macOS'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: target/media-sdk/archives
+        key: libav-macos-${{ runner.arch }}-${{ hashFiles('packaging/media/**', 'script/media-worker.py') }}
+        restore-keys: libav-macos-${{ runner.arch }}-
     - name: ci::setup_media_sdk
       run: python script/media-worker.py setup-ci
+    - name: ci::save_sdk_cache
+      if: runner.os == 'macOS' && steps.sdk-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: target/media-sdk/archives
+        key: ${{ steps.sdk-cache.outputs.cache-primary-key }}
     - name: ci::build_media_worker
       run: cargo build --locked --package frame-media
     - name: ci::test_media_worker
       run: cargo test --locked --package frame-media
+    - name: ci::build_app_qa
+      run: cargo build --locked --package frame-app --features qa-harness --bin frame-qa
     - name: ci::test_worker_packaging
+      env:
+        FRAME_TEST_QA_RELOCATION: '1'
       run: python -B -m unittest discover -s script/tests -p test_media_worker.py -v
     - name: ci::check_macos
       run: cargo check --manifest-path frame-app/Cargo.toml --locked
@@ -110,7 +152,15 @@ jobs:
       run: cargo xtask setup-ffmpeg
     - name: ci::test_media_conversions
       run: cargo test --locked -p frame-core --test media_integration -- --ignored --test-threads=1
-    timeout-minutes: 60
+    - name: ci::test_app
+      run: cargo test --locked -p frame-app --lib -- --test-threads=1
+    - name: ci::test_conversion_runner
+      run: cargo test --locked -p frame-app --lib conversion_runner -- --ignored --test-threads=1
+    - name: ci::test_frame_export
+      run: cargo test --locked -p frame-app --lib frame_export -- --ignored --test-threads=1
+    - name: ci::test_app_package_pipeline
+      run: cargo test --locked -p frame-app --features qa-harness --test qa_harness -- --include-ignored --test-threads=1
+    timeout-minutes: 150
   cargo_check_windows:
     name: cargo check windows
     runs-on: windows-2022
@@ -125,13 +175,31 @@ jobs:
         rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
         rustup default 1.95.0
         test "$(rustc --version | awk '{print $2}')" = "1.95.0"
+    - name: ci::restore_sdk_cache
+      id: sdk-cache
+      if: runner.os == 'macOS'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: target/media-sdk/archives
+        key: libav-macos-${{ runner.arch }}-${{ hashFiles('packaging/media/**', 'script/media-worker.py') }}
+        restore-keys: libav-macos-${{ runner.arch }}-
     - name: ci::setup_media_sdk
       run: python script/media-worker.py setup-ci
+    - name: ci::save_sdk_cache
+      if: runner.os == 'macOS' && steps.sdk-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: target/media-sdk/archives
+        key: ${{ steps.sdk-cache.outputs.cache-primary-key }}
     - name: ci::build_media_worker
       run: cargo build --locked --package frame-media
     - name: ci::test_media_worker
       run: cargo test --locked --package frame-media
+    - name: ci::build_app_qa
+      run: cargo build --locked --package frame-app --features qa-harness --bin frame-qa
     - name: ci::test_worker_packaging
+      env:
+        FRAME_TEST_QA_RELOCATION: '1'
       run: python -B -m unittest discover -s script/tests -p test_media_worker.py -v
     - name: ci::check_windows
       run: cargo check --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --locked
@@ -146,7 +214,15 @@ jobs:
       run: cargo xtask setup-ffmpeg
     - name: ci::test_media_conversions
       run: cargo test --locked -p frame-core --test media_integration -- --ignored --test-threads=1
-    timeout-minutes: 90
+    - name: ci::test_app
+      run: cargo test --locked -p frame-app --lib -- --test-threads=1
+    - name: ci::test_conversion_runner
+      run: cargo test --locked -p frame-app --lib conversion_runner -- --ignored --test-threads=1
+    - name: ci::test_frame_export
+      run: cargo test --locked -p frame-app --lib frame_export -- --ignored --test-threads=1
+    - name: ci::test_app_package_pipeline
+      run: cargo test --locked -p frame-app --features qa-harness --test qa_harness -- --include-ignored --test-threads=1
+    timeout-minutes: 150
   media_other_architectures:
     strategy:
       fail-fast: false
@@ -164,16 +240,53 @@ jobs:
         rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
         rustup default 1.95.0
         test "$(rustc --version | awk '{print $2}')" = "1.95.0"
+    - name: steps::setup_linux
+      if: runner.os == 'Linux'
+      run: |
+        ubuntu_archive='https://archive.ubuntu.com/ubuntu'
+        if ! getent ahosts archive.ubuntu.com >/dev/null; then
+          ubuntu_archive='https://mirrors.edge.kernel.org/ubuntu'
+        fi
+        echo "Using Ubuntu archive: $ubuntu_archive"
+        sudo find /etc/apt -maxdepth 2 -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -E -i "s|mirror\+file:/etc/apt/apt-mirrors\.txt|${ubuntu_archive}/|g;s|https?://(azure\.)?archive\.ubuntu\.com/ubuntu|${ubuntu_archive}|g" {} +
+        sudo apt-get update
+        sudo apt-get install -y clang desktop-file-utils libasound2-dev libdrm-dev libfontconfig1-dev libfreetype6-dev libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev pkg-config
+    - name: ci::restore_sdk_cache
+      id: sdk-cache
+      if: runner.os == 'macOS'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: target/media-sdk/archives
+        key: libav-macos-${{ runner.arch }}-${{ hashFiles('packaging/media/**', 'script/media-worker.py') }}
+        restore-keys: libav-macos-${{ runner.arch }}-
     - name: ci::setup_media_sdk
       run: python script/media-worker.py setup-ci
+    - name: ci::save_sdk_cache
+      if: runner.os == 'macOS' && steps.sdk-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: target/media-sdk/archives
+        key: ${{ steps.sdk-cache.outputs.cache-primary-key }}
     - name: ci::build_media_worker
       run: cargo build --locked --package frame-media
     - name: ci::test_media_worker
       run: cargo test --locked --package frame-media
+    - name: ci::build_app_qa
+      run: cargo build --locked --package frame-app --features qa-harness --bin frame-qa
     - name: ci::test_worker_packaging
+      env:
+        FRAME_TEST_QA_RELOCATION: '1'
       run: python -B -m unittest discover -s script/tests -p test_media_worker.py -v
     - name: ci::setup_ffmpeg
       run: cargo xtask setup-ffmpeg
     - name: ci::test_media_conversions
       run: cargo test --locked -p frame-core --test media_integration -- --ignored --test-threads=1
-    timeout-minutes: 90
+    - name: ci::test_app
+      run: cargo test --locked -p frame-app --lib -- --test-threads=1
+    - name: ci::test_conversion_runner
+      run: cargo test --locked -p frame-app --lib conversion_runner -- --ignored --test-threads=1
+    - name: ci::test_frame_export
+      run: cargo test --locked -p frame-app --lib frame_export -- --ignored --test-threads=1
+    - name: ci::test_app_package_pipeline
+      run: cargo test --locked -p frame-app --features qa-harness --test qa_harness -- --include-ignored --test-threads=1
+    timeout-minutes: 150

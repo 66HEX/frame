@@ -145,7 +145,7 @@ jobs:
           # Preserve downstream changes, including nixfmt's shared cargoFlags list.
           perl -0pi -e 's/(cargo(?:Build|Test)?Flags\s*=\s*\[[^\]]*?"frame-app")(?![^\]]*"frame-media")/$1 "--package" "frame-media"/gs' "$package_path"
           perl -0pi -e 's/(\bbuildInputs\s*=\s*\[)(?![^\]]*\bffmpeg\b)/$1 ffmpeg/gs' "$package_path"
-          sed -i '/--prefix PATH : ${lib.makeBinPath \[ ffmpeg \]}/d; /--set FRAME_USE_SYSTEM_MEDIA_TOOLS 1/d' "$package_path"
+          sed -i '/--prefix PATH : [$]{lib.makeBinPath \[ ffmpeg \]}/d; /--set FRAME_USE_SYSTEM_MEDIA_TOOLS 1/d' "$package_path"
           grep -q '"frame-media"' "$package_path"
         else
           mkdir -p "$(dirname "$package_path")"

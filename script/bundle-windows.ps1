@@ -122,7 +122,7 @@ if (-not $PackageOnly) {
 & "$PSScriptRoot\check-windows-subsystem.ps1" -Path "$InnoDir\Frame.exe"
 
 if ($PackageOnly) {
-    Invoke-Checked python "$RepoRoot/script/media-worker.py" verify --target $Target --bin-dir $InnoDir --package-root $InnoDir
+    Invoke-Checked python "$RepoRoot/script/media-worker.py" verify --target $Target --bin-dir $InnoDir --lib-dir $InnoDir --package-root $InnoDir
 }
 
 if ($PrepareOnly) {

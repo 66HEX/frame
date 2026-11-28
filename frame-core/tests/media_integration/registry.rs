@@ -23,6 +23,58 @@ fn rules() -> Value {
 #[test]
 #[ignore = "requires release codecs, the Frame worker and independent reference tools"]
 fn software_video_codecs_and_explicit_pixel_formats_in_every_container() -> TestResult {
+    check_video_registry(None)
+}
+
+#[test]
+#[ignore = "runs a real encode for each hardware encoder available on this machine"]
+fn hardware_video_codecs_and_explicit_pixel_formats_in_every_container() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let mut available = Vec::new();
+    for name in [
+        "h264_videotoolbox",
+        "hevc_videotoolbox",
+        "h264_nvenc",
+        "hevc_nvenc",
+        "av1_nvenc",
+    ] {
+        let mut child = Command::new(tools.worker.as_ref().unwrap())
+            .args(["capabilities", "hardware", name, "0"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(&[0; 128 * 128 * 3 / 2])
+            .map_err(|e| e.to_string())?;
+        let result = child.wait_with_output().map_err(|e| e.to_string())?;
+        if result.status.success() {
+            assert!(String::from_utf8_lossy(&result.stdout).contains("progress=end"));
+            available.push(name);
+        } else {
+            eprintln!(
+                "{name} unavailable: {}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+        }
+    }
+    if let Ok(required) = env::var("FRAME_TEST_REQUIRED_HW_ENCODERS") {
+        for name in required.split(',') {
+            assert!(
+                available.contains(&name),
+                "required device encoder {name} unavailable"
+            );
+        }
+    }
+    eprintln!("Testing working device encoders {available:?}");
+    check_video_registry(Some(&available))
+}
+
+fn check_video_registry(hardware: Option<&[&str]>) -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("video-registry")?;
     let input = sandbox.path("source.mp4");
@@ -33,8 +85,11 @@ fn software_video_codecs_and_explicit_pixel_formats_in_every_container() -> Test
             continue;
         };
         for encoder in encoders {
-            if encoder.ends_with("_nvenc") || encoder.ends_with("_videotoolbox") {
-                // Operational hardware is tested separately on a matching device.
+            let use_encoder = match hardware {
+                Some(available) => available.contains(&encoder.as_str()),
+                None => !encoder.ends_with("_nvenc") && !encoder.ends_with("_videotoolbox"),
+            };
+            if !use_encoder {
                 continue;
             }
             let formats = rules["containerEncoderPixelFormatCompatibility"]
@@ -51,7 +106,11 @@ fn software_video_codecs_and_explicit_pixel_formats_in_every_container() -> Test
                 );
                 config.pixel_format = format.into();
                 config.fps = "30".into();
-                config.hw_decode = false;
+                config.hw_decode = hardware.is_some();
+                if encoder.ends_with("_nvenc") {
+                    config.nvenc_spatial_aq = true;
+                    config.nvenc_temporal_aq = true;
+                }
                 let output = sandbox.path(&format!("{encoder}-{format}.{container}"));
                 convert(&tools, &input, &output, &config)
                     .map_err(|e| format!("{container}/{encoder}/{format}: {e}"))?;

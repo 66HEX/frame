@@ -1,5 +1,6 @@
 #include "render.h"
 #include "media_clock.h"
+#include "shared_input.h"
 #include <errno.h>
 #include <math.h>
 #include <string.h>
@@ -11,9 +12,12 @@
 #include <libavutil/display.h>
 #include <libavutil/hwcontext.h>
 #include <libavutil/opt.h>
+#include <libavutil/pixdesc.h>
+#include <libavutil/samplefmt.h>
 
 typedef struct {
     AVFormatContext *format;
+    AVIOContext *cursor;
     AVCodecContext *decoder;
     AVStream *stream;
     AVPacket *packet;
@@ -35,6 +39,7 @@ struct FrameRenderer {
     FrameRenderPlan filter_plan;
     char *graph_text, *tail_text;
     int initial_width, initial_height;
+    char *output_format;
 };
 
 static enum AVPixelFormat select_device_format(AVCodecContext *codec, const enum AVPixelFormat *formats)
@@ -49,7 +54,16 @@ static int open_input(RenderInput *input, const char *path, enum AVMediaType typ
                       int64_t start_us, const FrameRenderPlan *plan, int primary)
 {
     input->strict = plan->strict;
-    int rc = avformat_open_input(&input->format, path, NULL, NULL);
+    int rc;
+    if (primary && plan->shared_file) {
+        rc = frame_media_cursor_open(plan->shared_file, &input->cursor);
+        if (rc < 0) return rc;
+        input->format = avformat_alloc_context();
+        if (!input->format) return AVERROR(ENOMEM);
+        input->format->pb = input->cursor;
+        input->format->flags |= AVFMT_FLAG_CUSTOM_IO;
+    }
+    rc = avformat_open_input(&input->format, path, NULL, NULL);
     if (rc < 0) return rc;
     if ((rc = avformat_find_stream_info(input->format, NULL)) < 0) return rc;
     if (index < 0) {
@@ -126,6 +140,10 @@ static int next_decoded(RenderInput *in)
                 av_frame_free(&software);
                 if (rc < 0) return rc;
             }
+            // abuffer guesses a standard layout when the demuxer supplies only
+            // a channel count. Compare and feed the same canonical layout.
+            if (in->frame->nb_samples && in->frame->ch_layout.order == AV_CHANNEL_ORDER_UNSPEC)
+                av_channel_layout_default(&in->frame->ch_layout, in->frame->ch_layout.nb_channels);
             int64_t pts = in->frame->best_effort_timestamp;
             in->frame->pts = pts == AV_NOPTS_VALUE ? in->end_pts : av_sat_sub64(pts, in->origin);
             int64_t duration = in->frame->duration;
@@ -263,6 +281,8 @@ static int configure_graph(FrameRenderer *r, const FrameRenderPlan *p)
             snprintf(size, sizeof(size), "w=%d:h=%d", r->initial_width, r->initial_height);
             rc = add_filter(r->graph, &last, "scale", size);
         }
+        if (rc >= 0 && r->output_format)
+            rc = add_filter(r->graph, &last, p->audio ? "aformat" : "format", r->output_format);
         if (rc >= 0 && p->duration_us >= 0) {
             char duration[80];
             snprintf(duration, sizeof(duration), "end=%" PRId64 "us", p->duration_us);
@@ -281,9 +301,9 @@ done:
 }
 
 // Filters can buffer pictures (fps, deinterlace, palette generation). Their
-// old state belongs to the old format. Keep the last overlay so a one-frame
-// logo remains available when the primary stream changes dimensions.
-static int rebuild_graph(FrameRenderer *r)
+// old state belongs to the old format. Reuse input format descriptors, but
+// only submit pictures that have not already been consumed by the old graph.
+static int rebuild_graph(FrameRenderer *r, RenderInput *changed)
 {
     avfilter_graph_free(&r->graph);
     r->graph = avfilter_graph_alloc();
@@ -292,7 +312,7 @@ static int rebuild_graph(FrameRenderer *r)
     int rc = configure_graph(r, &r->filter_plan);
     for (int i = 0; rc >= 0 && i < r->count; ++i) {
         RenderInput *in = &r->inputs[i];
-        rc = av_buffersrc_write_frame(in->source, in->last);
+        if (!changed || changed == in) rc = av_buffersrc_add_frame_flags(in->source, in->last, AV_BUFFERSRC_FLAG_KEEP_REF | AV_BUFFERSRC_FLAG_PUSH);
         if (rc >= 0 && in->closed) rc = av_buffersrc_close(in->source, in->end_pts, 0);
     }
     return rc;
@@ -333,11 +353,24 @@ int frame_render_open(FrameRenderer **result, const FrameRenderPlan *plan)
                  r->inputs[i].frame->pts < 0);
         av_frame_move_ref(r->inputs[i].last, r->inputs[i].frame);
     }
-    if ((rc = rebuild_graph(r)) < 0) goto fail;
+    if ((rc = rebuild_graph(r, NULL)) < 0) goto fail;
     if (!plan->audio) {
         r->initial_width = av_buffersink_get_w(r->sink);
         r->initial_height = av_buffersink_get_h(r->sink);
+        r->output_format = av_asprintf("pix_fmts=%s", av_get_pix_fmt_name(av_buffersink_get_format(r->sink)));
+    } else {
+        AVChannelLayout layout = {0};
+        char channels[512];
+        rc = av_buffersink_get_ch_layout(r->sink, &layout);
+        if (rc >= 0) rc = av_channel_layout_describe(&layout, channels, sizeof(channels));
+        av_channel_layout_uninit(&layout);
+        if (rc < 0) goto fail;
+        if ((size_t)rc >= sizeof(channels)) { rc = AVERROR(ENOSPC); goto fail; }
+        r->output_format = av_asprintf("sample_fmts=%s:sample_rates=%d:channel_layouts=%s",
+                av_get_sample_fmt_name(av_buffersink_get_format(r->sink)),
+                av_buffersink_get_sample_rate(r->sink), channels);
     }
+    if (!r->output_format) { rc = AVERROR(ENOMEM); goto fail; }
     *result = r;
     return 0;
 fail:
@@ -347,11 +380,14 @@ fail:
 
 AVFilterContext *frame_render_sink(FrameRenderer *r) { return r->sink; }
 
-int frame_render_samples(FrameRenderer *r, AVFrame *frame, AVRational *tb, int samples)
+int frame_render_next(FrameRenderer *r, AVFrame *frame, AVRational *tb)
 {
-    *tb = av_buffersink_get_time_base(r->sink);
     for (;;) {
-        int rc = samples ? av_buffersink_get_samples(r->sink, frame, samples) : av_buffersink_get_frame(r->sink, frame);
+        *tb = av_buffersink_get_time_base(r->sink);
+        int rc = av_buffersink_get_frame_flags(r->sink, frame, AV_BUFFERSINK_FLAG_NO_REQUEST);
+        if (rc != AVERROR(EAGAIN)) return rc;
+        rc = avfilter_graph_request_oldest(r->graph);
+        if (rc >= 0) continue;
         if (rc != AVERROR(EAGAIN)) return rc;
         RenderInput *feed = NULL;
         for (int i = 0; i < r->count; ++i) {
@@ -368,16 +404,12 @@ int frame_render_samples(FrameRenderer *r, AVFrame *frame, AVRational *tb, int s
             int reconfigure = changed_format(feed->last, feed->frame);
             av_frame_unref(feed->last);
             av_frame_move_ref(feed->last, feed->frame);
-            rc = reconfigure ? rebuild_graph(r) : av_buffersrc_write_frame(feed->source, feed->last);
+            rc = reconfigure ? rebuild_graph(r, feed) : av_buffersrc_add_frame_flags(feed->source, feed->last, AV_BUFFERSRC_FLAG_KEEP_REF | AV_BUFFERSRC_FLAG_PUSH);
         }
         if (rc < 0) return rc;
     }
 }
 
-int frame_render_next(FrameRenderer *r, AVFrame *frame, AVRational *tb)
-{
-    return frame_render_samples(r, frame, tb, 0);
-}
 
 void frame_render_close(FrameRenderer **renderer)
 {
@@ -391,7 +423,9 @@ void frame_render_close(FrameRenderer **renderer)
         av_frame_free(&r->inputs[i].frame);
         avcodec_free_context(&r->inputs[i].decoder);
         avformat_close_input(&r->inputs[i].format);
+        frame_media_cursor_close(&r->inputs[i].cursor);
     }
+    av_free(r->output_format);
     av_free(r->graph_text);
     av_free(r->tail_text);
     av_freep(renderer);

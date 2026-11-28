@@ -178,14 +178,19 @@ fn ffmpeg_audio_drain_does_not_end_a_longer_video() {
     with_watchdog(move || {
         let session = PreviewSession::start(config).expect("AV session");
         session.command(PreviewCommand::Play).expect("AV Play");
-        thread::sleep(Duration::from_millis(350));
-        let snapshot = session.snapshot();
-        assert!(snapshot.playback.playing, "audio EOF must not end video");
-        assert!(snapshot.runtime_metrics.audio_samples_queued > 0);
-        assert_eq!(
-            snapshot.runtime_metrics.audio_samples_consumed,
-            snapshot.runtime_metrics.audio_samples_queued
-        );
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let snapshot = loop {
+            let snapshot = session.snapshot();
+            assert!(snapshot.playback.playing, "audio EOF must not end video");
+            let metrics = &snapshot.runtime_metrics;
+            if metrics.audio_samples_queued > 0
+                && metrics.audio_samples_consumed == metrics.audio_samples_queued
+            {
+                break snapshot;
+            }
+            assert!(Instant::now() < deadline, "short audio track did not drain");
+            thread::sleep(Duration::from_millis(2));
+        };
         wait_for_end(&session);
         assert_eq!(
             session.snapshot().runtime_metrics.audio_samples_consumed,
