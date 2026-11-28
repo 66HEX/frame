@@ -8,7 +8,7 @@
       "default-features": false,
       "features": [
         "ass", "avcodec", "avfilter", "avformat", "bzip2", "dav1d", "drawtext",
-        "fontconfig", "gpl", "iconv", "lzma", "mp3lame", "opus", "svt-av1",
+        "fontconfig", "gpl", "iconv", "jxl", "lzma", "mp3lame", "opus", "svt-av1",
         "swresample", "swscale", "version3", "vorbis", "vpx", "webp", "x264",
         "x265", "zlib"
       ]

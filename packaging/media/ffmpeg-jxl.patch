@@ -1,0 +1,29 @@
+--- a/vcpkg.json
++++ b/vcpkg.json
+@@ -476,6 +476,12 @@
+         "libilbc"
+       ]
+     },
++    "jxl": {
++      "description": "JPEG XL encoding and decoding",
++      "dependencies": [
++        "libjxl"
++      ]
++    },
+     "lzma": {
+       "description": "lzma support",
+       "dependencies": [
+--- a/portfile.cmake
++++ b/portfile.cmake
+@@ -556,6 +556,11 @@
+     set(OPTIONS "${OPTIONS} --enable-vulkan")
+ else()
+     set(OPTIONS "${OPTIONS} --disable-vulkan")
++endif()
++
++if("jxl" IN_LIST FEATURES)
++    # Frame links codec dependencies statically into its shared macOS libavcodec.
++    string(APPEND OPTIONS " --enable-libjxl --pkg-config-flags=--static --extra-libs=-lc++")
+ endif()
+ 
+ if("webp" IN_LIST FEATURES)

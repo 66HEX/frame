@@ -81,12 +81,15 @@ def mac_sdk(target):
     # dependencies to prevent accidental linkage to a developer's Homebrew.
     libass["dependencies"].append("libunibreak")
     libass["dependencies"].append({"name": "fontconfig", "platform": "osx"})
+    jxl_patch = PORTS / "ffmpeg-jxl.patch"
     libass_manifest = json.dumps(libass).encode()
-    overlay = overlay / hashlib.sha256(extra + libass_manifest).hexdigest()
+    overlay = overlay / hashlib.sha256(extra + libass_manifest + jxl_patch.read_bytes()).hexdigest()
     if not overlay.exists():
         overlay.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=overlay.parent) as temporary:
             stage = Path(temporary) / "ports"
+            shutil.copytree(checkout / "ports/ffmpeg", stage / "ffmpeg")
+            subprocess.run(["patch", "-p1", "-i", jxl_patch], cwd=stage / "ffmpeg", check=True)
             shutil.copytree(checkout / "ports/x265", stage / "x265")
             shutil.copytree(checkout / "ports/libass", stage / "libass")
             (stage / "libass/vcpkg.json").write_bytes(libass_manifest)
@@ -181,7 +184,7 @@ def smoke(worker, lib_dir):
         if len(paths) != len(LIBRARIES) or any(path.parent != lib_dir.resolve() for path in paths):
             raise ValueError(f"Worker loaded media libraries outside {lib_dir}: {paths}")
         encoders = invoke(["capabilities", "-encoders"])
-        required = ["libx264", "libx265", "libvpx-vp9", "libsvtav1", "libopus", "libmp3lame", "libwebp"]
+        required = ["libx264", "libx265", "libvpx-vp9", "libsvtav1", "libopus", "libmp3lame", "libwebp", "libjxl"]
         if sys.platform == "darwin":
             required.extend(["h264_videotoolbox", "hevc_videotoolbox"])
         if sys.platform == "win32":
@@ -193,6 +196,18 @@ def smoke(worker, lib_dir):
         for name in ("subtitles", "deshake", "palettegen", "paletteuse", "loudnorm"):
             if not re.search(r"\b" + name + r"\b", filters):
                 raise ValueError(f"SDK missing filter {name}")
+        # Exercise the codec and preserve hidden RGB under fully transparent pixels.
+        image = Path(temporary) / "alpha.pam"
+        encoded = image.with_suffix(".jxl")
+        rgba = bytes((40, 72, 240, 0, 19, 111, 53, 127, 201, 9, 18, 255))
+        image.write_bytes(b"P7\nWIDTH 3\nHEIGHT 1\nDEPTH 4\nMAXVAL 255\nTUPLTYPE RGB_ALPHA\nENDHDR\n" + rgba)
+        invoke(["convert", "-i", image, "-map", "0:v:0", "-c:v", "libjxl", "-distance", "0",
+                "-frames:v", "1", "-update", "1", "-n", encoded])
+        decoded = invoke(["preview", "-i", encoded, "-map", "0:v:0", "-pix_fmt", "bgra",
+                          "-f", "rawvideo", "pipe:1"], text=False)
+        expected = bytes(rgba[i + c] for i in range(0, len(rgba), 4) for c in (2, 1, 0, 3))
+        if decoded != expected:
+            raise ValueError("Packaged JPEG XL lossless export changed RGBA samples")
         info = json.loads(invoke(["probe", "metadata", fixture]))
         if info["streams"][0]["codec_name"] != "pcm_s16le":
             raise ValueError("Packaged worker failed PCM probe")
