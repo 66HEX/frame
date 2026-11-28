@@ -137,7 +137,7 @@ fn zero_tail_requires_native_repair_identity_and_unknown_never_becomes_ordinary(
     let fixture = Fixture::new(Some(0));
     let report = fixture.run(&|| false, &mut |_| {});
     assert!(
-        matches!(&report.result, Err(Failure::Invalid(detail)) if detail.contains("native FFmpeg"))
+        matches!(&report.result, Err(Failure::Invalid(detail)) if detail.contains("media worker identity"))
     );
     assert_eq!(fixture.calls(), 1);
     fs::write(fixture.root.join("manifest"), b"partial protocol\n").unwrap();
