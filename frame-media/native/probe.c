@@ -102,6 +102,9 @@ static void video_fields(AVFormatContext *format, AVStream *stream)
     AVRational sar = av_guess_sample_aspect_ratio(format, stream, NULL);
     if (sar.num) printf(",\"sample_aspect_ratio\":\"%d:%d\"", sar.num, sar.den);
     string_field("pix_fmt", av_get_pix_fmt_name(p->format));
+    const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(p->format);
+    if (desc && desc->nb_components)
+        printf(",\"component_depth\":%d", desc->comp[0].depth);
     if (p->color_range != AVCOL_RANGE_UNSPECIFIED)
         string_field("color_range", av_color_range_name(p->color_range));
     if (p->color_space != AVCOL_SPC_UNSPECIFIED)

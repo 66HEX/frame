@@ -317,6 +317,8 @@ pub struct ProbeMetadata {
     #[serde(default)]
     pub tags: Option<FfprobeTags>,
     pub pixel_format: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub component_depth: Option<u8>,
     pub color_space: Option<String>,
     pub color_range: Option<String>,
     pub color_primaries: Option<String>,
@@ -707,6 +709,7 @@ pub struct FfprobeStream {
     pub channel_layout: Option<String>,
     pub tags: Option<FfprobeTags>,
     pub pix_fmt: Option<String>,
+    pub component_depth: Option<u8>,
     pub color_space: Option<String>,
     pub color_range: Option<String>,
     pub color_primaries: Option<String>,

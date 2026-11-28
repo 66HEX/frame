@@ -80,12 +80,7 @@ fn software_alternative(
     }
     if config.pixel_format == "auto" {
         // Match the 4:2:0 output family of the selected hardware encoder.
-        config.pixel_format = if codec != "libx264"
-            && probe
-                .pixel_format
-                .as_deref()
-                .is_some_and(|f| f.contains("10") || f.contains("12") || f.contains("16"))
-        {
+        config.pixel_format = if codec != "libx264" && probe.component_depth? > 8 {
             "yuv420p10le"
         } else {
             "yuv420p"

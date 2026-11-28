@@ -112,6 +112,7 @@ fn metadata_from_ffprobe(
         metadata.video_stream_index = Some(video_stream.index);
         metadata.video_codec.clone_from(&video_stream.codec_name);
         metadata.pixel_format.clone_from(&video_stream.pix_fmt);
+        metadata.component_depth = video_stream.component_depth;
         metadata.color_space.clone_from(&video_stream.color_space);
         metadata.color_range.clone_from(&video_stream.color_range);
         metadata

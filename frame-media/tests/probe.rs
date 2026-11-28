@@ -47,6 +47,7 @@ fn metadata_preserves_display_rotation_audio_and_subtitle_mapping() {
     let info = metadata(&fixture("rotated.mp4"));
     assert_eq!(info.video_stream_index, Some(0));
     assert_eq!(info.pixel_format.as_deref(), Some("yuv420p"));
+    assert_eq!(info.component_depth, Some(8));
     assert_eq!(info.profile.as_deref(), Some("Constrained Baseline"));
     assert_eq!((info.width, info.height), (Some(32), Some(48)));
     assert_eq!(info.frame_rate, Some(12.0));
