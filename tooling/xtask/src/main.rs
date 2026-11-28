@@ -2052,9 +2052,7 @@ __UBUNTU_ARCHIVE_SELECTION__
         .replace("__UBUNTU_ARCHIVE_SUBSTITUTIONS__", UBUNTU_ARCHIVE_SUBSTITUTIONS)
 }
 
-fn ci_workflow() -> String {
-    render_workflow(
-        &r"# Generated from xtask::workflows::ci
+const CI_WORKFLOW_TEMPLATE: &str = r"# Generated from xtask::workflows::ci
 # Rebuild with `cargo xtask workflows`.
 name: ci
 on:
@@ -2191,14 +2189,21 @@ __CI_MEDIA_TESTS__
     - name: ci::build_and_test_flathub_package
       run: dbus-run-session -- python3 script/test-flathub-package.py
     timeout-minutes: 120
-"
-        .replace("__CI_WORKER_TESTS__", CI_WORKER_TESTS)
-        .replace("__CI_LINUX_SETUP__", &linux_ci_setup_step())
-        .replace(
-            "__CI_OTHER_LINUX_SETUP__",
-            &linux_ci_setup_step().replace("      run: |", "      if: runner.os == 'Linux'\n      run: |"),
-        )
-        .replace("__CI_MEDIA_TESTS__", ci_media_test_steps()),
+";
+
+fn ci_workflow() -> String {
+    render_workflow(
+        &CI_WORKFLOW_TEMPLATE
+            .replace("__CI_WORKER_TESTS__", CI_WORKER_TESTS)
+            .replace("__CI_LINUX_SETUP__", &linux_ci_setup_step())
+            .replace(
+                "__CI_OTHER_LINUX_SETUP__",
+                &linux_ci_setup_step().replace(
+                    "      run: |",
+                    "      if: runner.os == 'Linux'\n      run: |",
+                ),
+            )
+            .replace("__CI_MEDIA_TESTS__", ci_media_test_steps()),
     )
 }
 
