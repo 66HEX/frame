@@ -2,6 +2,7 @@
 #define FRAME_CONVERT_H
 #include "media_clock.h"
 #include "render.h"
+#include "hardware.h"
 #include "shared_input.h"
 #include <errno.h>
 #include <inttypes.h>
@@ -40,7 +41,7 @@ typedef struct {
     Source *sources;
     int options_len, sources_len;
     const char *output;
-    int video_pass;
+    int video_pass, preflight;
     const char *stats_path;
     char *vpx_stats;
     int64_t duration;
@@ -63,6 +64,7 @@ typedef struct {
     AVPacket *next, *raw, *filtered_input;
     AVRational packet_tb;
     FrameRenderer *render;
+    FrameHardwareRoute route;
     AVCodecContext *encoder, *subdecoder;
     AVFrame *frame, *audio_input;
     AVRational audio_input_tb;

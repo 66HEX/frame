@@ -294,6 +294,7 @@ static void free_track(ConvertTrack *t) {
     av_frame_free(&t->cadence.current);
     av_bsf_free(&t->bsf);
     frame_render_close(&t->render);
+    av_buffer_unref(&t->route.device);
     avcodec_free_context(&t->encoder);
     avcodec_free_context(&t->subdecoder);
 }
@@ -474,6 +475,38 @@ static int convert(ConvertPlan *p, AVFormatContext **outp, ConvertTrack *tracks,
         for (int k = 0; k < *count - 1; ++k)
             track->ordinal += tracks[k].kind == track->kind;
     }
+    if (p->preflight) {
+        for (int i = 0; i < *count; ++i) {
+            ConvertTrack *t = &tracks[i];
+            if (t->kind != 'v')
+                continue;
+            if ((err = configure_track(p, t, out)) < 0)
+                return err;
+            if (!t->encoder)
+                return AVERROR(EINVAL);
+            // Some codecs only allocate their hardware session on first send.
+            // Drain the first filtered picture independently of encoder delay.
+            t->frame_limit = 1;
+            err = frame_read_encoded(t, t->next);
+            if (err < 0)
+                return err;
+            if (t->next->size <= 0)
+                return AVERROR_INVALIDDATA;
+            const FrameHardwareRoute *r = &t->route;
+            // All strings originate from libav registries or the typed route,
+            // including the numeric render node/adapter ID.
+            printf("{\"encoder\":\"%s\",\"decoder\":\"%s\",\"filters\":\"cpu\","
+                   "\"upload\":%s,\"device\":\"%s\",\"format\":\"%s\",\"fallback\":",
+                   t->encoder->codec->name, r->decoder, r->upload ? "true" : "false",
+                   r->device_name, av_get_pix_fmt_name(r->sample_format));
+            if (r->fallback)
+                printf("\"%s\"}\n", r->fallback);
+            else
+                puts("null}");
+            return fflush(stdout) ? AVERROR(EIO) : 0;
+        }
+        return AVERROR_STREAM_NOT_FOUND;
+    }
     const int64_t duration = output_duration(p, tracks, *count);
     const char *two_pass = frame_plan_opt(p, "frame_two_pass");
     if (two_pass) {
@@ -496,6 +529,13 @@ static int convert(ConvertPlan *p, AVFormatContext **outp, ConvertTrack *tracks,
             return 0;
         if (err < 0)
             return err;
+        const ConvertTrack *t = &tracks[i];
+        if (t->kind == 'v' && t->encoder &&
+            (frame_plan_opt(p, "hwaccel") || t->route.device || frame_plan_opt(p, "frame_decoder")))
+            fprintf(stderr, "Video route: decoder=%s filters=cpu samples=%s upload=%s encoder=%s device=%s%s%s\n",
+                    t->route.decoder, av_get_pix_fmt_name(t->route.sample_format),
+                    t->route.upload ? "yes" : "no", t->encoder->codec->name, t->route.device_name,
+                    t->route.fallback ? " fallback=" : "", t->route.fallback ? t->route.fallback : "");
     }
     if (!*count)
         return AVERROR_STREAM_NOT_FOUND;
@@ -513,8 +553,8 @@ static int convert(ConvertPlan *p, AVFormatContext **outp, ConvertTrack *tracks,
     return err;
 }
 
-int frame_convert(int argc, const char *const *argv, void *io) {
-    ConvertPlan p = {0};
+int frame_convert(int argc, const char *const *argv, void *io, int preflight) {
+    ConvertPlan p = {.preflight = preflight};
     AVIOContext *pb = NULL;
     AVFormatContext *out = NULL;
     ConvertTrack *tracks = NULL;

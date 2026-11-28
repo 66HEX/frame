@@ -7,10 +7,14 @@ fn main() -> ExitCode {
     let args: Vec<_> = args.collect();
     let result = match operation.as_deref().and_then(OsStr::to_str) {
         Some("convert") => frame_media::conversion::run(&args),
+        Some("preflight") => frame_media::conversion::preflight(&args),
         Some("preview") => frame_media::preview::run(&args),
         Some("probe") => frame_media::probe::run(&args),
         Some("capabilities") => frame_media::capabilities::run(&args),
-        _ => Err("Expected a Frame media operation (convert, preview, probe, capabilities)".into()),
+        _ => Err(
+            "Expected a Frame media operation (convert, preflight, preview, probe, capabilities)"
+                .into(),
+        ),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

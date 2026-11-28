@@ -56,6 +56,10 @@ static int append_constraints(const ConvertPlan *p, const ConvertTrack *t, const
     int err;
     if (t->kind == 'v') {
         const char *fixed = frame_plan_opt(p, "pix_fmt");
+        if (t->route.device) {
+            av_bprintf(tail, "format=pix_fmts=%s", av_get_pix_fmt_name(t->route.sample_format));
+            return av_bprint_is_complete(tail) ? 0 : AVERROR(ENOMEM);
+        }
         const enum AVPixelFormat *fmts = NULL;
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
         if ((err = avcodec_get_supported_config(NULL, codec, AV_CODEC_CONFIG_PIX_FORMAT, 0,
@@ -196,6 +200,44 @@ static int share_local_container(const ConvertTrack *t) {
     return 1;
 }
 
+/* The first decoded frame proves that the input profile works on this adapter.
+ * Retry only decoder initialization/first-frame failures; graph and overlay
+ * errors must still identify the offending operation. */
+static int negotiate_decoder(const ConvertPlan *p, ConvertTrack *t, FrameRenderPlan *request) {
+    const char *pin = t->kind == 'v' ? frame_plan_opt(p, "frame_decoder") : NULL;
+    if (pin && !strcmp(pin, "cpu"))
+        request->hardware_device = NULL;
+    if (pin && strcmp(pin, "cpu") &&
+        (!request->hardware_device || strcmp(pin, request->hardware_device)))
+        return AVERROR(EINVAL);
+    int decoder_failed = 0;
+    request->hardware_failed = &decoder_failed;
+    int err = frame_render_open(&t->render, request);
+    if (err < 0 && err != AVERROR_EOF && err != AVERROR(ENOMEM) && decoder_failed && !pin) {
+        request->hardware_device = NULL;
+        err = frame_render_open(&t->render, request);
+        t->route.fallback = "Hardware decoding could not initialize for this source";
+    }
+    // A seek past EOF still has a valid stream description. Open at the start
+    // to configure the encoder and drain an empty interval.
+    if (err == AVERROR_EOF && request->start_us > 0) {
+        request->start_us = 0;
+        request->duration_us = 0;
+        return negotiate_decoder(p, t, request);
+    }
+    if (err < 0 || t->kind != 'v')
+        return err;
+    if (frame_render_downloaded(t->render))
+        t->route.decoder = request->hardware_device;
+    else if (request->hardware_device)
+        t->route.fallback = "Hardware decoding is unavailable for this source";
+    if (pin && strcmp(t->route.decoder, pin)) {
+        fprintf(stderr, "The decoder changed after hardware preflight. Check the export again.\n");
+        return AVERROR(ENODEV);
+    }
+    return 0;
+}
+
 static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *codec, const char *muxer) {
     AVBPrint tail;
     av_bprint_init(&tail, 128, AV_BPRINT_SIZE_UNLIMITED);
@@ -209,6 +251,7 @@ static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *cod
             err = frame_media_file_open(&t->source->shared_file, t->source->path);
         }
         FrameRenderPlan request = {
+            .device_context = t->route.device,
             .path = t->source->path,
             .shared_file = t->source->shared_file,
             .threads = t->kind == 'a' && t->source->mapped_count > 1 ? 1 : 0,
@@ -226,17 +269,8 @@ static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *cod
             .strict = t->strict,
             .hardware_device = t->kind == 'v' ? frame_plan_opt(p, "hwaccel") : NULL,
         };
-        if (err >= 0) {
-            err = frame_render_open(&t->render, &request);
-            // An accurate seek past EOF still has a valid stream description.
-            // Configure the encoder from its first frame and drain an empty
-            // interval so the container gets its normal header and trailer.
-            if (err == AVERROR_EOF && request.start_us > 0) {
-                request.start_us = 0;
-                request.duration_us = 0;
-                err = frame_render_open(&t->render, &request);
-            }
-        }
+        if (err >= 0)
+            err = negotiate_decoder(p, t, &request);
     }
     av_bprint_finalize(&tail, NULL);
     if (err < 0)
@@ -253,6 +287,14 @@ static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *cod
         ctx->width = av_buffersink_get_w(sink);
         ctx->height = av_buffersink_get_h(sink);
         ctx->pix_fmt = av_buffersink_get_format(sink);
+        t->route.sample_format = ctx->pix_fmt;
+        const char *pin = frame_plan_opt(p, "frame_format");
+        if (pin && strcmp(pin, av_get_pix_fmt_name(ctx->pix_fmt))) {
+            fprintf(stderr, "The pixel format changed after hardware preflight. Check the export again.\n");
+            return AVERROR(EINVAL);
+        }
+        if ((err = frame_prepare_surface(ctx, &t->route)) < 0)
+            return err;
         ctx->sample_aspect_ratio = av_buffersink_get_sample_aspect_ratio(sink);
         ctx->framerate = av_buffersink_get_frame_rate(sink);
         if (!ctx->framerate.num)
@@ -366,6 +408,15 @@ int frame_prepare_encoder(const ConvertPlan *p, ConvertTrack *t, AVFormatContext
         return AVERROR(ENOMEM);
     if (out->oformat->flags & AVFMT_GLOBALHEADER)
         t->encoder->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+    if (t->kind == 'v') {
+        enum AVPixelFormat samples = frame_surface_samples(codec, frame_plan_opt(p, "pix_fmt"),
+                                                           t->src->codecpar->format);
+        int rc = frame_hardware_route(&t->route, codec, samples, frame_plan_opt(p, "frame_device"));
+        if (rc < 0) {
+            fprintf(stderr, "Cannot open %s on a compatible adapter: %s\n", name, av_err2str(rc));
+            return rc;
+        }
+    }
     int err = t->kind == 's' ? open_subtitle_decoder(t) : open_render(p, t, codec, out->oformat->name);
     if (err < 0 || (err = open_codec(p, t, codec)) < 0)
         return err;
@@ -513,7 +564,8 @@ int frame_read_encoded(ConvertTrack *t, AVPacket *packet) {
             t->frame->pict_type = AV_PICTURE_TYPE_NONE;
             if (t->encoder->flags & AV_CODEC_FLAG_QSCALE)
                 t->frame->quality = t->encoder->global_quality;
-            err = avcodec_send_frame(t->encoder, t->frame);
+            err = t->kind == 'v' ? frame_send_video_frame(t->encoder, t->frame)
+                                 : avcodec_send_frame(t->encoder, t->frame);
             if (t->analysis_io && err >= 0 && t->frame->pts != AV_NOPTS_VALUE) {
                 int64_t end = av_rescale_q(av_sat_add64(t->frame->pts, t->frame->duration),
                                            t->encoder->time_base, AV_TIME_BASE_Q);

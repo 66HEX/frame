@@ -6,7 +6,12 @@ unsafe extern "C" {
     fn frame_library_paths() -> c_int;
     fn frame_library_versions() -> c_int;
     fn frame_inventory(kind: c_int) -> c_int;
-    fn frame_check_encoder(name: *const c_char, allow_sw: c_int, input: *const u8) -> c_int;
+    fn frame_check_encoder(
+        name: *const c_char,
+        allow_sw: c_int,
+        sample_format: *const c_char,
+        input: *const u8,
+    ) -> c_int;
 }
 
 /// # Errors
@@ -31,13 +36,18 @@ pub fn run(args: &[OsString]) -> Result<(), String> {
         Some("-filters") => 1,
         Some("-bsfs") => 2,
         _ => {
-            let [operation, encoder, allow_sw] = args else {
+            let [operation, encoder, allow_sw, extra @ ..] = args else {
                 return Err("invalid encoder check".into());
             };
-            if operation != OsStr::new("hardware") {
+            if operation != OsStr::new("hardware") || extra.len() > 1 {
                 return Err("invalid capability request".into());
             }
             let name = CString::new(encoder.to_str().ok_or("invalid encoder")?)
+                .map_err(|e| e.to_string())?;
+            let format = extra
+                .first()
+                .map(|fmt| CString::new(fmt.to_str().unwrap_or_default()))
+                .transpose()
                 .map_err(|e| e.to_string())?;
             let mut frame = vec![0; 128 * 128 * 3 / 2];
             std::io::stdin()
@@ -45,7 +55,12 @@ pub fn run(args: &[OsString]) -> Result<(), String> {
                 .map_err(|e| e.to_string())?;
             // SAFETY: the native encoder reads exactly one packed 128x128 YUV420P frame.
             let rc = unsafe {
-                frame_check_encoder(name.as_ptr(), i32::from(allow_sw == "1"), frame.as_ptr())
+                frame_check_encoder(
+                    name.as_ptr(),
+                    i32::from(allow_sw == "1"),
+                    format.as_ref().map_or(std::ptr::null(), |f| f.as_ptr()),
+                    frame.as_ptr(),
+                )
             };
             return if rc < 0 {
                 Err(format!("encoder check failed ({rc})"))

@@ -5,7 +5,12 @@ use std::io::{self, Seek, SeekFrom, Write};
 use std::time::{Duration, Instant};
 
 unsafe extern "C" {
-    fn frame_convert(argc: c_int, argv: *const *const c_char, io: *mut c_void) -> c_int;
+    fn frame_convert(
+        argc: c_int,
+        argv: *const *const c_char,
+        io: *mut c_void,
+        preflight: c_int,
+    ) -> c_int;
     fn av_strerror(error: c_int, buffer: *mut c_char, size: usize) -> c_int;
 }
 
@@ -303,6 +308,19 @@ extern "C" fn frame_output_stats(state: &mut Output, frames: i64, time_us: i64) 
 /// # Errors
 /// Returns the library or I/O error that stopped the export.
 pub fn run(args: &[OsString]) -> Result<(), String> {
+    execute(args, false)
+}
+
+/// Opens the source decoder, filter graph and encoder and prints the negotiated
+/// video route before any output, progress or pass files are opened.
+///
+/// # Errors
+/// Returns a diagnostic if the requested route cannot produce this format.
+pub fn preflight(args: &[OsString]) -> Result<(), String> {
+    execute(args, true)
+}
+
+fn execute(args: &[OsString], preflight: bool) -> Result<(), String> {
     let strings: Vec<_> = args
         .iter()
         .map(|value| {
@@ -319,7 +337,14 @@ pub fn run(args: &[OsString]) -> Result<(), String> {
     let pointers: Vec<_> = strings.iter().map(|s| s.as_ptr()).collect();
     let mut state = Output::default();
     let count = c_int::try_from(pointers.len()).map_err(|err| err.to_string())?;
-    let result = unsafe { frame_convert(count, pointers.as_ptr(), (&raw mut state).cast()) };
+    let result = unsafe {
+        frame_convert(
+            count,
+            pointers.as_ptr(),
+            (&raw mut state).cast(),
+            i32::from(preflight),
+        )
+    };
     if let Some(error) = state.error.take() {
         return Err(error.to_string());
     }
@@ -330,6 +355,9 @@ pub fn run(args: &[OsString]) -> Result<(), String> {
             "Media export failed: {}",
             unsafe { CStr::from_ptr(buf.as_ptr()) }.to_string_lossy()
         ));
+    }
+    if preflight {
+        return Ok(());
     }
     if let Some(media) = &mut state.media {
         media.flush().map_err(|error| error.to_string())?;

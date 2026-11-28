@@ -5,6 +5,14 @@ use crate::utils::{
 };
 
 #[must_use]
+pub fn requires_video_bitrate(codec: &str) -> bool {
+    matches!(
+        codec,
+        "mpeg2video" | "h264_vaapi" | "hevc_vaapi" | "av1_vaapi" | "hevc_amf"
+    )
+}
+
+#[must_use]
 pub fn supports_video_two_pass(codec: &str, bitrate_mode: &str) -> bool {
     bitrate_mode == "bitrate" && matches!(codec, "libx264" | "libx265" | "vp9")
 }
@@ -51,10 +59,7 @@ pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
         return;
     }
 
-    if matches!(
-        config.video_codec.as_str(),
-        "h264_vaapi" | "hevc_vaapi" | "av1_vaapi" | "hevc_amf"
-    ) {
+    if requires_video_bitrate(&config.video_codec) {
         args.extend(["-b:v".into(), format!("{}k", config.video_bitrate)]);
         return;
     }

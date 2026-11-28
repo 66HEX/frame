@@ -34,6 +34,7 @@ typedef struct {
     enum AVPixelFormat hardware_format;
     int32_t display_matrix[9];
     int has_display_matrix;
+    int downloaded;
 } RenderInput;
 
 struct FrameRenderer {
@@ -113,7 +114,15 @@ static int open_input(RenderInput *input, const char *path, enum AVMediaType typ
                 break;
         // A decoder with no hardware implementation (e.g. an image) uses its CPU path.
         if (config) {
-            rc = av_hwdevice_ctx_create(&input->decoder->hw_device_ctx, hw, NULL, NULL, 0);
+            if (plan->device_context) {
+                if (((AVHWDeviceContext *)plan->device_context->data)->type != hw)
+                    return AVERROR(EINVAL);
+                input->decoder->hw_device_ctx = av_buffer_ref(plan->device_context);
+                if (!input->decoder->hw_device_ctx)
+                    return AVERROR(ENOMEM);
+            } else {
+                rc = av_hwdevice_ctx_create(&input->decoder->hw_device_ctx, hw, NULL, NULL, 0);
+            }
             if (rc < 0)
                 return rc;
             input->hardware_format = config->pix_fmt;
@@ -180,12 +189,15 @@ static int next_decoded(RenderInput *in) {
                 AVFrame *software = av_frame_alloc();
                 if (!software)
                     return AVERROR(ENOMEM);
+                // Keep the surface's native transfer depth rather than forcing NV12.
+                software->format = ((AVHWFramesContext *)in->frame->hw_frames_ctx->data)->sw_format;
                 rc = av_hwframe_transfer_data(software, in->frame, 0);
                 if (rc >= 0)
                     rc = av_frame_copy_props(software, in->frame);
                 if (rc >= 0) {
                     av_frame_unref(in->frame);
                     av_frame_move_ref(in->frame, software);
+                    in->downloaded = 1;
                 }
                 av_frame_free(&software);
                 if (rc < 0)
@@ -502,6 +514,8 @@ int frame_render_open(FrameRenderer **result, const FrameRenderPlan *plan) {
                                        .fast_seek = plan->fast_seek,
                                        .threads = plan->threads};
     for (int i = 0; i < r->count; ++i) {
+        if (plan->hardware_failed)
+            *plan->hardware_failed = i == 0 && plan->hardware_device;
         rc = open_input(&r->inputs[i], i ? plan->overlay : plan->path,
                         plan->audio ? AVMEDIA_TYPE_AUDIO : AVMEDIA_TYPE_VIDEO,
                         i ? -1 : plan->stream, i ? 0 : plan->start_us, plan, i == 0);
@@ -515,6 +529,8 @@ int frame_render_open(FrameRenderer **result, const FrameRenderPlan *plan) {
                 goto fail;
         } while (i == 0 && !plan->audio && plan->start_us > 0 && !plan->fast_seek &&
                  r->inputs[i].frame->pts < 0);
+        if (plan->hardware_failed)
+            *plan->hardware_failed = 0;
         av_frame_move_ref(r->inputs[i].last, r->inputs[i].frame);
     }
     if ((rc = rebuild_graph(r, NULL)) < 0)
@@ -551,6 +567,8 @@ fail:
     frame_render_close(&r);
     return rc;
 }
+
+int frame_render_downloaded(const FrameRenderer *r) { return r->inputs[0].downloaded; }
 
 AVFilterContext *frame_render_sink(FrameRenderer *r) { return r->sink; }
 

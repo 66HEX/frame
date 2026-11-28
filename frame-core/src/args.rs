@@ -1412,7 +1412,8 @@ pub fn validate_task_input(
         && !is_video_only_container(&config.container)
         && !is_image_container(&config.container)
         && config.video_codec != "prores"
-        && (config.video_codec == "mpeg2video" || config.video_bitrate_mode == "bitrate")
+        && (crate::codec::requires_video_bitrate(&config.video_codec)
+            || config.video_bitrate_mode == "bitrate")
     {
         let bitrate = config.video_bitrate.parse::<f64>().map_err(|_| {
             ConversionError::InvalidInput(format!(
@@ -2254,6 +2255,8 @@ mod tests {
         for (container, codec, mode, used) in [
             ("mp4", "libx264", "bitrate", true),
             ("mkv", "mpeg2video", "crf", true),
+            ("mp4", "hevc_vaapi", "crf", true),
+            ("mkv", "hevc_amf", "crf", true),
             ("mov", "prores", "bitrate", false),
             ("png", "png", "bitrate", false),
             ("gif", "gif", "bitrate", false),
