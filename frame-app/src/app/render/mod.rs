@@ -360,6 +360,9 @@ impl Render for FrameRoot {
                 };
                 content.child(workspace_view(
                     &self.file_queue,
+                    self.file_queue
+                        .selected_file_id()
+                        .and_then(|id| self.conversion_events.encoding_stats_for(id)),
                     &self.file_list_scroll_handle,
                     &settings,
                     PreviewPanelProps {

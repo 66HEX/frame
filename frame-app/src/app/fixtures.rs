@@ -141,6 +141,7 @@ impl FrameRoot {
                 self.apply_settings_video_filters_fixture();
             }
             Some(VisualFixture::UpdateAvailable) => self.apply_update_available_fixture(),
+            Some(VisualFixture::WorkspaceEncodingStats) => self.apply_encoding_stats_fixture(),
             Some(VisualFixture::WorkspaceAudio) => self.apply_workspace_audio_fixture(),
             Some(VisualFixture::WorkspaceEmpty) => self.apply_workspace_empty_fixture(),
             Some(VisualFixture::WorkspaceImage) => self.apply_workspace_image_fixture(),
@@ -182,6 +183,37 @@ impl FrameRoot {
         self.seed_audio_source_fixture();
         self.settings_ui.active_tab = SettingsTab::Metadata;
     }
+    fn apply_encoding_stats_fixture(&mut self) {
+        self.apply_preview_ready_fixture();
+        self.is_processing = true;
+        let id = "fixture-preview";
+        self.file_queue
+            .update_status(id, crate::file_queue::FileStatus::Queued, 0);
+        self.conversion_events.apply_conversion_event(
+            &mut self.file_queue,
+            frame_core::events::ConversionEvent::started(id),
+        );
+        self.conversion_events.apply_conversion_event(
+            &mut self.file_queue,
+            frame_core::events::ConversionEvent::Progress(frame_core::types::ProgressPayload {
+                id: id.into(),
+                progress: 64.0,
+                stats: Some(frame_core::types::EncodingStats {
+                    frame: Some(1389),
+                    fps: Some(48.2),
+                    size_bytes: Some(42_110_976),
+                    bitrate_kbps: Some(5_820.4),
+                    speed: Some(2.01),
+                    media_seconds: 57.86,
+                    elapsed_seconds: 28.8,
+                    eta_seconds: Some(16.2),
+                    duration_seconds: Some(90.4),
+                    pass: None,
+                }),
+            }),
+        );
+    }
+
     pub(super) fn apply_workspace_image_fixture(&mut self) {
         self.seed_image_source_fixture();
         self.settings_ui.active_tab = SettingsTab::Metadata;

@@ -180,6 +180,18 @@ fn headless_qa_exports_through_the_app_runner_and_reports_the_actual_result() {
         .collect();
     assert_eq!(completed.len(), 1, "{events:?}");
     let result = Path::new(completed[0]["payload"]["output_path"].as_str().unwrap());
+    let stats = events
+        .iter()
+        .rev()
+        .find_map(|event| event["payload"].get("stats"))
+        .unwrap();
+    assert!(stats["frame"].is_null() && stats["fps"].is_null());
+    assert!(stats["media_seconds"].as_f64().unwrap() > 0.2);
+    assert!(stats["bitrate_kbps"].as_f64().unwrap() > 0.0);
+    assert_eq!(
+        stats["size_bytes"].as_u64(),
+        Some(fs::metadata(result).unwrap().len())
+    );
     assert_ne!(result, sentinel);
     assert!(result.is_file());
     assert_eq!(fs::read(&source).unwrap(), before);
@@ -331,6 +343,32 @@ fn headless_two_pass_export_publishes_the_selected_trim_with_audio() {
         String::from_utf8_lossy(&result.stderr),
         String::from_utf8_lossy(&result.stdout)
     );
+    let events: Vec<serde_json::Value> = std::str::from_utf8(&result.stdout)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let samples: Vec<_> = events
+        .iter()
+        .map(|event| &event["payload"])
+        .filter(|payload| payload["stats"].is_object())
+        .collect();
+    assert!(samples.iter().any(|payload| payload["stats"]["pass"] == 1));
+    for payload in samples
+        .iter()
+        .filter(|payload| payload["stats"]["pass"] == 1)
+    {
+        assert!(payload["progress"].as_f64().unwrap() <= 50.0);
+        assert!(payload["stats"]["size_bytes"].is_null());
+    }
+    let last = &samples.last().unwrap()["stats"];
+    assert_eq!(last["pass"], 2);
+    assert_eq!(last["frame"], 30);
+    assert_eq!(
+        last["size_bytes"].as_u64(),
+        Some(fs::metadata(out.join("render.mkv")).unwrap().len())
+    );
+    assert!((last["duration_seconds"].as_f64().unwrap() - 1.2).abs() < 0.001);
     let streams = probe_streams(&out.join("render.mkv"));
     assert_eq!(streams.len(), 2);
     assert_eq!(streams[0]["codec_name"], "hevc");

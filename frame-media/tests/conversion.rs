@@ -230,3 +230,85 @@ fn explicit_audio_rate_rejects_invalid_and_unrepresentable_values_before_encodin
         assert!(msg.contains(rate), "{msg}");
     }
 }
+
+fn last_telemetry(output: &Output) -> std::collections::HashMap<&str, &str> {
+    std::str::from_utf8(&output.stderr)
+        .unwrap()
+        .lines()
+        .rfind(|line| line.starts_with("frame="))
+        .expect("terminal progress line")
+        .split_ascii_whitespace()
+        .map(|field| field.split_once('=').expect("key=value"))
+        .collect()
+}
+
+#[test]
+fn audio_telemetry_uses_trimmed_clock_and_final_length_after_backpatching_headers() {
+    let dir = tempdir().unwrap();
+    let src = dir.path().join("short.wav");
+    wav(&src);
+    for (n, input, output, expected_us) in [
+        ("full", vec![], vec![], 50_000),
+        ("seek", vec!["-ss", "0.010"], vec![], 40_000),
+        ("trim", vec!["-ss", "0.010"], vec!["-t", "0.025"], 25_000),
+        ("past-end", vec!["-ss", "0.010"], vec!["-t", "1"], 40_000),
+    ] {
+        let dest = dir.path().join(format!("{n}.wav"));
+        let mut args: Vec<&OsStr> = input.into_iter().map(OsStr::new).collect();
+        args.extend([OsStr::new("-i"), src.as_os_str()]);
+        args.extend(output.into_iter().map(OsStr::new));
+        args.extend(["-map", "0:0", "-c:a", "pcm_s16le"].map(OsStr::new));
+        args.push(dest.as_os_str());
+        let result = worker("convert", args);
+        success(&result);
+        let stats = last_telemetry(&result);
+        let expected = expected_us.to_string();
+        assert_eq!(stats["duration_us"], expected);
+        assert_eq!(stats["media_us"], expected);
+        assert_eq!(stats["work_us"], expected);
+        assert_eq!(stats["pass"], "0");
+        assert_eq!(stats["frame"], "0");
+        assert_eq!(stats["video_frames"], "N/A");
+        assert_eq!(
+            stats["size_bytes"],
+            fs::metadata(dest).unwrap().len().to_string()
+        );
+    }
+}
+
+#[test]
+fn still_image_keeps_unknown_duration_and_quiet_helpers_write_only_completion() {
+    let dir = tempdir().unwrap();
+    let src = dir.path().join("source.ppm");
+    fs::write(&src, b"P6\n1 1\n255\n\x10\x20\x30").unwrap();
+    for quiet in [false, true] {
+        let proof = dir.path().join("progress");
+        let mut args = Vec::new();
+        if quiet {
+            args.extend(["-loglevel", "error"].map(OsStr::new));
+        }
+        args.extend([
+            OsStr::new("-progress"),
+            proof.as_os_str(),
+            OsStr::new("-i"),
+            src.as_os_str(),
+        ]);
+        args.extend(["-map", "0:v:0", "-c:v", "copy", "-f", "framehash", "pipe:1"].map(OsStr::new));
+        let result = worker("convert", args);
+        success(&result);
+        assert!(
+            fs::read_to_string(proof)
+                .unwrap()
+                .ends_with("progress=end\n")
+        );
+        if quiet {
+            assert!(result.stderr.is_empty());
+        } else {
+            let stats = last_telemetry(&result);
+            assert_eq!(stats["duration_us"], "0");
+            assert_eq!(stats["video_frames"], "1");
+            assert_eq!(stats["size_bytes"], "N/A");
+            assert_eq!(stats["media_us"], stats["work_us"]);
+        }
+    }
+}

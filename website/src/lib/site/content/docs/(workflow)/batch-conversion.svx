@@ -56,6 +56,12 @@ Start with a small value for high-resolution video. Increase it if your computer
   caption="App Settings contains the default output folder and maximum concurrency."
 />
 
+## Follow a running conversion
+
+Select a running file to see its statistics below the queue. The panel shows how much media Frame has processed, the elapsed encoding time, the output size and the average bitrate. Video exports also show the current frame and frames per second. A speed of 2× means Frame is processing two seconds of media per second of encoding time.
+
+The progress bar and remaining time use the selected trim range. For a two-pass export the bar covers both passes, and the file size appears when the second pass writes the output. When the source duration is unknown, Frame can still show elapsed time and output size. Pausing a file stops its encoding clock.
+
 ## Check the results
 
 Watch per-file status and progress. If one source fails, inspect its log and settings before repeating the entire queue. See [troubleshooting](/docs/troubleshooting) for common causes.

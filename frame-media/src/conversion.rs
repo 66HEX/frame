@@ -41,6 +41,9 @@ struct Output {
     time_us: i64,
     pass: c_int,
     duration_us: i64,
+    video_duration_us: i64,
+    analysis_work_us: i64,
+    has_video: bool,
     scratch: Option<(tempfile::TempDir, CString)>,
 }
 
@@ -172,9 +175,21 @@ extern "C" fn frame_pass_path(state: &mut Output) -> *const c_char {
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn frame_output_pass(state: &mut Output, pass: c_int, duration: i64) {
+extern "C" fn frame_output_pass(
+    state: &mut Output,
+    pass: c_int,
+    duration: i64,
+    video_duration: i64,
+    has_video: c_int,
+) {
+    if state.pass == 1 && pass == 2 {
+        state.report();
+        state.analysis_work_us = state.work_us();
+    }
     state.pass = pass;
     state.duration_us = duration;
+    state.video_duration_us = video_duration;
+    state.has_video = has_video != 0;
     state.last_report = None;
     state.time_us = 0;
     state.frames = 0;
@@ -191,13 +206,81 @@ extern "C" fn frame_output_pass(state: &mut Output, pass: c_int, duration: i64) 
                 duration % 1_000_000 / 1000
             );
         }
-        let _ = writeln!(log, "Video pass {pass}/2");
+        if pass != 0 {
+            let _ = writeln!(log, "Video pass {pass}/2");
+        }
     }
 }
 
 #[unsafe(no_mangle)]
 const extern "C" fn frame_output_quiet(state: &mut Output, quiet: c_int) {
     state.quiet = quiet != 0;
+}
+
+impl Output {
+    fn work_us(&self) -> i64 {
+        let total = self.duration_us;
+        if total <= 0 {
+            return match self.pass {
+                1 => self.time_us / 2,
+                2 => self.analysis_work_us + self.time_us / 2,
+                _ => self.time_us,
+            };
+        }
+        let media = self.time_us.min(total);
+        let work = match self.pass {
+            1 => {
+                // Analysis only visits the selected video stream, even when
+                // a longer audio or subtitle stream determines the final length.
+                let video = self.video_duration_us;
+                let estimate = if video > 0 { video } else { total };
+                i128::from(self.time_us.min(estimate)) * i128::from(total)
+                    / (i128::from(estimate) + i128::from(total))
+            }
+            2 => {
+                // Anchor to the last observed analysis report. Demuxer length
+                // estimates may include a tail that produces no video frames.
+                let anchor = self.analysis_work_us;
+                i128::from(anchor)
+                    + i128::from(media) * i128::from(total - anchor) / i128::from(total)
+            }
+            _ => return media,
+        };
+        // Each normalized interval is bounded by the signed 64-bit output duration.
+        i64::try_from(work).unwrap_or(total)
+    }
+
+    fn report(&self) {
+        if self.quiet {
+            return;
+        }
+        let work = self.work_us();
+        // The AVIO buffer can seek backwards and backpatch a header. The
+        // open file's length includes only committed writes and trailer bytes.
+        let size = match &self.media {
+            Some(Sink::File(handle)) if self.pass != 1 => handle.metadata().ok().map(|v| v.len()),
+            _ => None,
+        };
+        let size = size.map_or_else(|| "N/A".into(), |n| n.to_string());
+        let video = if self.has_video {
+            self.frames.to_string()
+        } else {
+            "N/A".into()
+        };
+        let sec = work / 1_000_000;
+        let _ = writeln!(
+            io::stderr(),
+            "frame={} time={:02}:{:02}:{:02}.{:03} media_us={} duration_us={} work_us={work} size_bytes={size} pass={} video_frames={video}",
+            self.frames,
+            sec / 3600,
+            sec % 3600 / 60,
+            sec % 60,
+            work % 1_000_000 / 1000,
+            self.time_us,
+            self.duration_us,
+            self.pass
+        );
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -212,20 +295,7 @@ extern "C" fn frame_output_stats(state: &mut Output, frames: i64, time_us: i64) 
         return;
     }
     state.last_report = Some(Instant::now());
-    let time = match state.pass {
-        1 => state.time_us.min(state.duration_us) / 2,
-        2 => state.duration_us / 2 + state.time_us.min(state.duration_us) / 2,
-        _ => state.time_us,
-    };
-    let sec = time / 1_000_000;
-    let _ = writeln!(
-        io::stderr(),
-        "frame={frames} time={:02}:{:02}:{:02}.{:03}",
-        sec / 3600,
-        sec % 3600 / 60,
-        sec % 60,
-        time % 1_000_000 / 1000
-    );
+    state.report();
 }
 
 /// Executes one export and publishes its completion record after the muxer closes.
@@ -264,9 +334,7 @@ pub fn run(args: &[OsString]) -> Result<(), String> {
     if let Some(media) = &mut state.media {
         media.flush().map_err(|error| error.to_string())?;
     }
-    state.last_report = None;
-    let (frames, time_us) = (state.frames, state.time_us);
-    frame_output_stats(&mut state, frames, time_us);
+    state.report();
     if let Some(progress) = &mut state.progress {
         writeln!(
             progress,

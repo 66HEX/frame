@@ -203,6 +203,10 @@ mod visual_fixture_env {
             ("update-available", VisualFixture::UpdateAvailable),
             ("workspace-audio", VisualFixture::WorkspaceAudio),
             ("workspace-empty", VisualFixture::WorkspaceEmpty),
+            (
+                "workspace-encoding-stats",
+                VisualFixture::WorkspaceEncodingStats,
+            ),
             ("workspace-image", VisualFixture::WorkspaceImage),
             ("workspace-large-queue", VisualFixture::WorkspaceLargeQueue),
         ];

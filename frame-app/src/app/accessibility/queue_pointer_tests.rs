@@ -388,3 +388,65 @@ fn header_and_row_columns_align_horizontally_across_scales_and_widths() {
         }
     }
 }
+
+#[test]
+fn encoding_stats_fit_the_minimum_window_and_expose_the_selected_job_to_keyboard_users() {
+    use frame_core::events::ConversionEvent;
+    let label = "Encoding statistics for source_render.mov";
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = test_window(&mut app, VisualFixture::WorkspaceEncodingStats, scale);
+        cx.simulate_resize(size(px(1200.0), px(800.0)));
+        cx.update(|window, _| window.set_a11y_forced(true));
+        draw(cx);
+        let bounds = cx.debug_bounds("encoding-stats").unwrap();
+        assert!(
+            bounds.bottom() <= px(800.0) && bounds.right() <= px(1200.0),
+            "{scale:?} {bounds:?}"
+        );
+        let body = cx.debug_bounds("file-list-body").unwrap();
+        let row = cx.debug_bounds("file-list-row-fixture-preview").unwrap();
+        assert!(
+            body.size.height >= row.size.height,
+            "{scale:?} {body:?}, {bounds:?}"
+        );
+        assert!(body.bottom() <= bounds.top());
+        a11y_focus(cx, label);
+        cx.update(|window, _| {
+            let tree = window.a11y_tree().unwrap();
+            let (_, group) = tree
+                .nodes
+                .iter()
+                .find(|(_, node)| node.label() == Some(label))
+                .unwrap();
+            let description = group.description().unwrap();
+            for detail in [
+                "ETA 0:16",
+                "Media time 0:57 / 1:30",
+                "Frame 1389",
+                "FPS 48.2",
+                "Speed 2.01×",
+                "Bitrate 5820 kb/s",
+                "Size ",
+                "Elapsed 0:28",
+            ] {
+                assert!(description.contains(detail), "{description}");
+            }
+            let (_, bar) = tree
+                .nodes
+                .iter()
+                .find(|(_, node)| {
+                    node.role() == gpui::Role::ProgressIndicator
+                        && node.label() == Some("Encoding progress")
+                })
+                .unwrap();
+            assert_eq!(bar.numeric_value(), Some(64.0));
+        });
+        root.update(cx, |root, cx| {
+            root.apply_conversion_event(ConversionEvent::cancelled("fixture-preview"));
+            cx.notify();
+        });
+        draw(cx);
+        assert!(cx.debug_bounds("encoding-stats").is_none());
+    }
+}

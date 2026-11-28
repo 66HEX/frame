@@ -2,6 +2,7 @@
 
 use crate::file_queue::{FileItem, FileQueue, FileStatus};
 use frame_core::events::ConversionEvent;
+use frame_core::types::EncodingStats;
 use std::collections::BTreeMap;
 use std::ops::Range;
 
@@ -22,8 +23,9 @@ pub struct LogLine {
     pub text: String,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ConversionEventState {
+    encoding_stats: BTreeMap<String, EncodingStats>,
     logs: BTreeMap<String, Vec<String>>,
     selected_log_file_id: Option<String>,
 }
@@ -32,6 +34,7 @@ impl ConversionEventState {
     #[must_use]
     pub const fn new() -> Self {
         Self {
+            encoding_stats: BTreeMap::new(),
             logs: BTreeMap::new(),
             selected_log_file_id: None,
         }
@@ -47,7 +50,17 @@ impl ConversionEventState {
         self.logs.get(id).map_or(&[], Vec::as_slice)
     }
 
+    #[must_use]
+    pub fn encoding_stats_for(&self, id: &str) -> Option<&EncodingStats> {
+        self.encoding_stats.get(id)
+    }
+
+    pub fn clear_encoding_stats(&mut self, id: &str) {
+        self.encoding_stats.remove(id);
+    }
+
     pub fn remove_logs(&mut self, id: &str) {
+        self.clear_encoding_stats(id);
         self.logs.remove(id);
         if self.selected_log_file_id.as_deref() == Some(id) {
             self.selected_log_file_id = None;
@@ -138,23 +151,37 @@ impl ConversionEventState {
                     .file_by_id(&payload.id)
                     .is_some_and(|file| file.status == FileStatus::Queued)
                 {
+                    self.clear_encoding_stats(&payload.id);
                     queue.update_status(&payload.id, FileStatus::Converting, 0);
                 }
             }
             ConversionEvent::Progress(payload) => {
-                if let Some(file) = queue.file_by_id(&payload.id) {
+                if let Some(file) = queue.file_by_id(&payload.id)
+                    && matches!(
+                        file.status,
+                        FileStatus::Queued
+                            | FileStatus::Converting
+                            | FileStatus::Paused
+                            | FileStatus::Cancelling
+                    )
+                {
                     let status = if file.status == FileStatus::Queued {
                         FileStatus::Converting
                     } else {
                         file.status
                     };
                     queue.update_status(&payload.id, status, percent_to_u8(payload.progress));
+                    if let Some(stats) = payload.stats {
+                        self.encoding_stats.insert(payload.id, stats);
+                    }
                 }
             }
             ConversionEvent::Completed(payload) => {
+                self.clear_encoding_stats(&payload.id);
                 queue.complete_conversion(&payload.id, payload.output_path);
             }
             ConversionEvent::Error(payload) => {
+                self.clear_encoding_stats(&payload.id);
                 if queue.file_by_id(&payload.id).is_some() {
                     self.logs
                         .entry(payload.id.clone())
@@ -169,6 +196,7 @@ impl ConversionEventState {
                 }
             }
             ConversionEvent::Cancelled(payload) => {
+                self.clear_encoding_stats(&payload.id);
                 queue.update_status(&payload.id, FileStatus::Idle, 0);
                 queue.clear_error(&payload.id);
             }
@@ -654,5 +682,57 @@ mod tests {
         assert_eq!(lines[0].index, 1);
         assert_eq!(lines[9_999].index, 10_000);
         assert_eq!(lines[9_999].text, "ffmpeg line 9999");
+    }
+}
+
+#[cfg(test)]
+mod encoding_stats_tests {
+    use super::*;
+    use frame_core::types::ProgressPayload;
+
+    fn report(id: &str, frame: u64, progress: f64) -> ConversionEvent {
+        ConversionEvent::Progress(ProgressPayload {
+            id: id.into(),
+            progress,
+            stats: Some(EncodingStats {
+                frame: Some(frame),
+                ..EncodingStats::default()
+            }),
+        })
+    }
+
+    #[test]
+    fn samples_follow_each_active_attempt_and_late_messages_cannot_revive_a_terminal_row() {
+        for terminal in [
+            ConversionEvent::cancelled("a"),
+            ConversionEvent::error("a", "failed"),
+            ConversionEvent::completed("a", "output.mov"),
+        ] {
+            let mut queue = FileQueue::new();
+            let mut state = ConversionEventState::new();
+            for id in ["a", "b"] {
+                queue.add_file(FileItem::from_path(id, id, 1));
+                queue.update_status(id, FileStatus::Queued, 0);
+                state.apply_conversion_event(&mut queue, ConversionEvent::started(id));
+            }
+            state.apply_conversion_event(&mut queue, report("a", 80, 60.0));
+            state.apply_conversion_event(&mut queue, report("b", 20, 10.0));
+            state.apply_conversion_event(&mut queue, ConversionEvent::progress("a", 61.0));
+            assert_eq!(state.encoding_stats_for("a").unwrap().frame, Some(80));
+            state.apply_conversion_event(&mut queue, terminal);
+            let percent = queue.file_by_id("a").unwrap().progress_percent;
+            state.apply_conversion_event(&mut queue, report("a", 81, 65.0));
+            assert_eq!(queue.file_by_id("a").unwrap().progress_percent, percent);
+            assert!(state.encoding_stats_for("a").is_none());
+            assert_eq!(state.encoding_stats_for("b").unwrap().frame, Some(20));
+            queue.update_status("a", FileStatus::Queued, 0);
+            state.apply_conversion_event(&mut queue, ConversionEvent::started("a"));
+            state.apply_conversion_event(&mut queue, report("a", 1, 0.5));
+            assert_eq!(state.encoding_stats_for("a").unwrap().frame, Some(1));
+            queue.remove_file("b");
+            state.remove_logs("b");
+            state.apply_conversion_event(&mut queue, report("b", 22, 11.0));
+            assert!(state.encoding_stats_for("b").is_none());
+        }
     }
 }
