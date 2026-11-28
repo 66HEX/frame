@@ -39,7 +39,7 @@ enum AVPixelFormat frame_surface_samples(const AVCodec *codec, const char *reque
 
 const char *frame_filter_mapping(const char *backend, const char *graph, int transpose_available) {
     int cuda = !strcmp(backend, "cuda"), va = !strcmp(backend, "vaapi");
-    if (!cuda && !va && strcmp(backend, "d3d11va"))
+    if (!cuda && !va && strcmp(backend, "d3d11va") && strcmp(backend, "videotoolbox"))
         return NULL;
     if (!graph || !strcmp(graph, "null"))
         return "null";

@@ -213,7 +213,8 @@ static int negotiate_decoder(const ConvertPlan *p, ConvertTrack *t, FrameRenderP
     int decoder_failed = 0;
     request->hardware_failed = &decoder_failed;
     int err = frame_render_open(&t->render, request);
-    if (err < 0 && err != AVERROR_EOF && err != AVERROR(ENOMEM) && decoder_failed && !pin && !request->keep_surfaces) {
+    if (err < 0 && !(err == AVERROR_EOF && request->start_us > 0) &&
+        err != AVERROR(ENOMEM) && decoder_failed && !pin && !request->keep_surfaces) {
         request->hardware_device = NULL;
         err = frame_render_open(&t->render, request);
         t->route.fallback = "Hardware decoding could not initialize for this source";

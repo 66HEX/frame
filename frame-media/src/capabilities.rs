@@ -95,6 +95,7 @@ mod tests {
             ("cuda", "null", false, Some("null")),
             ("vaapi", "null", false, Some("null")),
             ("d3d11va", "null", false, Some("null")),
+            ("videotoolbox", "null", false, Some("null")),
             ("cuda", "hflip", true, Some("transpose_cuda=hflip")),
             ("cuda", "transpose=1", true, Some("transpose_cuda=clock")),
             ("vaapi", "vflip", true, Some("transpose_vaapi=vflip")),
