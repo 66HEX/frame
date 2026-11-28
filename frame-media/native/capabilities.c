@@ -49,4 +49,3 @@ int frame_inventory(int kind) {
     }
     return ferror(stdout) || fflush(stdout) ? AVERROR(EIO) : 0;
 }
-
