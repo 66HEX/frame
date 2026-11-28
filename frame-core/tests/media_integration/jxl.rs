@@ -4,6 +4,15 @@ use super::*;
 #[ignore = "requires a JPEG XL-enabled worker and FFmpeg reference tools"]
 fn jpeg_xl_should_preserve_lossless_pixels_and_encode_lossy_stills() -> TestResult {
     let tools = Toolchain::discover()?;
+    let inventory = tools.native("capabilities", &args(&["-encoders"]))?;
+    let inventory = String::from_utf8(inventory).map_err(|error| error.to_string())?;
+    if !frame_core::capabilities::parse_available_encoders(inventory).libjxl {
+        if env::var("FRAME_TEST_REQUIRE_JXL").as_deref() == Ok("1") {
+            return Err("release SDK is missing the libjxl encoder".into());
+        }
+        eprintln!("Skipping JPEG XL conversion: local worker has no libjxl encoder");
+        return Ok(());
+    }
     let sandbox = Sandbox::new("jxl")?;
     let reference_decoders = run_tool_output(&tools.ffmpeg, &args(&["-hide_banner", "-decoders"]))?;
     let reference_decodes_jxl = String::from_utf8_lossy(&reference_decoders)

@@ -3857,6 +3857,7 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
           # Preserve downstream changes, including nixfmt's shared cargoFlags list.
           perl -0pi -e 's/(cargo(?:Build|Test)?Flags\s*=\s*\[[^\]]*?"frame-app")(?![^\]]*"frame-media")/$1 "--package" "frame-media"/gs' "$package_path"
           perl -0pi -e 's/(\bbuildInputs\s*=\s*\[)(?![^\]]*\bffmpeg\b)/$1 ffmpeg/gs' "$package_path"
+          perl -0pi -e 's/(\bbuildInputs\s*=\s*\[[^\]]*?)(?<!\()\bffmpeg\b(?!\.override)/$1(ffmpeg.override { withJxl = true; })/s' "$package_path"
           sed -i '/--prefix PATH : [$]{lib.makeBinPath \[ ffmpeg \]}/d; /--set FRAME_USE_SYSTEM_MEDIA_TOOLS 1/d' "$package_path"
           grep -q '"frame-media"' "$package_path"
         else
@@ -3903,7 +3904,7 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
           ];
 
           buildInputs = [
-            ffmpeg
+            (ffmpeg.override { withJxl = true; })
             alsa-lib
             fontconfig
             freetype
@@ -3999,7 +4000,7 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
         nix-shell -I nixpkgs="$PWD" -p nixfmt-rfc-style --run "nixfmt $package_path maintainers/maintainer-list.nix"
         nix-build -A "$NIXPKGS_PACKAGE"
         source_dir="$(nix-build --no-out-link -A "$NIXPKGS_PACKAGE.src")"
-        media_libs="$(nix-build --no-out-link -A ffmpeg.lib)"
+        media_libs="$(nix-build --no-out-link -E 'let pkgs = import ./. {}; in (pkgs.ffmpeg.override { withJxl = true; }).lib')"
         python3 "$source_dir/script/media-worker.py" verify --target x86_64-unknown-linux-gnu \
           --package-root result --bin-dir result/bin --lib-dir "$media_libs/lib"
         nix-build lib/tests/maintainers.nix
@@ -4044,7 +4045,7 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
       run: |
         nix-build -A "$NIXPKGS_PACKAGE"
         source_dir="$(nix-build --no-out-link -A "$NIXPKGS_PACKAGE.src")"
-        media_libs="$(nix-build --no-out-link -A ffmpeg.lib)"
+        media_libs="$(nix-build --no-out-link -E 'let pkgs = import ./. {}; in (pkgs.ffmpeg.override { withJxl = true; }).lib')"
         python3 "$source_dir/script/media-worker.py" verify --target aarch64-unknown-linux-gnu \
           --package-root result --bin-dir result/bin --lib-dir "$media_libs/lib"
     timeout-minutes: 90
