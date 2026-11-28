@@ -133,8 +133,10 @@ def export_case(worker, ffmpeg, ffprobe, encoder, folder, source, depth, case, m
     route = json.loads(checked(worker, "preflight", *args).stdout)
     if output.exists():
         raise RuntimeError("preflight created the output")
-    if (route["encoder"] != encoder or route["filters"] != "cpu"
-            or route["upload"] != (backend == "vaapi")):
+    filters = route["filters"]
+    device_filters = case == "identity" and filters == decoder and route["decoder"] == decoder
+    if (route["encoder"] != encoder or (filters != "cpu" and not device_filters)
+            or route["upload"] != (backend == "vaapi" and filters == "cpu")):
         raise RuntimeError(f"unexpected filter or encoder route: {route}")
     if backend == "vaapi" and not route["device"].startswith("/dev/dri/renderD"):
         raise RuntimeError(f"VA-API route did not identify a render node: {route}")
@@ -149,13 +151,13 @@ def export_case(worker, ffmpeg, ffprobe, encoder, folder, source, depth, case, m
     elif route["decoder"] != decoder and (route["decoder"] != "cpu" or not route["fallback"]):
         raise RuntimeError(f"missing decoder or fallback: {route}")
     pin = ["-frame_decoder", route["decoder"], "-frame_device", route["device"],
-           "-frame_format", route["format"]]
+           "-frame_format", route["format"], "-frame_filters", filters]
     run = checked(worker, "convert", *pin, *args)
     upload = "yes" if route["upload"] else "no"
-    expected = (f"Video route: decoder={route['decoder']} filters=cpu samples={route['format']} "
+    expected = (f"Video route: decoder={route['decoder']} filters={filters} samples={route['format']} "
                 f"upload={upload} encoder={encoder} device={route['device']}")
     traces = [line for line in run.stderr.decode(errors="replace").splitlines() if line.startswith("Video route: ")]
-    if traces != [expected]:
+    if len(traces) != 1 or traces[0].partition(" fallback=")[0] != expected:
         raise RuntimeError(f"preflight/execution mismatch: {expected!r}, {traces!r}")
     return {"case": case, "input": source.name, "depth": depth, "preflight": route, "execution": traces[0],
             "output": check_output(ffmpeg, ffprobe, output, codec, depth, case == "filtered")}
@@ -175,7 +177,7 @@ def exercise(worker, ffmpeg, ffprobe, encoder, folder, sources, marker):
         cases = []
         decoded = False
         passed = True
-        for case in (["cpu", "filtered", "fallback"] if depth == 8 else ["cpu", "filtered"]):
+        for case in (["cpu", "identity", "filtered", "fallback"] if depth == 8 else ["cpu", "identity", "filtered"]):
             source = sources["odd"] if case == "fallback" else sources[depth]
             try:
                 result = export_case(worker, ffmpeg, ffprobe, encoder, folder, source, depth, case, marker)
