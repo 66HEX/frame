@@ -244,13 +244,23 @@ fn validates_only_exported_audio_tags_and_projects_default_for_the_selected_cont
     assert!(apply_audio_track_default(&mut config, 1, false));
     assert!(audio_track_is_default(&config, &metadata, other));
     assert!(apply_audio_track_default(&mut config, 2, false));
+    for container in ["mp4", "mov", "m4a"] {
+        config.container = container.into();
+        assert!(audio_settings_hint(&config, Some(&metadata)).is_none());
+    }
+    config.container = "mp4".into();
     assert!(
         audio_settings_error(&config, Some(&metadata))
             .unwrap()
             .contains("default")
     );
-    assert!(apply_audio_track_default(&mut config, 2, true));
     config.audio_track_overrides.entry(1).or_default().language = Some("English".into());
+    assert!(
+        audio_settings_hint(&config, Some(&metadata))
+            .unwrap()
+            .contains("language")
+    );
+    assert!(apply_audio_track_default(&mut config, 2, true));
     assert!(
         audio_settings_error(&config, Some(&metadata))
             .unwrap()

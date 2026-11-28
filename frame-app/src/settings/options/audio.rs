@@ -86,6 +86,19 @@ pub fn audio_settings_error(
     config: &ConversionConfig,
     metadata: Option<&SourceMetadata>,
 ) -> Option<String> {
+    frame_core::audio_rules::missing_audio_default_error(
+        &config.container,
+        &config.selected_audio_tracks,
+        &config.audio_track_overrides,
+    )
+    .or_else(|| audio_settings_hint(config, metadata))
+}
+
+#[must_use]
+pub fn audio_settings_hint(
+    config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
+) -> Option<String> {
     if !frame_core::media_rules::container_supports_audio(&config.container) {
         return None;
     }
@@ -94,7 +107,7 @@ pub fn audio_settings_error(
     {
         return Some(reason);
     }
-    if let Some(reason) = frame_core::audio_rules::audio_track_metadata_error(
+    if let Some(reason) = frame_core::audio_rules::audio_track_metadata_edit_error(
         &config.container,
         &config.selected_audio_tracks,
         &config.audio_track_overrides,

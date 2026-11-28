@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Audio Settings:** If all selected tracks have Default set to No for MP4, MOV or M4A, Frame reports the error in the file’s conversion log when export starts.
 - **Media Engine:** Frame now reads, previews and exports files through a worker linked directly to the FFmpeg libraries. Desktop packages include the worker, while Flathub and Nixpkgs use their distribution’s libraries.
 - **Homebrew Distribution:** Expands the custom Homebrew tap cask (`brew install 66HEX/frame/frame`) to support Linux AppImages alongside macOS DMGs, automatically strips the macOS quarantine attribute on install, and updates installation docs.
 

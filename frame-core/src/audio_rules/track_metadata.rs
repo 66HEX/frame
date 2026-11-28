@@ -29,6 +29,15 @@ pub fn audio_track_default_error(
     selected: &[u32],
     edits: &BTreeMap<u32, AudioTrackOverride>,
 ) -> Option<String> {
+    conflicting_defaults_error(container, selected, edits)
+        .or_else(|| missing_audio_default_error(container, selected, edits))
+}
+
+fn conflicting_defaults_error(
+    container: &str,
+    selected: &[u32],
+    edits: &BTreeMap<u32, AudioTrackOverride>,
+) -> Option<String> {
     if selected.is_empty() || !audio_track_metadata_support(container).default_flag {
         return None;
     }
@@ -40,7 +49,18 @@ pub fn audio_track_default_error(
             return Some("Select only one default audio track.".into());
         }
     }
-    if requires_default(container)
+    None
+}
+
+/// Reports a required playback default once all selected tracks explicitly opt out.
+#[must_use]
+pub fn missing_audio_default_error(
+    container: &str,
+    selected: &[u32],
+    edits: &BTreeMap<u32, AudioTrackOverride>,
+) -> Option<String> {
+    if !selected.is_empty()
+        && requires_default(container)
         && selected
             .iter()
             .all(|index| edits.get(index).and_then(|edit| edit.is_default) == Some(false))
@@ -61,10 +81,22 @@ pub fn audio_track_metadata_error(
     edits: &BTreeMap<u32, AudioTrackOverride>,
     preserve_text: bool,
 ) -> Option<String> {
+    missing_audio_default_error(container, selected, edits)
+        .or_else(|| audio_track_metadata_edit_error(container, selected, edits, preserve_text))
+}
+
+/// Validates individual edits while the user is still choosing a default track.
+#[must_use]
+pub fn audio_track_metadata_edit_error(
+    container: &str,
+    selected: &[u32],
+    edits: &BTreeMap<u32, AudioTrackOverride>,
+    preserve_text: bool,
+) -> Option<String> {
     if edits.is_empty() {
         return None;
     }
-    if let Some(reason) = audio_track_default_error(container, selected, edits) {
+    if let Some(reason) = conflicting_defaults_error(container, selected, edits) {
         return Some(reason);
     }
     if preserve_text {

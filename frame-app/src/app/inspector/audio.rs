@@ -19,7 +19,7 @@ use crate::app::root::FrameRoot;
 use crate::settings::{
     ConversionConfig, SourceMetadata, apply_audio_bitrate_mode, apply_audio_channels,
     apply_audio_codec, apply_audio_quality, apply_opus_vbr, audio_channel_options,
-    audio_codec_options, audio_codec_supports_vbr, audio_quality_range, audio_settings_error,
+    audio_codec_options, audio_codec_supports_vbr, audio_quality_range, audio_settings_hint,
     audio_track_options, mp2_original_channels_are_unsupported, toggle_audio_track_selection,
 };
 use crate::theme;
@@ -61,7 +61,7 @@ pub(in crate::app) fn settings_audio_tab(
             palette,
         ));
     }
-    if let Some(reason) = audio_settings_error(config, metadata) {
+    if let Some(reason) = audio_settings_hint(config, metadata) {
         encoding = encoding.child(settings_hint_text(&reason, palette));
     }
     let content = crate::app::components::frame_field_group()

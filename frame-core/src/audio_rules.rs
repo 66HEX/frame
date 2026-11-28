@@ -11,7 +11,7 @@ pub use sample_rate::{
 mod track_metadata;
 pub use track_metadata::{
     audio_track_default_actions, audio_track_default_error, audio_track_language_value,
-    audio_track_metadata_error,
+    audio_track_metadata_edit_error, audio_track_metadata_error, missing_audio_default_error,
 };
 
 #[must_use]
