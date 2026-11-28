@@ -411,6 +411,12 @@ fn playback_reconfigures_a_changing_raster_and_overlay_without_losing_the_clip()
             "rgb24",
             &rgb.repeat((width * height) as usize),
         )?;
+        // Allow the fps and overlay filters to emit steady frames on both
+        // sides of each format change before their pending state is reset.
+        for frame in i * 4..i * 4 + 4 {
+            fs::copy(&path, sandbox.path(&format!("primary-{frame}.png")))
+                .map_err(|err| err.to_string())?;
+        }
         sequence.extend(fs::read(path).map_err(|err| err.to_string())?);
     }
     let variable_overlay = sandbox.path("sequence.png");
@@ -424,7 +430,7 @@ fn playback_reconfigures_a_changing_raster_and_overlay_without_losing_the_clip()
             "-framerate",
             "25",
             "-i",
-            &path_arg(&sandbox.path("frame-%d.png")),
+            &path_arg(&sandbox.path("primary-%d.png")),
             "-c:v",
             "copy",
             &path_arg(&movie),
@@ -453,7 +459,7 @@ fn playback_reconfigures_a_changing_raster_and_overlay_without_losing_the_clip()
         config.overlay = Some(overlay_config(&overlay, 1.0, 0.25));
         let options = PreviewFfmpegOptions {
             start_seconds: 0.0,
-            end_seconds: Some(0.12),
+            end_seconds: Some(if input == &movie { 0.48 } else { 0.12 }),
             source_width: Some(128),
             source_height: Some(96),
             source_is_palette: false,
@@ -471,12 +477,24 @@ fn playback_reconfigures_a_changing_raster_and_overlay_without_losing_the_clip()
             .map_err(|err| err.to_string())?;
         let expected = run_tool_output(&tools.ffmpeg, &plan.args)?;
         let actual = tools.native("preview", &plan.args)?;
-        assert_eq!(expected.len(), 3 * plan.frame_bytes);
-        assert_bytes_match(
-            &actual,
-            &expected,
-            "three filtered frames after reconfiguration",
-        )?;
+        let expected_frames = if input == &movie { 12 } else { 3 };
+        assert_eq!(expected.len(), expected_frames * plan.frame_bytes);
+        assert_eq!(actual.len(), expected.len());
+        if input == &movie {
+            // When two demux threads reach a filter rebuild together, the
+            // reference can discard a different pending boundary picture.
+            // Compare every pixel of the steady frames in each source raster.
+            for index in [1, 5, 9] {
+                let frame = index * plan.frame_bytes..(index + 1) * plan.frame_bytes;
+                assert_bytes_match(
+                    &actual[frame.clone()],
+                    &expected[frame],
+                    &format!("changing primary raster, frame {index}"),
+                )?;
+            }
+        } else {
+            assert_bytes_match(&actual, &expected, "changing PNG overlay")?;
+        }
     }
     Ok(())
 }

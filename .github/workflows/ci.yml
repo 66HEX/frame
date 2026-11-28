@@ -290,3 +290,31 @@ jobs:
     - name: ci::test_app_package_pipeline
       run: cargo test --locked -p frame-app --features qa-harness --test qa_harness -- --include-ignored --test-threads=1
     timeout-minutes: 150
+  flathub_package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: steps::setup_rust
+      shell: bash
+      run: |
+        rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
+        rustup default 1.95.0
+        test "$(rustc --version | awk '{print $2}')" = "1.95.0"
+    - name: ci::setup_flathub
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y flatpak flatpak-builder
+        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        flatpak install --user --no-related -y --noninteractive flathub \
+          org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08 \
+          org.freedesktop.Sdk.Extension.rust-stable//25.08 org.freedesktop.Platform.codecs-extra//25.08-extra
+    - name: ci::build_and_test_flathub_package
+      run: dbus-run-session -- python3 script/test-flathub-package.py
+    timeout-minutes: 120

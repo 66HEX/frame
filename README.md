@@ -267,8 +267,12 @@ cd frame
 
 Install the FFmpeg development headers and libraries for your target, including
 the codecs you intend to use. Set `FFMPEG_DIR` to the SDK prefix or configure
-pkg-config for the six libraries listed above. Windows needs the SDK DLLs on
-the loader's search path for local builds. Native packaging uses pinned SDKs.
+pkg-config for the six libraries listed above. For a custom SDK, the local
+loader also needs its shared libraries. Add the SDK's `bin` to `PATH` on
+Windows, or its `lib` to `LD_LIBRARY_PATH` on Linux. macOS debug builds
+record the SDK's library path. Native packaging uses pinned SDKs and stages
+their libraries with the worker. See the [feature and platform matrix](MEDIA_MIGRATION.md)
+for the test commands.
 
 **4. Run or Build**
 

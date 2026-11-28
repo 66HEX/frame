@@ -2166,6 +2166,30 @@ __CI_OTHER_LINUX_SETUP__
 __CI_WORKER_TESTS__
 __CI_MEDIA_TESTS__
     timeout-minutes: 150
+  flathub_package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v7.0.0
+      with:
+        persist-credentials: false
+    - name: steps::setup_rust
+      run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
+    - name: ci::setup_flathub
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y flatpak flatpak-builder
+        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        flatpak install --user --no-related -y --noninteractive flathub \
+          org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08 \
+          org.freedesktop.Sdk.Extension.rust-stable//25.08 org.freedesktop.Platform.codecs-extra//25.08-extra
+    - name: ci::build_and_test_flathub_package
+      run: dbus-run-session -- python3 script/test-flathub-package.py
+    timeout-minutes: 120
 "
         .replace("__CI_WORKER_TESTS__", CI_WORKER_TESTS)
         .replace("__CI_LINUX_SETUP__", &linux_ci_setup_step())
@@ -2513,6 +2537,16 @@ fn linux_job(arch: &str, runner: &str) -> String {
         actual="$(target/release/Frame-{arch}.AppImage --appimage-updateinformation)"
         test "$actual" = "$expected"
         test -s target/release/Frame-{arch}.AppImage.zsync
+    - name: run_bundling::verify_extracted_linux_packages
+      shell: bash
+      run: |
+        output="$GITHUB_WORKSPACE/target/release"
+        cd "$RUNNER_TEMP"
+        tar -xzf "$output/frame-linux-{arch}.tar.gz"
+        "$output/Frame-{arch}.AppImage" --appimage-extract >/dev/null
+        for root in frame.app squashfs-root/usr; do
+          python3 "$GITHUB_WORKSPACE/script/media-worker.py" verify --bin-dir "$root/bin" --lib-dir "$root/lib" --package-root "$root"
+        done
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@v7.0.1
       with:
@@ -2583,7 +2617,7 @@ fn macos_job(arch: &str, target: &str, runner: &str) -> String {
 
 fn windows_job(arch: &str, runner: &str) -> String {
     format!(
-        r"  bundle_windows_{arch}:
+        r#"  bundle_windows_{arch}:
     if: |-
 {if_expression}
     runs-on: {runner}
@@ -2597,6 +2631,14 @@ fn windows_job(arch: &str, runner: &str) -> String {
     - name: ./script/bundle-windows.ps1
       shell: pwsh
       run: ./script/bundle-windows.ps1 -Architecture {arch}
+    - name: run_bundling::verify_installed_windows_package
+      shell: pwsh
+      run: |
+        $installed = Join-Path $env:RUNNER_TEMP 'Frame media package'
+        $argsList = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', ('/DIR="' + $installed + '"'))
+        $setup = Start-Process ./target/Frame-{arch}.exe -ArgumentList $argsList -PassThru -Wait
+        if ($setup.ExitCode -ne 0) {{ throw "Frame installer exited $($setup.ExitCode)" }}
+        python script/media-worker.py verify --bin-dir $installed --lib-dir $installed --package-root $installed
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@v7.0.1
       with:
@@ -2604,7 +2646,7 @@ fn windows_job(arch: &str, runner: &str) -> String {
         path: target/Frame-{arch}.exe
         if-no-files-found: error
     timeout-minutes: 60
-",
+"#,
         if_expression = bundle_if_expression(),
         checkout = checkout_step(),
         rust = setup_rust_step(),

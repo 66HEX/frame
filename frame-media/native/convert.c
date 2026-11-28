@@ -37,8 +37,9 @@ static int input_for_map(ConvertTrack *t, const ConvertPlan *p, const char *map)
     t->source = &p->sources[source];
     int err;
     if (!t->source->input) {
-        err = avformat_open_input(&t->source->input,t->source->path,NULL,NULL);
-        if (err < 0 || (err = avformat_find_stream_info(t->source->input,NULL)) < 0) return err;
+        err = avformat_open_input(&t->source->input, t->source->path, NULL, NULL);
+        if (err < 0 || (err = avformat_find_stream_info(t->source->input, NULL)) < 0)
+            return err;
     }
     t->input = t->source->input;
     const char *selector = end + 1;
@@ -82,9 +83,11 @@ static int input_for_map(ConvertTrack *t, const ConvertPlan *p, const char *map)
 }
 
 static int configure_track(const ConvertPlan *p, ConvertTrack *t, AVFormatContext *out) {
-    t->source->origin_us = frame_clock_origin(t->input,t->source->mapped,t->source->mapped_count,t->source->seek);
-    t->origin = av_rescale_q(t->source->origin_us,AV_TIME_BASE_Q,t->src->time_base);
-    t->duration = p->duration < 0 ? -1 : av_rescale_q(p->duration,AV_TIME_BASE_Q,t->src->time_base);
+    t->source->origin_us =
+        frame_clock_origin(t->input, t->source->mapped, t->source->mapped_count, t->source->seek);
+    t->origin = av_rescale_q(t->source->origin_us, AV_TIME_BASE_Q, t->src->time_base);
+    t->duration =
+        p->duration < 0 ? -1 : av_rescale_q(p->duration, AV_TIME_BASE_Q, t->src->time_base);
     t->strict = frame_plan_opt(p, "xerror") != NULL;
     t->next = av_packet_alloc();
     t->raw = av_packet_alloc();
@@ -320,7 +323,8 @@ static int convert(const ConvertPlan *p, AVFormatContext **outp, ConvertTrack *t
     set_implicit_defaults(p, tracks, *count);
     if ((err = setup_muxer(p, out, tracks, *count, io, pb)) < 0)
         return err;
-    if ((err = frame_mux_packets(p,tracks,*count,out,io)) < 0) return err;
+    if ((err = frame_mux_packets(p, tracks, *count, out, io)) < 0)
+        return err;
     err = av_write_trailer(out);
     if (*pb) {
         avio_flush(*pb);
@@ -367,7 +371,7 @@ int frame_convert(int argc, const char *const *argv, void *io) {
         avio_context_free(&pb);
     }
     avformat_free_context(out);
-    for (int i=0;i<p.sources_len;++i) {
+    for (int i = 0; i < p.sources_len; ++i) {
         Source *source = &p.sources[i];
         frame_clock_free(&source->clock);
         av_packet_free(&source->pending);

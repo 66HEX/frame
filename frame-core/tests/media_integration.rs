@@ -30,6 +30,10 @@ mod adpcm;
 mod audio_titles;
 #[path = "media_integration/cadence_clock.rs"]
 mod cadence_clock;
+#[path = "media_integration/decode_recovery.rs"]
+mod decode_recovery;
+#[path = "media_integration/effects.rs"]
+mod effects;
 #[path = "media_integration/gif_frames.rs"]
 mod gif_frames;
 #[path = "media_integration/overlay_depth.rs"]
@@ -716,6 +720,10 @@ fn hevc_videotoolbox_mp4_mov_reencode_should_write_hvc1_video_and_aac_audio() ->
 
 fn assert_hevc_mp4_mov_tags(encoder: &str) -> TestResult {
     let tools = Toolchain::discover()?;
+    if encoder.ends_with("_videotoolbox") && !registry::hardware_encoder_available(&tools, encoder)?
+    {
+        return Ok(());
+    }
     let sandbox = Sandbox::new(&format!("hevc_mp4_mov_{encoder}"))?;
     let input = sandbox.path("source.mp4");
     generate_h264_aac_source(&tools, &input, 1.0, 640, 360)?;
@@ -724,6 +732,9 @@ fn assert_hevc_mp4_mov_tags(encoder: &str) -> TestResult {
         for pixel_format in ["yuv420p", "yuv420p10le"] {
             let output = sandbox.path(&format!("output-{pixel_format}.{container}"));
             let mut config = video_config(container, encoder, "aac");
+            if encoder.ends_with("_videotoolbox") {
+                config.video_bitrate_mode = "bitrate".into();
+            }
             config.selected_audio_tracks = vec![1];
             config.pixel_format = pixel_format.to_string();
             convert(&tools, &input, &output, &config)?;
