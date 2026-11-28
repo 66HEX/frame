@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Text Editing:** On Linux and Windows, Ctrl+A selects the contents of a text field and Ctrl+C, Ctrl+X and Ctrl+V copy, cut and paste text.
+- **Pasting Multiline Text:** Pasting a Windows-style line break into a single-line field now inserts a space. This keeps pasted audio track titles valid for export.
 - **File Queue:** Aligns the column headings with their file rows. [#305](https://github.com/66HEX/frame/pull/305)
 - **Audio Track Selection After Non-Audio Presets:** Restores the default source audio track when switching from a non-audio container or preset (such as GIF) back to an audio-supporting format, while preserving explicit audio exclusion between audio-capable formats. Resolves [#273](https://github.com/66HEX/frame/issues/273).
 - **Windows Bundling:** Stops `cargo xtask bundle windows` from re-entering Cargo via `script/bundle-windows.ps1` and scrubs Cargo package environment variables from child processes so Windows builds no longer fail trying to relink `xtask.exe`. Resolves [#254](https://github.com/66HEX/frame/issues/254).

@@ -893,6 +893,14 @@ fn native_clipboard_shortcuts_edit_the_focused_text_field() {
     assert_eq!(title(cx), "");
     press(cx, paste);
     assert_eq!(title(cx), "Main mix");
+    cx.update(|_, cx| {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string(
+            "Main\r\nEnglish\rFrench\nPolish".into(),
+        ));
+    });
+    press(cx, select_all);
+    press(cx, paste);
+    assert_eq!(title(cx), "Main English French Polish");
 }
 
 #[test]
