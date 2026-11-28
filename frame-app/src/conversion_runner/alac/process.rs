@@ -106,6 +106,10 @@ impl Helpers {
         };
         let mut command = runtime.command.clone();
         if let Some(owner) = &completion {
+            command.args.extend(
+                crate::runtime_binaries::worker_subcommand(&command.program, "convert")
+                    .map(OsString::from),
+            );
             command.args.push("-progress".into());
             command.args.push(owner.path().as_os_str().to_owned());
         }

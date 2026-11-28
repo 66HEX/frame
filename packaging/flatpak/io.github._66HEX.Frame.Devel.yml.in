@@ -16,6 +16,7 @@ modules:
     buildsystem: simple
     build-commands:
       - install -Dm755 frame.app/bin/frame /app/bin/frame
+      - install -Dm755 frame.app/bin/frame-media /app/bin/frame-media
       - install -Dm755 frame.app/bin/frame-update-helper /app/bin/frame-update-helper
       - mkdir -p /app/bin/binaries /app/lib
       - cp -a frame.app/bin/binaries/. /app/bin/binaries/

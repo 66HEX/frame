@@ -2044,6 +2044,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "frame-media"
+version = "0.35.0"
+dependencies = [
+ "cc",
+ "frame-core",
+ "pkg-config",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "frame-updater"
 version = "0.35.0"
 dependencies = [

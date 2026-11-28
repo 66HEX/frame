@@ -57,6 +57,10 @@ fn command(
     // std Command retains its platform batch-wrapper semantics on Windows.
     let mut command = Command::new(&runtime.command.program);
     command
+        .args(crate::runtime_binaries::worker_subcommand(
+            &runtime.command.program,
+            "convert",
+        ))
         .args(&runtime.command.args)
         .envs(runtime.command.env.iter().cloned());
     #[cfg(unix)]

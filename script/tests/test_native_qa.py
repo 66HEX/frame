@@ -34,6 +34,7 @@ class PackageFixture(unittest.TestCase):
         target = target or self.target
         inputs = {
             target.app_name: self.repo / "target" / "release" / target.app_name,
+            **{name: self.repo / "target/native-qa-worker" / name for name in target.worker_members},
             **{
                 f"binaries/{name}": self.repo / "frame-app" / "resources" / "binaries" / name
                 for name in target.runtime_names
@@ -91,20 +92,20 @@ class PackageTests(PackageFixture):
     def test_archive_size_policy_is_target_specific_and_keeps_ci_total_bounded(self):
         limits = {}
         for system, machine, expected in [
-            ("Windows", "AMD64", 140), ("Linux", "x86_64", 80),
-            ("Linux", "aarch64", 80), ("Darwin", "x86_64", 100),
-            ("Darwin", "arm64", 100),
+            ("Windows", "AMD64", 240), ("Linux", "x86_64", 180),
+            ("Linux", "aarch64", 180), ("Darwin", "x86_64", 180),
+            ("Darwin", "arm64", 180),
         ]:
             with self.subTest(system=system, machine=machine):
                 target = native_qa.identify_target(system, machine)
                 self.assertEqual(target.archive_limit_mib, expected)
                 limits[(target.platform, target.architecture)] = target.archive_limit_mib
-        self.assertEqual(sum(value for (system, _), value in limits.items() if system != "macos"), 300)
+        self.assertEqual(sum(value for (system, _), value in limits.items() if system != "macos"), 600)
 
     def test_explicit_archive_limits_cannot_exceed_the_target_policy(self):
         for system, machine, maximum in [
-            ("Windows", "AMD64", 140), ("Linux", "x86_64", 80),
-            ("Linux", "aarch64", 80), ("Darwin", "x86_64", 100),
+            ("Windows", "AMD64", 240), ("Linux", "x86_64", 180),
+            ("Linux", "aarch64", 180), ("Darwin", "x86_64", 180),
         ]:
             with self.subTest(system=system, machine=machine):
                 self.target = native_qa.identify_target(system, machine)
@@ -137,7 +138,7 @@ class PackageTests(PackageFixture):
         archive = self.output / self.target.archive_name
         self.assertEqual(json.loads(stdout.getvalue())["archiveBytes"], archive.stat().st_size)
         self.assertGreater(archive.stat().st_size, 100 * 1024 * 1024)
-        self.assertLessEqual(archive.stat().st_size, 140 * 1024 * 1024)
+        self.assertLessEqual(archive.stat().st_size, 240 * 1024 * 1024)
         relocated = self.repo.parent / "relocated"
         manifest = native_qa.unpack_verified(archive, relocated, self.target)
         self.assertEqual(manifest["files"][self.target.app_name]["size"], 101 * 1024 * 1024)
@@ -146,8 +147,8 @@ class PackageTests(PackageFixture):
     def test_unpack_rejects_an_archive_above_each_target_budget(self):
         oversized = self.repo.parent / "oversized.zip"
         for system, machine, maximum in [
-            ("Windows", "AMD64", 140), ("Linux", "x86_64", 80),
-            ("Linux", "aarch64", 80), ("Darwin", "arm64", 100),
+            ("Windows", "AMD64", 240), ("Linux", "x86_64", 180),
+            ("Linux", "aarch64", 180), ("Darwin", "arm64", 180),
         ]:
             with self.subTest(system=system, machine=machine):
                 with oversized.open("wb") as output:

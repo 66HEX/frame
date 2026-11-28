@@ -3,7 +3,7 @@ use super::controller::ConversionProcessController;
 use super::output_paths::disambiguate_output_paths;
 use super::{PublicationDecision, StagedOutput, publish_staged_output};
 use crate::capabilities::{HardwareEncoder, HardwareProbePolicy, probe_hardware_encoder};
-use crate::runtime_binaries::{ffmpeg_executable, ffprobe_executable};
+use crate::runtime_binaries::media_worker_executable;
 use frame_core::args::{
     GifFramePolicy, build_alac_copy_observer, build_ffmpeg_args, build_ffmpeg_args_with_gif_policy,
     build_output_path, effective_video_encoder, validate_task_input,
@@ -123,7 +123,7 @@ fn run_prepared_conversion_task_with_control(
     validate_task_input(&task.file_path, &task.config)?;
     let Some(probe) = probe_conversion_source(
         &task.file_path,
-        &ffprobe_executable(),
+        &media_worker_executable(),
         &task.id,
         controller,
         emit,
@@ -138,7 +138,7 @@ fn run_prepared_conversion_task_with_control(
         task.output_name.as_deref(),
     );
     let ordinary_args = build_ffmpeg_args(&task.file_path, &output_path, &task.config, &probe)?;
-    let executable = ffmpeg_executable();
+    let executable = media_worker_executable();
     if !super::stabilization::check_with_control(
         &task.config,
         &executable,
@@ -167,7 +167,7 @@ fn run_prepared_conversion_task_with_control(
             &output_path,
             &observer,
             &executable,
-            &ffprobe_executable(),
+            &media_worker_executable(),
             controller,
             emit,
         );
@@ -175,7 +175,7 @@ fn run_prepared_conversion_task_with_control(
     let opus_proof = if crate::runtime_environment::is_flatpak() {
         None
     } else {
-        let result = super::opus::check(task, &probe, &ffprobe_executable(), || {
+        let result = super::opus::check(task, &probe, &media_worker_executable(), || {
             controller.is_cancelled(&task.id)
         });
         if finish_preflight_cancellation(&task.id, controller, emit)? {
@@ -507,6 +507,10 @@ fn finish_staged_conversion(
 fn final_command(executable: &str, args: &[String], progress_path: &std::path::Path) -> Command {
     let mut command = Command::new(executable);
     command
+        .args(crate::runtime_binaries::worker_subcommand(
+            std::path::Path::new(executable),
+            "convert",
+        ))
         .arg("-progress")
         .arg(progress_path)
         .args(args)

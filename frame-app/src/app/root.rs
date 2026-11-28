@@ -96,7 +96,7 @@ impl FrameRoot {
 
     pub fn load_runtime_capabilities(&mut self, cx: &mut Context<Self>) {
         let generation = self.begin_runtime_capability_load();
-        let executable = crate::runtime_binaries::ffmpeg_executable();
+        let executable = crate::runtime_binaries::media_worker_executable();
         let listing_executable = executable.clone();
         cx.notify();
         cx.spawn(async move |this, cx| {

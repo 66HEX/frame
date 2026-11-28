@@ -116,7 +116,7 @@ fn genuine_audio_names_should_survive_mp4_mov_copy_without_changing_packets() ->
             let arguments =
                 build_ffmpeg_args(&path_arg(&source), &path_arg(output), &config, metadata)
                     .map_err(|error| error.to_string())?;
-            run_tool(&tools.ffmpeg, &arguments)?;
+            tools.native("convert", &arguments)?;
         }
         let facts = packet_and_stream_facts(&tools, &actual)?;
         let audio = facts["streams"]

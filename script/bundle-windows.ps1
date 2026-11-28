@@ -89,6 +89,7 @@ function Prepare-BundleDirectory {
     Copy-Item -Path "$ReleaseDir\frame.exe" -Destination "$InnoDir\Frame.exe" -Force
     Copy-Item -Path "$ReleaseDir\frame-update-helper.exe" -Destination "$InnoDir\frame-update-helper.exe" -Force
     Copy-Item -Path "$RepoRoot\frame-app\resources\app-icons\icon.ico" -Destination "$InnoDir\app-icon.ico" -Force
+    Invoke-Checked python "$RepoRoot/script/media-worker.py" bundle --target $Target --bin-dir $InnoDir --lib-dir $InnoDir
     foreach ($source in Get-RuntimeBinaryPaths) {
         if (-not (Test-Path $source)) {
             throw "Missing runtime binary: $source"
@@ -149,6 +150,10 @@ if (-not $PackageOnly) {
 # Check the application copied into the installer, including separately restored
 # PackageOnly inputs. The installer and updater helper have different entrypoints.
 & "$PSScriptRoot\check-windows-subsystem.ps1" -Path "$InnoDir\Frame.exe"
+
+if ($PackageOnly) {
+    Invoke-Checked python "$RepoRoot/script/media-worker.py" verify --target $Target --bin-dir $InnoDir
+}
 
 if ($PrepareOnly) {
     Write-Output "Prepared unsigned installer inputs at $InnoDir"

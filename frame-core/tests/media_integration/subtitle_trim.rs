@@ -351,7 +351,7 @@ fn mixed_subtitle_ordinals_should_clip_only_imported_text_and_preserve_bitmap_pa
         let output = sandbox.path(&format!("fixed-{mode}.mkv"));
         let argv = build_ffmpeg_args(&path_arg(&input), &path_arg(&output), &config, &metadata)
             .map_err(|error| error.to_string())?;
-        run_tool(&tools.ffmpeg, &argv)?;
+        tools.native("convert", &argv)?;
         let baseline = sandbox.path(&format!("baseline-{mode}.mkv"));
         let mut baseline_args = without_subtitle_bsfs(&argv);
         *baseline_args.last_mut().unwrap() = path_arg(&baseline);

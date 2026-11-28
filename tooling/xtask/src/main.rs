@@ -163,7 +163,39 @@ Commands:
     );
 }
 
+fn build_media_worker(args: &[String]) -> Result<()> {
+    let mut command = vec![
+        "build".to_string(),
+        "--package".to_string(),
+        "frame-media".to_string(),
+    ];
+    let mut args = args.iter().take_while(|arg| arg.as_str() != "--");
+    while let Some(arg) = args.next() {
+        let flag = arg.split('=').next().unwrap_or(arg);
+        if [
+            "--release",
+            "--locked",
+            "--offline",
+            "--frozen",
+            "--target",
+            "--target-dir",
+            "--profile",
+        ]
+        .contains(&flag)
+        {
+            command.push(arg.clone());
+            if ["--target", "--target-dir", "--profile"].contains(&arg.as_str())
+                && let Some(value) = args.next()
+            {
+                command.push(value.clone());
+            }
+        }
+    }
+    run_command_path("cargo", &command)
+}
+
 fn run_frame_app(args: Vec<String>) -> Result<()> {
+    build_media_worker(&args)?;
     let mut cargo_args = vec![
         "run".to_string(),
         "--manifest-path".to_string(),
@@ -174,6 +206,7 @@ fn run_frame_app(args: Vec<String>) -> Result<()> {
 }
 
 fn build_frame_app(args: Vec<String>) -> Result<()> {
+    build_media_worker(&args)?;
     let mut cargo_args = vec![
         "build".to_string(),
         "--manifest-path".to_string(),
@@ -1394,8 +1427,9 @@ const fn host_arch() -> &'static str {
 }
 
 fn ci() -> Result<()> {
-    const MANIFESTS: [&str; 5] = [
+    const MANIFESTS: [&str; 6] = [
         "frame-core/Cargo.toml",
+        "frame-media/Cargo.toml",
         "frame-app/Cargo.toml",
         "frame-updater/Cargo.toml",
         "tooling/manifest-signer/Cargo.toml",
@@ -2065,6 +2099,7 @@ fn ci_workflow() -> String {
 # Rebuild with `cargo xtask workflows`.
 name: ci
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
@@ -2086,6 +2121,7 @@ jobs:
     - name: steps::setup_rust
       run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
 __CI_LINUX_SETUP__
+__CI_WORKER_TESTS__
     - name: security::validate_workflow_syntax
       run: |
         mkdir -p target/actionlint
@@ -2130,6 +2166,7 @@ __CI_MEDIA_TESTS__
         persist-credentials: false
     - name: steps::setup_rust
       run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
+__CI_WORKER_TESTS__
     - name: ci::check_macos
       run: cargo check --manifest-path frame-app/Cargo.toml --locked
 __CI_MEDIA_TESTS__
@@ -2144,6 +2181,7 @@ __CI_MEDIA_TESTS__
         persist-credentials: false
     - name: steps::setup_rust
       run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
+__CI_WORKER_TESTS__
     - name: ci::check_windows
       run: cargo check --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --locked
     - name: ci::build_windows_release
@@ -2154,12 +2192,37 @@ __CI_MEDIA_TESTS__
     - name: ci::test_windows_process_launch
       run: 'cargo test --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --release --locked --lib process_launch::windows_tests:: -- --test-threads=1'
 __CI_MEDIA_TESTS__
-    timeout-minutes: 60
+    timeout-minutes: 90
+  media_other_architectures:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04-arm, macos-26-intel]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v7.0.0
+      with:
+        persist-credentials: false
+    - name: steps::setup_rust
+      run: rustup toolchain install __RUST_VERSION__ --profile minimal
+__CI_WORKER_TESTS__
+    timeout-minutes: 90
 "
+        .replace("__CI_WORKER_TESTS__", CI_WORKER_TESTS)
         .replace("__CI_LINUX_SETUP__", &linux_ci_setup_step())
         .replace("__CI_MEDIA_TESTS__", ci_media_test_steps()),
     )
 }
+
+const CI_WORKER_TESTS: &str = "    - name: ci::setup_media_sdk
+      run: python script/media-worker.py setup-ci
+    - name: ci::build_media_worker
+      run: cargo build --locked --package frame-media
+    - name: ci::test_media_worker
+      run: cargo test --locked --package frame-media
+    - name: ci::test_worker_packaging
+      run: python -B -m unittest discover -s script/tests -p test_media_worker.py -v";
 
 const fn ci_media_test_steps() -> &'static str {
     "    - name: ci::setup_ffmpeg
@@ -3715,8 +3778,8 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
           };
 
           cargoHash = lib.fakeHash;
-          cargoBuildFlags = [ "--package" "frame-app" ];
-          cargoTestFlags = [ "--package" "frame-app" ];
+          cargoBuildFlags = [ "--package" "frame-app" "--package" "frame-media" ];
+          cargoTestFlags = [ "--package" "frame-app" "--package" "frame-media" ];
 
           nativeBuildInputs = [
             makeWrapper
@@ -3724,6 +3787,7 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
           ];
 
           buildInputs = [
+            ffmpeg
             alsa-lib
             fontconfig
             freetype

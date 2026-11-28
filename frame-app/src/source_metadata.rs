@@ -1,7 +1,7 @@
-//! Source metadata state and ffprobe integration for the GPUI app.
+//! Source metadata state and bounded media inspection for the GPUI app.
 
 use crate::file_queue::FileQueue;
-use crate::runtime_binaries::ffprobe_executable;
+use crate::runtime_binaries::media_worker_executable;
 use crate::settings::{AudioTrack, SourceKind, SourceMetadata, SourceTags, SubtitleTrack};
 use frame_core::error::ConversionError;
 use frame_core::types::{FfprobeTags, ProbeMetadata};
@@ -157,11 +157,11 @@ pub fn source_metadata_from_probe(probe: ProbeMetadata) -> SourceMetadata {
     }
 }
 
-/// Probes source metadata with the bundled ffprobe executable.
+/// Reads source metadata with the configured media worker.
 ///
 /// # Errors
 ///
-/// Returns an error when ffprobe cannot be executed, exits unsuccessfully, or
+/// Returns an error when the worker cannot be executed, exits unsuccessfully, or
 /// exceeds the probe time or output limit, or emits invalid metadata.
 pub fn probe_source_metadata(file_path: &str) -> Result<SourceMetadata, ConversionError> {
     probe_source_metadata_cancellable(file_path, &|| false)
@@ -171,10 +171,14 @@ pub(crate) fn probe_source_metadata_cancellable(
     file_path: &str,
     cancelled: &dyn Fn() -> bool,
 ) -> Result<SourceMetadata, ConversionError> {
-    probe_source_metadata_with_executable_cancellable(file_path, &ffprobe_executable(), cancelled)
+    probe_source_metadata_with_executable_cancellable(
+        file_path,
+        &media_worker_executable(),
+        cancelled,
+    )
 }
 
-/// Probes source metadata with a specific ffprobe executable.
+/// Reads source metadata with a specific media inspection executable.
 ///
 /// # Errors
 ///

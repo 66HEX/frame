@@ -206,10 +206,15 @@ fn sandboxed_direct_publication_keeps_its_original_output_path_and_lifecycle() {
     let output_path = output.to_str().unwrap();
     let args: Vec<String> = [
         "-n",
-        "-f",
-        "lavfi",
         "-i",
-        "color=size=32x32:duration=0.1",
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../frame-core/tests/fixtures/hevc-runtime-comparison/source.mp4"
+        ),
+        "-map",
+        "0:0",
+        "-c:v",
+        "png",
         "-frames:v",
         "1",
         "-update",
@@ -227,7 +232,7 @@ fn sandboxed_direct_publication_keeps_its_original_output_path_and_lifecycle() {
     run_final_conversion_with_publication(
         &task,
         OutputPublication::for_environment(output_path, true),
-        &ffmpeg_executable(),
+        &media_worker_executable(),
         args.clone(),
         PreparedExport {
             args,

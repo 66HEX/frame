@@ -15,8 +15,8 @@ fn probe_frames(
     let argv = build_gif_probe_args(&path_arg(input), config, &metadata, mode)
         .map_err(|error| error.to_string())?
         .ok_or_else(|| "expected GIF frame probe".to_string())?;
-    let stdout = String::from_utf8(run_tool_output(&tools.ffmpeg, &argv)?)
-        .map_err(|error| error.to_string())?;
+    let stdout =
+        String::from_utf8(tools.native("convert", &argv)?).map_err(|error| error.to_string())?;
     assert!(
         stdout.lines().last() == Some("progress=end"),
         "incomplete progress: {stdout}"
@@ -86,7 +86,7 @@ fn gif_minimum_frame_proof_should_recover_a_still_and_distinguish_empty_trim() -
         GifFramePolicy::ConfirmedMinimumFrame,
     )
     .map_err(|error| error.to_string())?;
-    run_tool(&tools.ffmpeg, &argv)?;
+    tools.native("convert", &argv)?;
     let metadata = probe_media(&tools, &output)?;
     assert_eq!((metadata.width, metadata.height), (Some(31), Some(33)));
     let pixels = run_tool_output(
@@ -212,7 +212,7 @@ fn snapshot_without_pacing_should_keep_one_frame_without_changing_the_stream_pla
     let decode = |mut argv: Vec<String>| {
         let index = argv.len() - 1;
         argv.splice(index..index, ["-frames:v".into(), "1".into()]);
-        run_tool_output(&tools.ffmpeg, &argv)
+        tools.native("preview", &argv)
     };
     assert!(decode(ordinary.args)?.is_empty());
     let pixels = decode(snapshot.args)?;

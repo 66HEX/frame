@@ -258,6 +258,10 @@ impl RunningPreviewProcess {
         let plan = preview_audio_plan(config, seconds, true, precise, output_spec)?;
         let mut child = super::startup_process::spawn(
             Command::new(&self.executable)
+                .args(crate::runtime_binaries::worker_subcommand(
+                    std::path::Path::new(&self.executable),
+                    "preview",
+                ))
                 .args(&plan.args)
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())

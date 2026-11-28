@@ -113,6 +113,10 @@ fn raw_snapshot(
 ) -> Result<Vec<u8>, PreviewEngineError> {
     let mut command = CommandSpec::new(executable);
     command.args = args.iter().map(Into::into).collect();
+    if let Some(operation) = crate::runtime_binaries::worker_subcommand(&command.program, "preview")
+    {
+        command.args.insert(0, operation.into());
+    }
     #[cfg(windows)]
     {
         let (program, interpreter) =

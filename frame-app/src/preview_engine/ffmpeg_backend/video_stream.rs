@@ -283,6 +283,10 @@ impl RunningPreviewProcess {
         let spawned_at = Instant::now();
         let child = super::startup_process::spawn(
             Command::new(&self.executable)
+                .args(crate::runtime_binaries::worker_subcommand(
+                    std::path::Path::new(&self.executable),
+                    "preview",
+                ))
                 .args(&plan.args)
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())

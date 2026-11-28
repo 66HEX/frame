@@ -149,6 +149,8 @@ mkdir -p \
 
 cp "$binary_path" "$app_dir/bin/frame"
 cp "$helper_path" "$app_dir/bin/frame-update-helper"
+python3 "$repo_root/script/media-worker.py" bundle --target "$target_triple" \
+	--bin-dir "$app_dir/bin" --lib-dir "$app_dir/lib"
 
 find_libs() {
 	ldd "$binary_path" |
