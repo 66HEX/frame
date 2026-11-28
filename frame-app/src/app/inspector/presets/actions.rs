@@ -18,7 +18,10 @@ impl FrameRoot {
 
         let (id, next_sequence) = self.next_custom_preset_identity();
         let mut preset = create_custom_preset(id, name, &config);
-        preset.enable_source_audio = self.settings_ui.preset_enables_source_audio(&config);
+        preset.enable_source_audio = crate::app::inspector::state::preset_draft_enables_audio(
+            self.settings_ui.preset_audio_draft,
+            &config,
+        );
         self.presets.push(preset);
         if self.persist_app_settings().is_err() {
             self.presets.pop();

@@ -349,9 +349,7 @@ impl Render for FrameRoot {
                     subtitle_font_color_hsv_draft: self.subtitle_ui.font_color_hsv_draft,
                     subtitle_outline_color_hsv_draft: self.subtitle_ui.outline_color_hsv_draft,
                     preset_name: &self.settings_ui.preset_name_draft,
-                    preset_enables_audio: self
-                        .settings_ui
-                        .preset_enables_source_audio(&selected_config_snapshot),
+                    preset_audio_draft: self.settings_ui.preset_audio_draft,
                     preset_name_focus: Some(&preset_name_focus),
                     presets: &self.presets,
                     applied_preset_id: self.selected_applied_preset_id(),

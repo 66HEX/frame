@@ -3,7 +3,8 @@ use crate::settings::rules::container_supports_audio;
 use crate::settings::updates::normalize::normalize_output_config;
 
 /// Returns the first local track only when applying the preset would enable audio.
-pub(crate) fn preset_default_audio_track<'a>(
+#[must_use]
+pub fn preset_default_audio_track<'a>(
     target: &ConversionConfig,
     output_supports_audio: bool,
     enable_source_audio: bool,

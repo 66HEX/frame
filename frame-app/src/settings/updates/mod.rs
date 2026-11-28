@@ -26,8 +26,7 @@ pub use normalize::{initialize_output_config, normalize_output_config, normalize
 pub use output::{
     apply_output_container, apply_processing_mode, apply_trim_times, sanitize_output_name,
 };
-pub use presets::apply_preset;
-pub(crate) use presets::preset_default_audio_track;
+pub use presets::{apply_preset, preset_default_audio_track};
 pub use subtitles::{
     add_external_subtitle_tracks, apply_external_subtitle_default, apply_external_subtitle_forced,
     apply_external_subtitle_language, apply_external_subtitle_title, apply_subtitle_burn_path,

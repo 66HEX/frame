@@ -177,7 +177,7 @@ pub fn preset_options(
                 preset: preset.clone(),
                 is_selected,
                 is_compatible,
-                status: unavailable.or(is_selected.then_some("Applied")),
+                status: unavailable.or_else(|| is_selected.then_some("Applied")),
             }
         })
         .collect()
@@ -212,7 +212,8 @@ pub fn preset_is_compatible(preset: &PresetDefinition, metadata: Option<&SourceM
 }
 
 /// Explains why a saved preset cannot enable audio on this source.
-pub(crate) fn preset_audio_unavailable(
+#[must_use]
+pub fn preset_audio_unavailable(
     preset: &PresetDefinition,
     target: &ConversionConfig,
     metadata: Option<&SourceMetadata>,

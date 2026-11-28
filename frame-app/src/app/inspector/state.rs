@@ -65,13 +65,12 @@ impl Default for SettingsUiState {
     }
 }
 
-impl SettingsUiState {
-    pub(in crate::app) fn preset_enables_source_audio(&self, config: &ConversionConfig) -> bool {
-        crate::settings::container_supports_audio(&config.container)
-            && self
-                .preset_audio_draft
-                .unwrap_or(!config.selected_audio_tracks.is_empty())
-    }
+pub(in crate::app) fn preset_draft_enables_audio(
+    draft: Option<bool>,
+    config: &ConversionConfig,
+) -> bool {
+    crate::settings::container_supports_audio(&config.container)
+        && draft.unwrap_or(!config.selected_audio_tracks.is_empty())
 }
 
 #[derive(Clone, Copy)]
@@ -110,7 +109,7 @@ pub(in crate::app) struct SettingsRenderState<'a> {
     pub(in crate::app) subtitle_font_color_hsv_draft: SettingsSubtitleHsv,
     pub(in crate::app) subtitle_outline_color_hsv_draft: SettingsSubtitleHsv,
     pub(in crate::app) preset_name: &'a str,
-    pub(in crate::app) preset_enables_audio: bool,
+    pub(in crate::app) preset_audio_draft: Option<bool>,
     pub(in crate::app) preset_name_focus: Option<&'a FocusHandle>,
     pub(in crate::app) presets: &'a [PresetDefinition],
     pub(in crate::app) applied_preset_id: Option<&'a str>,
