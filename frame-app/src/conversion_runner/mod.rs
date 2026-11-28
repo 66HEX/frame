@@ -15,6 +15,7 @@ mod stabilization;
 mod subtitles;
 #[cfg(test)]
 mod tests;
+pub(crate) mod video_route;
 
 #[cfg(test)]
 use crate::file_queue::FileItem;
@@ -29,7 +30,10 @@ use frame_core::events::ConversionEvent;
 use frame_core::types::{ConversionTask, DEFAULT_MAX_CONCURRENCY};
 pub use output_paths::*;
 pub(crate) use publication::{PublicationDecision, publish_staged_output};
-pub use runner::*;
+pub(crate) use runner::run_planned_batch;
 #[cfg(test)]
 use runner::{expected_duration_seconds, ffmpeg_progress_from_line, next_batch_launch_count};
+pub use runner::{
+    run_conversion_batch_with_control, run_conversion_task, run_conversion_task_with_control,
+};
 pub use subtitles::check_subtitle_trim_support;

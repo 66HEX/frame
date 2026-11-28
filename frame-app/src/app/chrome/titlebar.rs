@@ -379,7 +379,7 @@ pub(in crate::app) fn titlebar_start_button(
     .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
         cx.stop_propagation();
         match availability {
-            StartAvailability::Ready => root.start_selected_conversions(cx),
+            StartAvailability::Ready => root.start_selected_conversions(window, cx),
             StartAvailability::MissingOutputDirectory => {
                 FrameRoot::prompt_default_output_folder(window, cx);
             }

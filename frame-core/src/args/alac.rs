@@ -26,6 +26,11 @@ pub struct AlacCopyObserver {
 }
 
 impl AlacCopyObserver {
+    /// Pin the video export route while leaving the independent audio observation intact.
+    pub fn pin_video_route(&mut self, route: &super::VideoRoute) {
+        route.pin(&mut self.ordinary);
+    }
+
     #[must_use]
     pub fn audio_outputs(&self) -> &[CopyAudioOutput] {
         &self.audio

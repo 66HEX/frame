@@ -1,7 +1,7 @@
 use crate::app::root::FrameRoot;
 use crate::conversion_events::all_conversions_settled;
 use crate::conversion_runner::{
-    conversion_task_from_file, disambiguate_output_paths, run_conversion_batch_with_control,
+    conversion_task_from_file, disambiguate_output_paths, run_planned_batch,
 };
 use crate::file_filters::source_kind_for_extension;
 use crate::file_queue::{FileItem, FileStatus};
@@ -79,7 +79,11 @@ impl FrameRoot {
 
         tasks
     }
-    pub(in crate::app) fn start_selected_conversions(&mut self, cx: &mut Context<Self>) {
+    pub(in crate::app) fn start_selected_conversions(
+        &mut self,
+        window: &gpui::Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.is_processing || self.update_installation_in_progress() {
             return;
         }
@@ -92,21 +96,21 @@ impl FrameRoot {
 
         self.active_conversion_task_ids = tasks.iter().map(|task| task.id.clone()).collect();
         self.is_processing = true;
-        self.spawn_conversion_batch(tasks, cx);
+        self.preflight_conversion_batch(tasks, window, cx);
         cx.notify();
     }
     pub(in crate::app) fn spawn_conversion_batch(
-        &mut self,
+        &self,
         tasks: Vec<frame_core::types::ConversionTask>,
+        routes: std::collections::HashMap<String, frame_core::args::VideoRoute>,
         cx: &Context<Self>,
     ) {
-        self.conversion_batch_generation = self.conversion_batch_generation.wrapping_add(1);
         let generation = self.conversion_batch_generation;
         let (tx, rx) = mpsc::channel();
         let controller = self.conversion_processes.clone();
 
         cx.background_spawn(async move {
-            let result = run_conversion_batch_with_control(tasks, &controller, |event| {
+            let result = run_planned_batch(tasks, routes, &controller, |event| {
                 let _ = tx.send(event);
             });
             if let Err(error) = result {

@@ -176,3 +176,60 @@ fn run_conversion_task_should_preserve_existing_output_and_use_suffix() {
         )
     );
 }
+
+#[test]
+#[ignore = "requires the Frame worker and reference media tools"]
+fn hardware_preflight_pins_a_confirmed_software_fallback_before_publication() {
+    let sandbox = ConversionRunnerSandbox::new("hardware-fallback");
+    let input = sandbox.path("source.mp4");
+    generate_runner_source(&input);
+    // Pick a backend unavailable on this OS, even on a machine with a GPU.
+    let missing = if cfg!(target_os = "windows") {
+        "hevc_vaapi"
+    } else {
+        "hevc_amf"
+    };
+    let mut task = ConversionTask {
+        id: "fallback".to_owned(),
+        config: core_config_from_gpui(&GpuiConversionConfig {
+            video_codec: missing.to_owned(),
+            video_bitrate_mode: "bitrate".to_owned(),
+            hw_decode: true,
+            ..GpuiConversionConfig::default()
+        }),
+        file_path: input.to_string_lossy().into_owned(),
+        output_directory: sandbox.root.to_string_lossy().into_owned(),
+        output_name: Some("approved.mp4".to_owned()),
+    };
+    let route = crate::conversion_runner::video_route::plan_task_video(&mut task, || false)
+        .unwrap()
+        .unwrap();
+    assert!(route.fallback.as_deref().unwrap().contains(missing));
+    assert_eq!(route.encoder, "libx265");
+    assert_eq!(route.decoder, "cpu");
+    assert!(!sandbox.path("approved.mp4").exists());
+
+    let routes = std::collections::HashMap::from([(task.id.clone(), route)]);
+    let mut events = Vec::new();
+    crate::conversion_runner::run_planned_batch(
+        vec![task],
+        routes,
+        &ConversionProcessController::default(),
+        |event| events.push(event),
+    )
+    .unwrap();
+    assert!(
+        events
+            .iter()
+            .any(|event| matches!(event, ConversionEvent::Completed(_))),
+        "{events:?}"
+    );
+    let decoded = crate::process_launch::status(
+        std::process::Command::new(crate::runtime_binaries::ffmpeg_executable())
+            .args(["-loglevel", "error", "-xerror", "-i"])
+            .arg(sandbox.path("approved.mp4"))
+            .args(["-map", "0:v:0", "-f", "null", "-"]),
+    )
+    .unwrap();
+    assert!(decoded.success());
+}

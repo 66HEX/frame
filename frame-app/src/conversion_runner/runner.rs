@@ -7,14 +7,15 @@ use super::{PublicationDecision, StagedOutput, publish_staged_output};
 use crate::capabilities::{HardwareEncoder, HardwareProbePolicy, probe_hardware_encoder};
 use crate::runtime_binaries::media_worker_executable;
 use frame_core::args::{
-    GifFramePolicy, build_alac_copy_observer, build_ffmpeg_args, build_ffmpeg_args_with_gif_policy,
-    build_output_path, effective_video_encoder, validate_task_input,
+    GifFramePolicy, VideoRoute, build_alac_copy_observer, build_ffmpeg_args,
+    build_ffmpeg_args_with_gif_policy, build_output_path, effective_video_encoder,
+    validate_task_input,
 };
 use frame_core::error::ConversionError;
 use frame_core::events::ConversionEvent;
 use frame_core::types::{ConversionConfig as CoreConversionConfig, ConversionTask, ProbeMetadata};
 use frame_core::utils::{DURATION_REGEX, TIME_REGEX, parse_time};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::io::Read;
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
@@ -42,7 +43,20 @@ pub fn run_conversion_task(
 /// Returns an error when the controller state cannot be read or the worker
 /// channel disconnects before all tasks complete.
 pub fn run_conversion_batch_with_control(
+    tasks: Vec<ConversionTask>,
+    controller: &ConversionProcessController,
+    emit: impl FnMut(ConversionEvent),
+) -> Result<(), ConversionError> {
+    run_planned_batch(tasks, HashMap::new(), controller, emit)
+}
+
+/// Runs queued tasks with their confirmed video routes.
+///
+/// # Errors
+/// Returns an error if the batch cannot be scheduled or monitored.
+pub fn run_planned_batch(
     mut tasks: Vec<ConversionTask>,
+    mut routes: HashMap<String, VideoRoute>,
     controller: &ConversionProcessController,
     mut emit: impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
@@ -66,7 +80,14 @@ pub fn run_conversion_batch_with_control(
                 break;
             };
             running_count += 1;
-            spawn_batch_worker(task, controller.clone(), event_tx.clone(), done_tx.clone());
+            let route = routes.remove(&task.id);
+            spawn_batch_worker(
+                task,
+                route,
+                controller.clone(),
+                event_tx.clone(),
+                done_tx.clone(),
+            );
         }
 
         drain_batch_events(&event_rx, &mut emit);
@@ -108,11 +129,12 @@ pub fn run_conversion_task_with_control(
 ) -> Result<(), ConversionError> {
     controller.begin_attempt(&task.id)?;
     disambiguate_output_paths(std::slice::from_mut(&mut task));
-    run_prepared_conversion_task_with_control(&task, controller, emit)
+    run_prepared_conversion_task_with_control(&task, None, controller, emit)
 }
 
 fn run_prepared_conversion_task_with_control(
     task: &ConversionTask,
+    route: Option<&VideoRoute>,
     controller: &ConversionProcessController,
     emit: &mut impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
@@ -139,7 +161,15 @@ fn run_prepared_conversion_task_with_control(
         &task.config.container,
         task.output_name.as_deref(),
     );
-    let ordinary_args = build_ffmpeg_args(&task.file_path, &output_path, &task.config, &probe)?;
+    let mut ordinary_args = build_ffmpeg_args(&task.file_path, &output_path, &task.config, &probe)?;
+    if let Some(route) = route {
+        if effective_video_encoder(&task.config, &probe) != Some(route.encoder.as_str()) {
+            return Err(ConversionError::InvalidInput(
+                "The video route changed after preflight. Start the export again.".into(),
+            ));
+        }
+        route.pin(&mut ordinary_args);
+    }
     let executable = media_worker_executable();
     if !super::stabilization::check_with_control(
         &task.config,
@@ -150,11 +180,14 @@ fn run_prepared_conversion_task_with_control(
     )? {
         return Ok(());
     }
-    if let Some(observer) =
+    if let Some(mut observer) =
         build_alac_copy_observer(&task.file_path, &output_path, &task.config, &probe)?
     {
-        if !check_export_capabilities(task, &probe, &executable, controller, emit)? {
+        if !check_export_capabilities(task, &probe, &executable, route, controller, emit)? {
             return Ok(());
+        }
+        if let Some(route) = route {
+            observer.pin_video_route(route);
         }
         return super::alac::run(
             task,
@@ -191,7 +224,7 @@ fn run_prepared_conversion_task_with_control(
     };
     prepared.opus_proof = opus_proof;
 
-    if !check_export_capabilities(task, &probe, &executable, controller, emit)? {
+    if !check_export_capabilities(task, &probe, &executable, route, controller, emit)? {
         return Ok(());
     }
 
@@ -612,6 +645,7 @@ fn check_export_capabilities(
     task: &ConversionTask,
     probe: &ProbeMetadata,
     executable: &str,
+    route: Option<&VideoRoute>,
     controller: &ConversionProcessController,
     emit: &mut impl FnMut(ConversionEvent),
 ) -> Result<bool, ConversionError> {
@@ -623,6 +657,10 @@ fn check_export_capabilities(
         emit,
     )? {
         return Ok(false);
+    }
+    // Preflight already encoded and drained a picture from this file with the pinned route.
+    if route.is_some() {
+        return Ok(true);
     }
     check_hardware_encoder(task, probe, executable, controller, emit)
 }
@@ -637,7 +675,8 @@ fn check_hardware_encoder(
     if let Some(encoder) =
         effective_video_encoder(&task.config, probe).and_then(HardwareEncoder::from_name)
     {
-        let policy = HardwareProbePolicy::new(encoder, task.config.videotoolbox_allow_sw);
+        let policy = HardwareProbePolicy::new(encoder, task.config.videotoolbox_allow_sw)
+            .for_pixel_format(&task.config.pixel_format);
         let report =
             probe_hardware_encoder(executable, policy, || controller.is_cancelled(&task.id));
         if controller.take_cancelled(&task.id)? {
@@ -751,15 +790,21 @@ fn prepare_gif_export(
 
 fn spawn_batch_worker(
     task: ConversionTask,
+    route: Option<VideoRoute>,
     controller: ConversionProcessController,
     event_tx: mpsc::Sender<ConversionEvent>,
     done_tx: mpsc::Sender<(String, Result<(), ConversionError>)>,
 ) {
     let task_id = task.id.clone();
     thread::spawn(move || {
-        let result = run_prepared_conversion_task_with_control(&task, &controller, &mut |event| {
-            let _ = event_tx.send(event);
-        });
+        let result = run_prepared_conversion_task_with_control(
+            &task,
+            route.as_ref(),
+            &controller,
+            &mut |event| {
+                let _ = event_tx.send(event);
+            },
+        );
         let _ = done_tx.send((task_id, result));
     });
 }

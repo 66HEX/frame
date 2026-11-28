@@ -2,7 +2,9 @@ use crate::trim::{OutputTrim, SubtitleTrimPlan};
 use std::{collections::HashSet, path::Path};
 
 mod alac;
+mod hardware;
 pub use alac::{AlacCopyObserver, CopyAudioOutput, build_alac_copy_observer};
+pub use hardware::VideoRoute;
 
 use crate::audio_rules::{
     AudioStreamCopySource, audio_stream_copy_error_with_source, audio_track_count_error,
