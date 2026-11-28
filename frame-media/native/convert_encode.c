@@ -363,6 +363,7 @@ static int open_codec(const ConvertPlan *p, ConvertTrack *t, const AVCodec *code
                                         "temporal-aq",
                                         "allow_sw",
                                         "huffman",
+                                        "distance",
                                         "lossless",
                                         "quality",
                                         "compression_level",

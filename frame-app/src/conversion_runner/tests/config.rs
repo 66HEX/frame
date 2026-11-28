@@ -157,6 +157,7 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
         pixel_format: "yuv420p10le".to_string(),
         image_jpeg_quality: 92,
         image_jpeg_huffman: "optimal".to_string(),
+        image_jxl_lossless: false,
         image_webp_lossless: true,
         image_webp_quality: 88,
         image_webp_compression: 6,
@@ -176,6 +177,7 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
     let core = core_config_from_gpui(&config);
 
     assert_eq!(core.processing_mode, "copy");
+    assert!(!core.image_jxl_lossless);
     assert_eq!(core.container, "mov");
     assert_eq!(core.audio_bitrate, "192");
     assert_eq!(core.audio_channels, "stereo");

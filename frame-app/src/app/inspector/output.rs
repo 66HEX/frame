@@ -20,6 +20,7 @@ pub(in crate::app) fn settings_output_tab(
     config: &ConversionConfig,
     metadata: Option<&SourceMetadata>,
     settings_disabled: bool,
+    jxl_available: bool,
     output_name: &str,
     output_name_focus: Option<&FocusHandle>,
     palette: &'static theme::ThemePalette,
@@ -65,6 +66,7 @@ pub(in crate::app) fn settings_output_tab(
                     settings_field("Container", palette).child(settings_container_grid(
                         config,
                         metadata,
+                        jxl_available,
                         settings_disabled,
                         palette,
                         window,
@@ -146,21 +148,23 @@ fn settings_processing_mode_grid(
     }
 }
 
-pub(in crate::app) fn settings_container_grid(
+fn settings_container_grid(
     config: &ConversionConfig,
     metadata: Option<&SourceMetadata>,
+    jxl_available: bool,
     settings_disabled: bool,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let mut grid = Vec::new();
-    for option in output_container_options(config, metadata, settings_disabled) {
+    for option in output_container_options(config, metadata, jxl_available, settings_disabled) {
         let container = option.container;
         let is_enabled = !option.is_disabled;
-        grid.push(FrameOption::new(
+        grid.push(FrameOption::with_caption(
             format!("output-container-{container}"),
             container.clone(),
+            option.disabled_reason.unwrap_or_default(),
             option.is_selected,
             is_enabled,
             move |root, _window, cx| {

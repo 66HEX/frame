@@ -100,6 +100,7 @@ pub fn core_config_from_gpui(config: &GpuiConversionConfig) -> CoreConversionCon
         pixel_format: non_empty_or(&config.pixel_format, DEFAULT_PIXEL_FORMAT),
         image_jpeg_quality: config.image_jpeg_quality.clamp(1, 100),
         image_jpeg_huffman: config.image_jpeg_huffman.clone(),
+        image_jxl_lossless: config.image_jxl_lossless,
         image_webp_lossless: config.image_webp_lossless,
         image_webp_quality: config.image_webp_quality.min(100),
         image_webp_compression: config.image_webp_compression.min(6),

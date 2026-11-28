@@ -160,7 +160,7 @@ fn selected_adpcm_copy_error_matches_container_and_readiness_without_changing_se
             Some("This audio track cannot be copied to MKV. Choose Re-encode.")
         );
         assert!(!options[1].is_disabled);
-        let outputs = output_container_options(&config, Some(&metadata), false);
+        let outputs = output_container_options(&config, Some(&metadata), true, false);
         assert_eq!(
             outputs
                 .iter()

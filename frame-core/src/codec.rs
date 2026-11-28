@@ -20,7 +20,7 @@ pub fn supports_video_two_pass(codec: &str, bitrate_mode: &str) -> bool {
 pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
     let is_still_image_codec = matches!(
         config.video_codec.as_str(),
-        "png" | "mjpeg" | "libwebp" | "bmp" | "tiff"
+        "png" | "mjpeg" | "libwebp" | "bmp" | "tiff" | "libjxl"
     );
 
     let is_nvenc = is_nvenc_codec(&config.video_codec);
@@ -124,6 +124,10 @@ fn add_still_image_codec_args(args: &mut Vec<String>, config: &ConversionConfig)
             args.push(jpeg_quality_to_qscale(config.image_jpeg_quality).to_string());
             args.push("-huffman".to_string());
             args.push(normalize_jpeg_huffman(&config.image_jpeg_huffman).to_string());
+        }
+        "libjxl" => {
+            let distance = if config.image_jxl_lossless { "0" } else { "1" };
+            args.extend(["-distance".to_string(), distance.to_string()]);
         }
         "libwebp" => {
             args.push("-lossless".to_string());

@@ -24,6 +24,7 @@ pub struct AvailableEncoders {
     pub hevc_amf: bool,
     pub libfdk_aac: bool,
     pub libmp3lame: bool,
+    pub libjxl: bool,
 }
 
 #[derive(serde::Serialize, Clone, Debug, Default, Eq, PartialEq)]
@@ -86,6 +87,7 @@ pub fn parse_available_encoders(ffmpeg_encoders_stdout: impl AsRef<str>) -> Avai
         hevc_amf: encoder_list_contains(stdout, "hevc_amf"),
         libfdk_aac: encoder_list_contains(stdout, "libfdk_aac"),
         libmp3lame: encoder_list_contains(stdout, "libmp3lame"),
+        libjxl: encoder_list_contains(stdout, "libjxl"),
     }
 }
 
@@ -174,6 +176,7 @@ Encoders:
  V..... av1_vaapi AV1 (VA-API)
  V..... hevc_amf HEVC (AMD AMF)
  A..... libfdk_aac Fraunhofer FDK AAC
+ V....D libjxl JPEG XL encoder
  A..... libmp3lame libmp3lame MP3
  V.S... mpeg2video MPEG-2 video
  A....D mp2 MP2 (MPEG audio layer 2)
@@ -201,6 +204,7 @@ Encoders:
                 hevc_amf: true,
                 libfdk_aac: true,
                 libmp3lame: true,
+                libjxl: true,
             }
         );
     }

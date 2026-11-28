@@ -73,13 +73,17 @@ pub fn visible_output_containers(metadata: Option<&SourceMetadata>) -> Vec<Strin
 pub fn output_container_options(
     config: &ConversionConfig,
     metadata: Option<&SourceMetadata>,
+    jxl_available: bool,
     disabled: bool,
 ) -> Vec<OutputContainerOption> {
     visible_output_containers(metadata)
         .into_iter()
         .map(|container| {
-            let disabled_reason =
-                output_container_disabled_reason(config, metadata, &container, disabled);
+            let disabled_reason = if container == "jxl" && !jxl_available {
+                Some("JPEG XL encoding is unavailable in this media runtime")
+            } else {
+                output_container_disabled_reason(config, metadata, &container, disabled)
+            };
             OutputContainerOption {
                 is_selected: config.container.eq_ignore_ascii_case(&container),
                 is_disabled: disabled_reason.is_some(),

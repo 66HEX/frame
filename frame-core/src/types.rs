@@ -423,6 +423,8 @@ pub struct ConversionConfig {
     pub image_jpeg_quality: u32,
     #[serde(default = "default_image_jpeg_huffman")]
     pub image_jpeg_huffman: String,
+    #[serde(default = "default_image_jxl_lossless")]
+    pub image_jxl_lossless: bool,
     #[serde(default)]
     pub image_webp_lossless: bool,
     #[serde(default = "default_image_webp_quality")]
@@ -523,6 +525,10 @@ const fn default_image_jpeg_quality() -> u32 {
 
 fn default_image_jpeg_huffman() -> String {
     "optimal".to_string()
+}
+
+const fn default_image_jxl_lossless() -> bool {
+    true
 }
 
 const fn default_image_webp_quality() -> u32 {

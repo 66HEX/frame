@@ -286,6 +286,7 @@ fn settings_output_section(
             settings.config,
             settings.metadata,
             settings.settings_disabled,
+            settings.available_encoders.libjxl,
             settings.output_name,
             settings.output_name_focus,
             palette,

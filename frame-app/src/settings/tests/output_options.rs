@@ -10,7 +10,7 @@ fn mp4_copy_option_explains_the_mp3_sample_rate_requirement() {
         selected_audio_tracks: vec![metadata.audio_tracks[0].index],
         ..ConversionConfig::default()
     };
-    let options = output_container_options(&config, Some(&metadata), false);
+    let options = output_container_options(&config, Some(&metadata), true, false);
     let mp4 = options
         .iter()
         .find(|option| option.container == "mp4")
@@ -81,8 +81,25 @@ fn visible_output_containers_for_video_exclude_image_formats() {
 fn visible_output_containers_for_images_match_original_image_and_gif_set() {
     assert_eq!(
         visible_output_containers(Some(&image_metadata())),
-        vec!["gif", "png", "jpg", "webp", "bmp", "tiff"]
+        vec!["gif", "png", "jpg", "webp", "bmp", "tiff", "jxl"]
     );
+}
+
+#[test]
+fn restored_jxl_selection_reports_a_missing_encoder() {
+    let config = ConversionConfig {
+        container: "jxl".into(),
+        ..ConversionConfig::default()
+    };
+    for available in [false, true] {
+        let option = output_container_options(&config, Some(&image_metadata()), available, false)
+            .into_iter()
+            .find(|option| option.container == "jxl")
+            .unwrap();
+        assert!(option.is_selected);
+        assert_eq!(option.is_disabled, !available);
+        assert_eq!(option.disabled_reason.is_some(), !available);
+    }
 }
 
 #[test]
@@ -194,6 +211,7 @@ fn output_container_options_disable_video_targets_for_audio_sources() {
     let options = output_container_options(
         &ConversionConfig::default(),
         Some(&audio_metadata("aac")),
+        true,
         false,
     );
     let mp4 = options
@@ -209,8 +227,12 @@ fn output_container_options_disable_video_targets_for_audio_sources() {
 
 #[test]
 fn output_container_options_disable_all_when_settings_are_locked() {
-    let options =
-        output_container_options(&ConversionConfig::default(), Some(&video_metadata()), true);
+    let options = output_container_options(
+        &ConversionConfig::default(),
+        Some(&video_metadata()),
+        true,
+        true,
+    );
 
     assert!(
         options

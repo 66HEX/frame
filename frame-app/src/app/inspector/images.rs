@@ -1,6 +1,6 @@
 use crate::app::components::{FrameOption, frame_option_field};
 use crate::app::components::{
-    frame_slider, frame_slider_fraction_from_bounds, frame_slider_handle,
+    frame_boolean_field, frame_slider, frame_slider_fraction_from_bounds, frame_slider_handle,
 };
 use crate::app::inspector::panel::settings_field;
 use crate::app::inspector::shared::{
@@ -148,6 +148,23 @@ fn settings_images_encoding_section(
     match config.container.as_str() {
         "jpg" => settings_image_jpeg_section(config, settings_disabled, palette, window, cx),
         "webp" => settings_image_webp_section(config, settings_disabled, palette, window, cx),
+        "jxl" => settings_field("JPEG XL compression", palette).child(frame_boolean_field(
+            "image-jxl-mode",
+            "JPEG XL compression",
+            config.image_jxl_lossless,
+            !settings_disabled,
+            ["Lossy", "Lossless"],
+            |root, lossless, _window, cx| {
+                if root.update_selected_config(|config| {
+                    std::mem::replace(&mut config.image_jxl_lossless, lossless) != lossless
+                }) {
+                    cx.notify();
+                }
+            },
+            palette,
+            window,
+            cx,
+        )),
         "png" => settings_image_png_section(config, settings_disabled, palette, window, cx),
         "tiff" => settings_image_tiff_section(config, settings_disabled, palette, window, cx),
         "bmp" => settings_field("BMP encoding", palette)

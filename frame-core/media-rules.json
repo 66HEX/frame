@@ -13,6 +13,7 @@
 		"webp",
 		"bmp",
 		"tiff",
+		"jxl",
 		"mp3",
 		"m4a",
 		"wav",
@@ -21,7 +22,7 @@
 	],
 	"audioOnlyContainers": ["mp3", "m4a", "wav", "flac", "opus", "aac"],
 	"videoOnlyContainers": ["gif"],
-	"imageContainers": ["png", "jpg", "webp", "bmp", "tiff"],
+	"imageContainers": ["png", "jpg", "webp", "bmp", "tiff", "jxl"],
 	"containerVideoCodecCompatibility": {
 		"mp4": [
 			"libx264",
@@ -71,9 +72,13 @@
 		"jpg": ["mjpeg"],
 		"webp": ["libwebp"],
 		"bmp": ["bmp"],
-		"tiff": ["tiff"]
+		"tiff": ["tiff"],
+		"jxl": ["libjxl"]
 	},
 	"containerEncoderPixelFormatCompatibility": {
+		"jxl": {
+			"libjxl": ["rgb24", "rgba", "rgb48le", "rgba64le", "gray", "ya8", "gray16le", "ya16le"]
+		},
 		"mp4": {
 			"libx264": ["yuv420p", "yuv422p", "yuv444p", "yuv420p10le", "yuv422p10le", "yuv444p10le"],
 			"libx265": ["yuv420p", "yuv422p", "yuv444p", "yuv420p10le", "yuv422p10le", "yuv444p10le"],
@@ -165,7 +170,8 @@
 		"jpg": [],
 		"webp": [],
 		"bmp": [],
-		"tiff": []
+		"tiff": [],
+		"jxl": []
 	},
 	"containerAudioStreamCodecCompatibility": {
 		"opus": ["opus"],
@@ -193,7 +199,8 @@
 		"jpg": [],
 		"webp": [],
 		"bmp": [],
-		"tiff": []
+		"tiff": [],
+		"jxl": []
 	},
 	"containerAudioStreamCopyTags": {
 		"mov": {

@@ -4,7 +4,9 @@
 /// No source pixel-format probe is used: the selected frame may change format.
 #[must_use]
 pub fn high_depth_image_overlay(container: &str, pixel_format: &str, opacity: f64) -> bool {
-    (container.eq_ignore_ascii_case("png") || container.eq_ignore_ascii_case("tiff"))
+    (container.eq_ignore_ascii_case("png")
+        || container.eq_ignore_ascii_case("tiff")
+        || container.eq_ignore_ascii_case("jxl"))
         && matches!(
             pixel_format.trim(),
             "rgb48le" | "rgb48be" | "rgba64le" | "rgba64be"

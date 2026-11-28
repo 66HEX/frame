@@ -36,6 +36,8 @@ mod decode_recovery;
 mod effects;
 #[path = "media_integration/gif_frames.rs"]
 mod gif_frames;
+#[path = "media_integration/jxl.rs"]
+mod jxl;
 #[path = "media_integration/mixed_modes.rs"]
 mod mixed_modes;
 #[path = "media_integration/overlay_depth.rs"]
@@ -3337,6 +3339,7 @@ fn base_config(container: &str, video_codec: &str) -> ConversionConfig {
         pixel_format: "auto".to_string(),
         image_jpeg_quality: 85,
         image_jpeg_huffman: "optimal".to_string(),
+        image_jxl_lossless: true,
         image_webp_lossless: false,
         image_webp_quality: 75,
         image_webp_compression: 4,

@@ -450,6 +450,7 @@ mod tests {
                 "webp".to_string(),
                 "bmp".to_string(),
                 "tiff".to_string(),
+                "jxl".to_string(),
                 "mp3".to_string(),
                 "m4a".to_string(),
                 "wav".to_string(),

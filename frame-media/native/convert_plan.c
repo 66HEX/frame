@@ -93,6 +93,7 @@ int frame_convert_parse(ConvertPlan *plan, int argc, const char *const *argv) {
                                          "temporal-aq",
                                          "allow_sw",
                                          "huffman",
+                                         "distance",
                                          "lossless",
                                          "quality",
                                          "compression_level",

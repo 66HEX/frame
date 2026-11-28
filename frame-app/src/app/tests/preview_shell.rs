@@ -18,6 +18,7 @@ fn empty_encoders() -> &'static AvailableEncoders {
         hevc_amf: false,
         libfdk_aac: false,
         libmp3lame: false,
+        libjxl: false,
     };
     &ENCODERS
 }

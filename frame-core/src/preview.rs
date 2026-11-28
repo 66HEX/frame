@@ -585,6 +585,7 @@ mod tests {
             pixel_format: "auto".to_string(),
             image_jpeg_quality: 85,
             image_jpeg_huffman: "optimal".to_string(),
+            image_jxl_lossless: true,
             image_webp_lossless: false,
             image_webp_quality: 75,
             image_webp_compression: 4,
