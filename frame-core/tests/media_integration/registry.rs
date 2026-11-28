@@ -4,11 +4,23 @@ use super::*;
 use frame_core::media_rules;
 use serde_json::Value;
 
+const HARDWARE_ENCODERS: &[&str] = &[
+    "h264_videotoolbox",
+    "hevc_videotoolbox",
+    "h264_nvenc",
+    "hevc_nvenc",
+    "av1_nvenc",
+    "h264_vaapi",
+    "hevc_vaapi",
+    "av1_vaapi",
+    "hevc_amf",
+];
+
 fn expected_codec(name: &str) -> &str {
     match name {
-        "libx264" | "h264_nvenc" | "h264_videotoolbox" => "h264",
-        "libx265" | "hevc_nvenc" | "hevc_videotoolbox" => "hevc",
-        "libsvtav1" | "av1_nvenc" => "av1",
+        "libx264" | "h264_nvenc" | "h264_videotoolbox" | "h264_vaapi" => "h264",
+        "libx265" | "hevc_nvenc" | "hevc_videotoolbox" | "hevc_vaapi" | "hevc_amf" => "hevc",
+        "libsvtav1" | "av1_nvenc" | "av1_vaapi" => "av1",
         "libwebp" => "webp",
         "libopus" => "opus",
         "libfdk_aac" => "aac",
@@ -30,34 +42,52 @@ fn software_video_codecs_and_explicit_pixel_formats_in_every_container() -> Test
 #[ignore = "runs a real encode for each hardware encoder available on this machine"]
 fn hardware_video_codecs_and_explicit_pixel_formats_in_every_container() -> TestResult {
     let tools = Toolchain::discover()?;
-    let mut available = Vec::new();
-    for name in [
-        "h264_videotoolbox",
-        "hevc_videotoolbox",
-        "h264_nvenc",
-        "hevc_nvenc",
-        "av1_nvenc",
-    ] {
+    let mut available = std::collections::BTreeMap::new();
+    for &name in HARDWARE_ENCODERS {
+        if (name.ends_with("_vaapi") && !cfg!(target_os = "linux"))
+            || (name.ends_with("_amf") && !cfg!(windows))
+            || (name.ends_with("_videotoolbox") && !cfg!(target_os = "macos"))
+            || (name.ends_with("_nvenc") && cfg!(target_os = "macos"))
+        {
+            continue;
+        }
         if hardware_encoder_available(&tools, name)? {
-            available.push(name);
+            let main10 =
+                !name.starts_with("h264_") && hardware_profile_available(&tools, name, "p010le")?;
+            available.insert(name, main10);
         }
     }
-    if let Ok(required) = env::var("FRAME_TEST_REQUIRED_HW_ENCODERS") {
-        for name in required.split(',') {
-            assert!(
-                available.contains(&name),
-                "required device encoder {name} unavailable"
-            );
+    for (variable, needs_main10) in [
+        ("FRAME_TEST_REQUIRED_HW_ENCODERS", false),
+        ("FRAME_TEST_REQUIRED_10BIT_HW_ENCODERS", true),
+    ] {
+        if let Ok(required) = env::var(variable) {
+            for name in required
+                .split(',')
+                .map(str::trim)
+                .filter(|item| !item.is_empty())
+            {
+                assert!(
+                    available
+                        .get(name)
+                        .is_some_and(|main10| !needs_main10 || *main10),
+                    "{variable} requires a working {name} profile on this machine"
+                );
+            }
         }
     }
-    eprintln!("Testing working device encoders {available:?}");
+    eprintln!("Working device encoders and 10-bit support: {available:?}");
     check_video_registry(Some(&available))
 }
 
 pub fn hardware_encoder_available(tools: &Toolchain, name: &str) -> TestResult<bool> {
+    hardware_profile_available(tools, name, "yuv420p")
+}
+
+fn hardware_profile_available(tools: &Toolchain, name: &str, pixel: &str) -> TestResult<bool> {
     let trial_frame = vec![0; 128 * 128 * 3 / 2];
     let mut child = Command::new(tools.worker.as_ref().unwrap())
-        .args(["capabilities", "hardware", name, "0"])
+        .args(["capabilities", "hardware", name, "0", pixel])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -76,33 +106,57 @@ pub fn hardware_encoder_available(tools: &Toolchain, name: &str) -> TestResult<b
     }
     // An unavailable device is expected on hosted runners. Detect a broken
     // worker probe if the legacy executable can actually use this encoder.
-    let mut trial = args(&[
-        "-v",
-        "error",
-        "-f",
-        "lavfi",
-        "-i",
-        "color=black:s=128x128:r=1:d=1",
-        "-frames:v",
-        "1",
-        "-c:v",
-        name,
-    ]);
-    if name.ends_with("_videotoolbox") {
-        trial.extend(args(&["-allow_sw", "0"]));
-    }
-    trial.extend(args(&["-f", "null", "-"]));
     let diagnostic = String::from_utf8_lossy(&result.stderr);
-    if run_tool(&tools.ffmpeg, &trial).is_ok() {
+    if reference_hardware_profile_works(tools, name, pixel) {
         return Err(format!(
-            "reference encoder {name} works but the worker probe failed: {diagnostic}"
+            "reference encoder {name}/{pixel} works but the worker probe failed: {diagnostic}"
         ));
     }
-    eprintln!("{name} unavailable on this device: {diagnostic}");
+    eprintln!("{name}/{pixel} unavailable on this device: {diagnostic}");
     Ok(false)
 }
 
-fn check_video_registry(hardware: Option<&[&str]>) -> TestResult {
+fn reference_hardware_profile_works(tools: &Toolchain, name: &str, pixel: &str) -> bool {
+    let try_device = |render_node: Option<&Path>| {
+        let mut trial = args(&["-v", "error"]);
+        if let Some(node) = render_node {
+            trial.extend(["-vaapi_device".into(), path_arg(node)]);
+        }
+        trial.extend(args(&[
+            "-f",
+            "lavfi",
+            "-i",
+            "color=black:s=320x256:r=1:d=1",
+            "-frames:v",
+            "1",
+        ]));
+        if render_node.is_some() {
+            let samples = if pixel == "p010le" { "p010le" } else { "nv12" };
+            trial.extend(["-vf".into(), format!("format={samples},hwupload")]);
+        } else {
+            trial.extend(args(&["-pix_fmt", pixel]));
+        }
+        trial.extend(args(&["-c:v", name, "-b:v", "1M"]));
+        if name.ends_with("_videotoolbox") {
+            trial.extend(args(&["-allow_sw", "0"]));
+        }
+        trial.extend(args(&["-f", "null", "-"]));
+        run_tool(&tools.ffmpeg, &trial).is_ok()
+    };
+    if !name.ends_with("_vaapi") {
+        return try_device(None);
+    }
+    // Match the worker's device search. The reference CLI needs device
+    // surfaces even when this probe uses a software-generated input frame.
+    std::fs::read_dir("/dev/dri").is_ok_and(|entries| {
+        entries.flatten().any(|entry| {
+            entry.file_name().to_string_lossy().starts_with("renderD")
+                && try_device(Some(&entry.path()))
+        })
+    })
+}
+
+fn check_video_registry(hardware: Option<&std::collections::BTreeMap<&str, bool>>) -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("video-registry")?;
     let input = sandbox.path("source.mp4");
@@ -114,8 +168,8 @@ fn check_video_registry(hardware: Option<&[&str]>) -> TestResult {
         };
         for encoder in encoders {
             let use_encoder = hardware.map_or_else(
-                || !encoder.ends_with("_nvenc") && !encoder.ends_with("_videotoolbox"),
-                |available| available.contains(&encoder.as_str()),
+                || !HARDWARE_ENCODERS.contains(&encoder.as_str()),
+                |available| available.contains_key(encoder.as_str()),
             );
             if !use_encoder {
                 continue;
@@ -127,6 +181,11 @@ fn check_video_registry(hardware: Option<&[&str]>) -> TestResult {
                 .flatten()
                 .map(|v| v.as_str().unwrap());
             for format in std::iter::once("auto").chain(formats) {
+                if format == "yuv420p10le"
+                    && hardware.is_some_and(|available| !available[encoder.as_str()])
+                {
+                    continue;
+                }
                 let mut config = video_config(
                     container,
                     encoder,
@@ -166,7 +225,11 @@ fn check_video_registry(hardware: Option<&[&str]>) -> TestResult {
                     );
                 }
                 decode_media(&tools, &output)?;
-                if hardware.is_some() && container == "mp4" && format == "auto" {
+                if hardware.is_some()
+                    && container == "mp4"
+                    && format == "auto"
+                    && !frame_core::codec::requires_video_bitrate(encoder)
+                {
                     // Quality mode is optional on Intel VideoToolbox. A capable
                     // legacy backend must have a working native counterpart.
                     config.video_bitrate_mode = "crf".into();
