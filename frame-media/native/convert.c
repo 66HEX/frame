@@ -1,6 +1,18 @@
 #include "convert.h"
 #include <libavutil/intreadwrite.h>
 
+static int log_level(const char *name) {
+    if (!name || !strcmp(name, "info"))
+        return AV_LOG_INFO;
+    if (!strcmp(name, "error"))
+        return AV_LOG_ERROR;
+    if (!strcmp(name, "quiet"))
+        return AV_LOG_QUIET;
+    if (!strcmp(name, "warning"))
+        return AV_LOG_WARNING;
+    return AV_LOG_INFO;
+}
+
 static int set_metadata(AVDictionary **dict, const char *pair) {
     const char *sep = strchr(pair, '=');
     if (!sep || sep == pair)
@@ -58,20 +70,35 @@ static int input_for_map(ConvertTrack *t, const ConvertPlan *p, const char *map)
     default:
         return AVERROR(EINVAL);
     }
-    t->origin = av_sat_add64(t->source->seek,
-                             t->input->start_time == AV_NOPTS_VALUE ? 0 : t->input->start_time);
+    int *mapped = av_realloc_array(t->source->mapped, t->source->mapped_count + 1, sizeof(*mapped));
+    if (!mapped)
+        return AVERROR(ENOMEM);
+    t->source->mapped = mapped;
+    t->source->mapped[t->source->mapped_count++] = t->src->index;
+    return 0;
+}
+
+static int prepare_clock(ConvertTrack *t, const ConvertPlan *p) {
+    int err = frame_clock_init(&t->clock, t->input, t->source->mapped, t->source->mapped_count);
+    if (err < 0)
+        return err;
+    int64_t seek_at = av_sat_add64(
+        t->source->seek, t->input->start_time == AV_NOPTS_VALUE ? 0 : t->input->start_time);
     if (t->source->seek > 0 && (t->input_num == 0 || t->kind != 's')) {
-        err = avformat_seek_file(t->input, -1, INT64_MIN, t->origin, t->origin, 0);
+        err = avformat_seek_file(t->input, -1, INT64_MIN, seek_at, seek_at, 0);
         if (err < 0)
             return err;
     }
-    t->origin = av_rescale_q(t->origin, AV_TIME_BASE_Q, t->src->time_base);
+    int64_t origin =
+        frame_clock_origin(t->input, t->source->mapped, t->source->mapped_count, t->source->seek);
+    t->origin = av_rescale_q(origin, AV_TIME_BASE_Q, t->src->time_base);
     t->duration =
         p->duration < 0 ? -1 : av_rescale_q(p->duration, AV_TIME_BASE_Q, t->src->time_base);
     return 0;
 }
 
 static int configure_track(const ConvertPlan *p, ConvertTrack *t, AVFormatContext *out) {
+    t->strict = frame_plan_opt(p, "xerror") != NULL;
     t->next = av_packet_alloc();
     t->raw = av_packet_alloc();
     t->filtered_input = av_packet_alloc();
@@ -132,10 +159,14 @@ static int configure_track(const ConvertPlan *p, ConvertTrack *t, AVFormatContex
             if ((err = set_metadata(&t->dst->metadata, opt.value)) < 0)
                 return err;
         } else if (frame_option_matches(opt.name, "disposition", t)) {
-            if (!strcmp(opt.value, "default+forced")) t->dst->disposition = AV_DISPOSITION_DEFAULT | AV_DISPOSITION_FORCED;
-            else if (!strcmp(opt.value, "0")) t->dst->disposition = 0;
-            else if ((err = av_disposition_from_string(opt.value)) < 0) return err;
-            else t->dst->disposition = err;
+            if (!strcmp(opt.value, "default+forced"))
+                t->dst->disposition = AV_DISPOSITION_DEFAULT | AV_DISPOSITION_FORCED;
+            else if (!strcmp(opt.value, "0"))
+                t->dst->disposition = 0;
+            else if ((err = av_disposition_from_string(opt.value)) < 0)
+                return err;
+            else
+                t->dst->disposition = err;
         }
     }
     return 0;
@@ -150,8 +181,13 @@ int frame_read_selected(ConvertTrack *t, AVPacket *packet) {
         int err = av_read_frame(t->input, packet);
         if (err < 0)
             return err;
+        frame_clock_packet(&t->clock, t->input, packet);
         if (packet->stream_index != t->src->index)
             continue;
+        if (t->strict && (packet->flags & AV_PKT_FLAG_CORRUPT)) {
+            av_log(t->input, AV_LOG_ERROR, "Corrupt packet in selected stream %d\n", t->src->index);
+            return AVERROR_INVALIDDATA;
+        }
         if (!t->encoder && !t->seen_key) {
             if (!(packet->flags & AV_PKT_FLAG_KEY))
                 continue;
@@ -253,7 +289,7 @@ static int setup_muxer(const ConvertPlan *p, AVFormatContext *out, ConvertTrack 
             return err;
         if ((err = copy_chapters(p, primary, out)) < 0)
             return err;
-        if (primary->duration > 0) {
+        if (primary->duration > 0 && av_log_get_level() >= AV_LOG_INFO) {
             int64_t secs = primary->duration / AV_TIME_BASE;
             fprintf(stderr, "Duration: %02" PRId64 ":%02" PRId64 ":%02" PRId64 ".%03" PRId64 "\n",
                     secs / 3600, (secs / 60) % 60, secs % 60,
@@ -316,6 +352,8 @@ static int convert(const ConvertPlan *p, AVFormatContext **outp, ConvertTrack *t
     if (err < 0)
         return err;
     AVFormatContext *out = *outp;
+    if (!strcmp(out->oformat->name, "mpegts"))
+        out->max_delay = 700000;
     for (int i = 0; i < p->options_len; i++) {
         if (strcmp(p->options[i].name, "map"))
             continue;
@@ -331,14 +369,21 @@ static int convert(const ConvertPlan *p, AVFormatContext **outp, ConvertTrack *t
             return err;
         for (int k = 0; k < *count - 1; ++k)
             track->ordinal += tracks[k].kind == track->kind;
-        if ((err = configure_track(p, track, out)) < 0)
+    }
+    const char *progress = frame_plan_opt(p, "progress");
+    if (progress && frame_output_open(io, progress, 1, 1) < 0)
+        return AVERROR(EIO);
+    for (int i = 0; i < *count; ++i) {
+        err = prepare_clock(&tracks[i], p);
+        if (err >= 0)
+            err = configure_track(p, &tracks[i], out);
+        if (err == AVERROR_EOF && *count == 1 && !strcmp(out->oformat->name, "null"))
+            return 0;
+        if (err < 0)
             return err;
     }
     if (!*count)
         return AVERROR_STREAM_NOT_FOUND;
-    const char *progress = frame_plan_opt(p, "progress");
-    if (progress && frame_output_open(io, progress, 1, 1) < 0)
-        return AVERROR(EIO);
     if ((err = setup_muxer(p, out, tracks, *count, io, pb)) < 0)
         return err;
     for (int i = 0; i < *count; ++i)
@@ -353,8 +398,12 @@ static int convert(const ConvertPlan *p, AVFormatContext **outp, ConvertTrack *t
         }
         if (!earliest)
             break;
-        int64_t stamp = clock_us(earliest);
         AVPacket *pkt = earliest->next;
+        int64_t presentation = pkt->pts == AV_NOPTS_VALUE ? pkt->dts : pkt->pts;
+        int64_t stamp = presentation == AV_NOPTS_VALUE
+                            ? 0
+                            : av_rescale_q(av_sat_add64(presentation, FFMAX(0, pkt->duration)),
+                                           output_tb(earliest), AV_TIME_BASE_Q);
         av_packet_rescale_ts(pkt, output_tb(earliest), earliest->dst->time_base);
         pkt->stream_index = earliest->dst->index;
         pkt->pos = -1;
@@ -383,6 +432,9 @@ int frame_convert(int argc, const char *const *argv, void *io) {
     int count = 0;
     int err = frame_convert_parse(&p, argc, argv);
     if (err >= 0) {
+        int level = log_level(frame_plan_opt(&p, "loglevel"));
+        av_log_set_level(level);
+        frame_output_quiet(io, level < AV_LOG_INFO || frame_plan_opt(&p, "nostats") != NULL);
         tracks = av_calloc(p.options_len, sizeof(*tracks));
         if (!tracks)
             err = AVERROR(ENOMEM);
@@ -395,10 +447,13 @@ int frame_convert(int argc, const char *const *argv, void *io) {
         av_packet_free(&t->raw);
         av_packet_free(&t->filtered_input);
         av_frame_free(&t->frame);
+        av_frame_free(&t->cadence.previous);
+        av_frame_free(&t->cadence.current);
         av_bsf_free(&t->bsf);
         frame_render_close(&t->render);
         avcodec_free_context(&t->encoder);
         avcodec_free_context(&t->subdecoder);
+        frame_clock_free(&t->clock);
         avformat_close_input(&t->input);
     }
     av_free(tracks);
@@ -407,6 +462,8 @@ int frame_convert(int argc, const char *const *argv, void *io) {
         avio_context_free(&pb);
     }
     avformat_free_context(out);
+    for (int i = 0; i < p.sources_len; i++)
+        av_free(p.sources[i].mapped);
     av_free(p.sources);
     av_free(p.options);
     return err;

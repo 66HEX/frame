@@ -19,6 +19,8 @@ unsafe extern "C" {
         limit: i64,
         progress: c_int,
         verbose: c_int,
+        strict: c_int,
+        passthrough: c_int,
     ) -> c_int;
 }
 
@@ -50,14 +52,13 @@ pub fn run(args: &[OsString]) -> Result<(), String> {
     let (mut stream, mut threads, mut limit) = (-1, 0, i64::MAX);
     let (mut channels, mut rate) = (0_u16, 0_u32);
     let mut format = "";
+    let (mut strict, mut passthrough) = (false, false);
     while let Some(option) = args.next() {
         let mut next = || args.next().ok_or("missing option value");
         let mut text = || next()?.to_str().ok_or("invalid option value");
         match option.to_str() {
-            Some(
-                "-hide_banner" | "-nostdin" | "-an" | "-sn" | "-dn" | "-vn" | "-nostats"
-                | "-xerror",
-            ) => (),
+            Some("-hide_banner" | "-nostdin" | "-an" | "-sn" | "-dn" | "-vn" | "-nostats") => (),
+            Some("-xerror") => strict = true,
             Some("-loglevel") => verbose = text()? == "info",
             Some("-noaccurate_seek") => fast = true,
             Some("-readrate") if text()? == "1" => realtime = true,
@@ -76,9 +77,9 @@ pub fn run(args: &[OsString]) -> Result<(), String> {
             Some("-filter_complex" | "-af" | "-vf") => graph = Some(c_string(next()?)?),
             Some("-c:v") if matches!(text()?, "png" | "wrapped_avframe") => (),
             Some("-pix_fmt") if text()? == "bgra" => (),
-            Some("-fps_mode") if text()? == "passthrough" => (),
+            Some("-fps_mode") if text()? == "passthrough" => passthrough = true,
             Some("-threads" | "-filter_threads") => {
-                threads = text()?.parse().map_err(|_| "invalid thread count")?
+                threads = text()?.parse().map_err(|_| "invalid thread count")?;
             }
             Some("-frames:v") => limit = text()?.parse().map_err(|_| "invalid frame count")?,
             Some("-ac") => channels = text()?.parse().map_err(|_| "invalid channel count")?,
@@ -133,6 +134,8 @@ pub fn run(args: &[OsString]) -> Result<(), String> {
             limit,
             progress.into(),
             verbose.into(),
+            strict.into(),
+            passthrough.into(),
         )
     };
     if result < 0 {

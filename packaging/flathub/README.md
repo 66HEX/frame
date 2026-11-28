@@ -10,10 +10,9 @@ The Flathub package intentionally differs from the local devel Flatpak built by
 - it uses a separate `cargo vendor` archive for offline Rust dependencies,
 - it does not install `frame-app/resources/binaries`,
 - it does not install copied host libraries from the managed Linux tarball,
-- it sets `FRAME_USE_SYSTEM_MEDIA_TOOLS=1`, so Frame resolves `ffmpeg` and
-  `ffprobe` from the Flatpak runtime PATH,
-- it uses the Freedesktop 25.08 runtime and its automatically installed
-  `org.freedesktop.Platform.codecs-extra` extension instead of bundling FFmpeg.
+- it builds `frame-media` against the Freedesktop SDK and installs it beside Frame,
+- it uses the Freedesktop 25.08 media libraries and its automatically installed
+  `org.freedesktop.Platform.codecs-extra` extension.
 - it does not request static home-directory access; Frame asks the user to
   choose its default output folder through the file chooser portal.
 - it sends completion notifications through the notification portal without

@@ -1,4 +1,5 @@
 #include "render.h"
+#include "media_clock.h"
 #include <errno.h>
 #include <math.h>
 #include <string.h>
@@ -17,9 +18,12 @@ typedef struct {
     AVStream *stream;
     AVPacket *packet;
     AVFrame *frame;
+    AVFrame *last;
+    int strict;
     AVFilterContext *source;
     int packet_pending, flushed, closed;
     int64_t origin, end_pts;
+    FramePacketClock clock;
     enum AVPixelFormat hardware_format;
 } RenderInput;
 
@@ -28,6 +32,9 @@ struct FrameRenderer {
     AVFilterContext *sink;
     RenderInput inputs[2];
     int count;
+    FrameRenderPlan filter_plan;
+    char *graph_text, *tail_text;
+    int initial_width, initial_height;
 };
 
 static enum AVPixelFormat select_device_format(AVCodecContext *codec, const enum AVPixelFormat *formats)
@@ -41,6 +48,7 @@ static enum AVPixelFormat select_device_format(AVCodecContext *codec, const enum
 static int open_input(RenderInput *input, const char *path, enum AVMediaType type, int index,
                       int64_t start_us, const FrameRenderPlan *plan, int primary)
 {
+    input->strict = plan->strict;
     int rc = avformat_open_input(&input->format, path, NULL, NULL);
     if (rc < 0) return rc;
     if ((rc = avformat_find_stream_info(input->format, NULL)) < 0) return rc;
@@ -61,7 +69,8 @@ static int open_input(RenderInput *input, const char *path, enum AVMediaType typ
     input->decoder = avcodec_alloc_context3(codec);
     input->packet = av_packet_alloc();
     input->frame = av_frame_alloc();
-    if (!input->decoder || !input->packet || !input->frame) return AVERROR(ENOMEM);
+    input->last = av_frame_alloc();
+    if (!input->last || !input->decoder || !input->packet || !input->frame) return AVERROR(ENOMEM);
     if ((rc = avcodec_parameters_to_context(input->decoder, input->stream->codecpar)) < 0) return rc;
     input->decoder->pkt_timebase = input->stream->time_base;
     input->decoder->thread_count = plan->threads;
@@ -84,7 +93,12 @@ static int open_input(RenderInput *input, const char *path, enum AVMediaType typ
     if ((rc = avcodec_open2(input->decoder, codec, NULL)) < 0) return rc;
     int64_t origin = input->format->start_time == AV_NOPTS_VALUE ? 0 : input->format->start_time;
     origin = av_sat_add64(origin, start_us);
-    input->origin = av_rescale_q(origin, AV_TIME_BASE_Q, input->stream->time_base);
+    const int *indices = primary && plan->mapped_count ? plan->mapped_streams : &index;
+    int count = primary && plan->mapped_count ? plan->mapped_count : 1;
+    rc = frame_clock_init(&input->clock, input->format, indices, count);
+    if (rc < 0) return rc;
+    input->origin = av_rescale_q(frame_clock_origin(input->format, indices, count, start_us),
+                                AV_TIME_BASE_Q, input->stream->time_base);
     if (start_us > 0) {
         rc = avformat_seek_file(input->format, -1, INT64_MIN, origin, origin, 0);
         if (rc < 0 && input->format->pb && input->format->pb->seekable) return rc;
@@ -98,6 +112,8 @@ static int next_decoded(RenderInput *in)
     for (;;) {
         int rc = avcodec_receive_frame(in->decoder, in->frame);
         if (rc == 0) {
+            if (in->strict && (in->frame->decode_error_flags || (in->frame->flags & AV_FRAME_FLAG_CORRUPT)))
+                return AVERROR_INVALIDDATA;
             if (in->frame->hw_frames_ctx) {
                 AVFrame *software = av_frame_alloc();
                 if (!software) return AVERROR(ENOMEM);
@@ -126,6 +142,7 @@ static int next_decoded(RenderInput *in)
             do {
                 av_packet_unref(in->packet);
                 rc = av_read_frame(in->format, in->packet);
+                if (rc >= 0) frame_clock_packet(&in->clock, in->format, in->packet);
             } while (rc >= 0 && in->packet->stream_index != in->stream->index);
             if (rc == AVERROR_EOF) {
                 in->flushed = 1;
@@ -134,6 +151,7 @@ static int next_decoded(RenderInput *in)
                 continue;
             }
             if (rc < 0) return rc;
+            if (in->strict && (in->packet->flags & AV_PKT_FLAG_CORRUPT)) return AVERROR_INVALIDDATA;
             in->packet_pending = 1;
         }
         rc = avcodec_send_packet(in->decoder, in->packet);
@@ -158,7 +176,7 @@ static int add_filter(AVFilterGraph *graph, AVFilterContext **link, const char *
 static int configure_input(FrameRenderer *renderer, RenderInput *in, AVFilterContext **last,
                            int audio, int trim_start)
 {
-    AVFrame *frame = in->frame;
+    AVFrame *frame = in->last;
     AVFilterContext *src = avfilter_graph_alloc_filter(renderer->graph,
             avfilter_get_by_name(audio ? "abuffer" : "buffer"), NULL);
     if (!src) return AVERROR(ENOMEM);
@@ -240,7 +258,12 @@ static int configure_graph(FrameRenderer *r, const FrameRenderPlan *p)
     if (rc >= 0) rc = avfilter_link(outputs->filter_ctx, outputs->pad_idx, tail_inputs->filter_ctx, tail_inputs->pad_idx);
     if (rc >= 0) {
         AVFilterContext *last = tail_outputs->filter_ctx;
-        if (p->duration_us >= 0) {
+        if (!p->audio && r->initial_width > 0) {
+            char size[80];
+            snprintf(size, sizeof(size), "w=%d:h=%d", r->initial_width, r->initial_height);
+            rc = add_filter(r->graph, &last, "scale", size);
+        }
+        if (rc >= 0 && p->duration_us >= 0) {
             char duration[80];
             snprintf(duration, sizeof(duration), "end=%" PRId64 "us", p->duration_us);
             rc = add_filter(r->graph, &last, p->audio ? "atrim" : "trim", duration);
@@ -257,6 +280,32 @@ done:
     return rc;
 }
 
+// Filters can buffer pictures (fps, deinterlace, palette generation). Their
+// old state belongs to the old format. Keep the last overlay so a one-frame
+// logo remains available when the primary stream changes dimensions.
+static int rebuild_graph(FrameRenderer *r)
+{
+    avfilter_graph_free(&r->graph);
+    r->graph = avfilter_graph_alloc();
+    if (!r->graph) return AVERROR(ENOMEM);
+    r->graph->nb_threads = r->filter_plan.threads;
+    int rc = configure_graph(r, &r->filter_plan);
+    for (int i = 0; rc >= 0 && i < r->count; ++i) {
+        RenderInput *in = &r->inputs[i];
+        rc = av_buffersrc_write_frame(in->source, in->last);
+        if (rc >= 0 && in->closed) rc = av_buffersrc_close(in->source, in->end_pts, 0);
+    }
+    return rc;
+}
+
+static int changed_format(const AVFrame *previous, const AVFrame *next)
+{
+    return previous->format != next->format || previous->width != next->width ||
+        previous->height != next->height || previous->sample_rate != next->sample_rate ||
+        previous->color_range != next->color_range || previous->colorspace != next->colorspace ||
+        (previous->nb_samples && av_channel_layout_compare(&previous->ch_layout, &next->ch_layout));
+}
+
 int frame_render_open(FrameRenderer **result, const FrameRenderPlan *plan)
 {
     FrameRenderer *r = av_mallocz(sizeof(*r));
@@ -264,9 +313,12 @@ int frame_render_open(FrameRenderer **result, const FrameRenderPlan *plan)
     if (!r) return AVERROR(ENOMEM);
     int rc = AVERROR(ENOMEM);
     r->count = plan->overlay && strstr(plan->graph, "[1:v:0]") ? 2 : 1;
-    r->graph = avfilter_graph_alloc();
-    if (!r->graph) goto fail;
-    r->graph->nb_threads = plan->threads;
+    r->graph_text = av_strdup(plan->graph);
+    r->tail_text = av_strdup(plan->tail ? plan->tail : "");
+    if (!r->graph_text || !r->tail_text) goto fail;
+    r->filter_plan = (FrameRenderPlan){.graph=r->graph_text, .tail=r->tail_text,
+        .audio=plan->audio, .start_us=plan->start_us, .duration_us=plan->duration_us,
+        .fast_seek=plan->fast_seek, .threads=plan->threads};
     for (int i = 0; i < r->count; ++i) {
         rc = open_input(&r->inputs[i], i ? plan->overlay : plan->path,
                 plan->audio ? AVMEDIA_TYPE_AUDIO : AVMEDIA_TYPE_VIDEO,
@@ -279,10 +331,13 @@ int frame_render_open(FrameRenderer **result, const FrameRenderPlan *plan)
             if (rc < 0) goto fail;
         } while (i == 0 && !plan->audio && plan->start_us > 0 && !plan->fast_seek &&
                  r->inputs[i].frame->pts < 0);
+        av_frame_move_ref(r->inputs[i].last, r->inputs[i].frame);
     }
-    if ((rc = configure_graph(r, plan)) < 0) goto fail;
-    for (int i = 0; i < r->count; ++i)
-        if ((rc = av_buffersrc_add_frame(r->inputs[i].source, r->inputs[i].frame)) < 0) goto fail;
+    if ((rc = rebuild_graph(r)) < 0) goto fail;
+    if (!plan->audio) {
+        r->initial_width = av_buffersink_get_w(r->sink);
+        r->initial_height = av_buffersink_get_h(r->sink);
+    }
     *result = r;
     return 0;
 fail:
@@ -310,7 +365,10 @@ int frame_render_samples(FrameRenderer *r, AVFrame *frame, AVRational *tb, int s
             feed->closed = 1;
             rc = av_buffersrc_close(feed->source, feed->end_pts, 0);
         } else if (rc >= 0) {
-            rc = av_buffersrc_add_frame(feed->source, feed->frame);
+            int reconfigure = changed_format(feed->last, feed->frame);
+            av_frame_unref(feed->last);
+            av_frame_move_ref(feed->last, feed->frame);
+            rc = reconfigure ? rebuild_graph(r) : av_buffersrc_write_frame(feed->source, feed->last);
         }
         if (rc < 0) return rc;
     }
@@ -327,10 +385,14 @@ void frame_render_close(FrameRenderer **renderer)
     if (!r) return;
     avfilter_graph_free(&r->graph);
     for (int i = 0; i < r->count; ++i) {
+        frame_clock_free(&r->inputs[i].clock);
         av_packet_free(&r->inputs[i].packet);
+        av_frame_free(&r->inputs[i].last);
         av_frame_free(&r->inputs[i].frame);
         avcodec_free_context(&r->inputs[i].decoder);
         avformat_close_input(&r->inputs[i].format);
     }
+    av_free(r->graph_text);
+    av_free(r->tail_text);
     av_freep(renderer);
 }

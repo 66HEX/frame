@@ -123,7 +123,7 @@ int frame_convert_parse(ConvertPlan *plan, int argc, const char *const *argv) {
             if (av_parse_time(&seek, value, 1) < 0)
                 return AVERROR(EINVAL);
         } else if (!strcmp(key, "i")) {
-            plan->sources[plan->sources_len++] = (Source){value, seek};
+            plan->sources[plan->sources_len++] = (Source){.path = value, .seek = seek};
             seek = 0;
         } else if (!strcmp(key, "t") || !strcmp(key, "to")) {
             if (av_parse_time(&plan->duration, value, 1) < 0 || plan->duration < 0)

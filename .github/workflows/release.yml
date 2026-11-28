@@ -1100,6 +1100,11 @@ jobs:
           perl -0pi -e 's/version = "[^"]+";/version = "$ENV{VERSION}";/' "$package_path"
           perl -0pi -e 's/hash = "[^"]+";/hash = lib.fakeHash;/' "$package_path"
           perl -0pi -e 's/cargoHash = "[^"]+";/cargoHash = lib.fakeHash;/' "$package_path"
+          # Preserve downstream changes, including nixfmt's shared cargoFlags list.
+          perl -0pi -e 's/(cargo(?:Build|Test)?Flags\s*=\s*\[[^\]]*?"frame-app")(?![^\]]*"frame-media")/$1 "--package" "frame-media"/gs' "$package_path"
+          perl -0pi -e 's/(\bbuildInputs\s*=\s*\[)(?![^\]]*\bffmpeg\b)/$1 ffmpeg/gs' "$package_path"
+          sed -i '/--prefix PATH : ${lib.makeBinPath \[ ffmpeg \]}/d; /--set FRAME_USE_SYSTEM_MEDIA_TOOLS 1/d' "$package_path"
+          grep -q '"frame-media"' "$package_path"
         else
           mkdir -p "$(dirname "$package_path")"
           cat > "$package_path" <<'EOF'
@@ -1178,8 +1183,6 @@ jobs:
 
           postFixup = ''
             wrapProgram $out/bin/frame \
-              --prefix PATH : ${lib.makeBinPath [ ffmpeg ]} \
-              --set FRAME_USE_SYSTEM_MEDIA_TOOLS 1 \
               --set FRAME_UPDATE_EXPLANATION \
                 'This Nixpkgs build is managed by Nix. Install updates through your Nix profile, flake, or NixOS configuration.'
           '';

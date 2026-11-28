@@ -39,6 +39,20 @@ class MediaWorkerPackages(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "avcodec"):
                     list(worker.runtime_libraries(root, target))
 
+    def test_release_package_rejects_cli_after_upgrade_or_repack(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            resources = root / "Contents/Resources/binaries"
+            resources.mkdir(parents=True)
+            for binary in ["ffmpeg", "ffprobe.exe", "ffmpeg-aarch64-apple-darwin"]:
+                path = resources / binary
+                path.touch()
+                with self.assertRaisesRegex(ValueError, "legacy CLI"):
+                    worker.verify_no_cli(root)
+                path.unlink()
+            (resources / "frame-media.LICENSE").touch()
+            worker.verify_no_cli(root)
+
     def test_mixed_abi_input_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -47,6 +61,25 @@ class MediaWorkerPackages(unittest.TestCase):
                 (root / f"lib/libavcodec.so.{major}").touch()
             with self.assertRaisesRegex(ValueError, "avcodec"):
                 list(worker.runtime_libraries(root, "x86_64-unknown-linux-gnu"))
+
+    @unittest.skipUnless(shutil.which("perl"), "requires release workflow Perl")
+    def test_nix_upgrade_preserves_downstream_changes_and_adds_worker(self):
+        workflow = (SCRIPT.parents[1] / ".github/workflows/publish_nixpkgs.yml").read_text()
+        changes = [line.strip().split("'", 2)[1] for line in workflow.splitlines()
+                   if "perl -0pi" in line and ("cargo(?:Build|Test)?Flags" in line or "buildInputs" in line)]
+        self.assertEqual(len(changes), 2)
+        for previous in ('cargoFlags = [ "--package" "frame-app" ];',
+                         'cargoBuildFlags = [ "--package" "frame-app" ];\ncargoTestFlags = [ "--package" "frame-app" ];'):
+            with self.subTest(previous=previous), tempfile.TemporaryDirectory() as temporary:
+                package = Path(temporary) / "package.nix"
+                package.write_text(previous + "\nbuildInputs = [\n  alsa-lib\n  vulkan-loader\n];")
+                for pass_number in range(2):
+                    for change in changes:
+                        subprocess.run(["perl", "-0pi", "-e", change, package], check=True)
+                    updated = package.read_text()
+                    self.assertEqual(updated.count('"frame-media"'), previous.count('"frame-app"'))
+                    self.assertEqual(updated.count('ffmpeg'), 1)
+                    self.assertIn("vulkan-loader", updated)
 
     @unittest.skipUnless(os.environ.get("FFMPEG_DIR"), "requires release media SDK")
     def test_worker_invokes_packaged_libraries_after_relocation(self):

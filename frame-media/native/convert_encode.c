@@ -5,7 +5,12 @@
 static const AVCodec *find_encoder(const char *name) {
     const AVCodec *codec = avcodec_find_encoder_by_name(name);
     const AVCodecDescriptor *desc = avcodec_descriptor_get_by_name(name);
-    return codec || !desc ? codec : avcodec_find_encoder(desc->id);
+    if (desc && (!codec || codec->capabilities & AV_CODEC_CAP_EXPERIMENTAL)) {
+        const AVCodec *preferred = avcodec_find_encoder(desc->id);
+        if (preferred)
+            return preferred;
+    }
+    return codec;
 }
 
 static int append_constraints(const ConvertPlan *p, const ConvertTrack *t, const AVCodec *codec,
@@ -13,19 +18,19 @@ static int append_constraints(const ConvertPlan *p, const ConvertTrack *t, const
     const AVCodecParameters *src = t->src->codecpar;
     int err;
     if (t->kind == 'v') {
-        const char *rate = frame_plan_opt(p, "r");
-        if (rate)
-            av_bprintf(tail, "fps=%s,", rate);
         const char *fixed = frame_plan_opt(p, "pix_fmt");
         const enum AVPixelFormat *fmts = NULL;
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
-        if ((err = avcodec_get_supported_config(NULL, codec, AV_CODEC_CONFIG_PIX_FORMAT, 0, (const void **)&fmts, NULL)) < 0) return err;
+        if ((err = avcodec_get_supported_config(NULL, codec, AV_CODEC_CONFIG_PIX_FORMAT, 0,
+                                                (const void **)&fmts, NULL)) < 0)
+            return err;
 #else
         fmts = codec->pix_fmts;
 #endif
         if (fixed) {
             enum AVPixelFormat requested = av_get_pix_fmt(fixed);
-            if (requested == AV_PIX_FMT_NONE) return AVERROR(EINVAL);
+            if (requested == AV_PIX_FMT_NONE)
+                return AVERROR(EINVAL);
             enum AVPixelFormat best = requested;
             if (fmts) {
                 best = AV_PIX_FMT_NONE;
@@ -35,7 +40,8 @@ static int append_constraints(const ConvertPlan *p, const ConvertTrack *t, const
                         best = av_find_best_pix_fmt_of_2(best, *f, requested, 1, NULL);
                 }
             }
-            if (best == AV_PIX_FMT_NONE) return AVERROR(EINVAL);
+            if (best == AV_PIX_FMT_NONE)
+                return AVERROR(EINVAL);
             av_bprintf(tail, "format=pix_fmts=%s", av_get_pix_fmt_name(best));
         } else {
             if (!fmts)
@@ -53,7 +59,8 @@ static int append_constraints(const ConvertPlan *p, const ConvertTrack *t, const
                     return AVERROR(ENOSYS);
             }
         }
-        if (codec->id == AV_CODEC_ID_MJPEG) av_bprintf(tail, ":color_ranges=pc");
+        if (codec->id == AV_CODEC_ID_MJPEG)
+            av_bprintf(tail, ":color_ranges=pc");
     } else {
         const enum AVSampleFormat *fmts = NULL;
         const int *rates = NULL;
@@ -89,6 +96,25 @@ static int append_constraints(const ConvertPlan *p, const ConvertTrack *t, const
             if (strcmp(channels, "1") && strcmp(channels, "2"))
                 return AVERROR(EINVAL);
             av_bprintf(tail, ":channel_layouts=%s", *channels == '1' ? "mono" : "stereo");
+        } else {
+            const AVChannelLayout *layouts = NULL;
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
+            if ((err = avcodec_get_supported_config(NULL, codec, AV_CODEC_CONFIG_CHANNEL_LAYOUT, 0,
+                                                    (const void **)&layouts, NULL)) < 0)
+                return err;
+#else
+            layouts = codec->ch_layouts;
+#endif
+            if (layouts && layouts->nb_channels) {
+                av_bprintf(tail, ":channel_layouts=");
+                for (int i = 0; layouts[i].nb_channels; ++i) {
+                    char layout[256];
+                    err = av_channel_layout_describe(&layouts[i], layout, sizeof(layout));
+                    if (err < 0 || (size_t)err >= sizeof(layout))
+                        return AVERROR(EINVAL);
+                    av_bprintf(tail, "%s%s", i ? "|" : "", layout);
+                }
+            }
         }
     }
     return av_bprint_is_complete(tail) ? 0 : AVERROR(ENOMEM);
@@ -143,6 +169,9 @@ static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *cod
             .stream = t->src->index,
             .start_us = t->source->seek,
             .duration_us = p->duration,
+            .mapped_streams = t->source->mapped,
+            .mapped_count = t->source->mapped_count,
+            .strict = t->strict,
             .hardware_device = t->kind == 'v' ? frame_plan_opt(p, "hwaccel") : NULL,
         };
         err = frame_render_open(&t->render, &request);
@@ -168,7 +197,11 @@ static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *cod
             ctx->framerate = av_guess_frame_rate(t->input, t->src, NULL);
         if (ctx->framerate.num <= 0 || ctx->framerate.den <= 0)
             ctx->framerate = (AVRational){25, 1};
+        const char *rate = frame_plan_opt(p, "r");
+        if (rate && (err = av_parse_video_rate(&ctx->framerate, rate)) < 0)
+            return err;
         ctx->time_base = av_inv_q(ctx->framerate);
+        ctx->flags |= AV_CODEC_FLAG_FRAME_DURATION;
         ctx->colorspace = t->src->codecpar->color_space;
         ctx->color_range = t->src->codecpar->color_range;
 #if LIBAVFILTER_VERSION_MAJOR >= 10
@@ -242,6 +275,19 @@ int frame_prepare_encoder(const ConvertPlan *p, ConvertTrack *t, AVFormatContext
     int err = t->kind == 's' ? open_subtitle_decoder(t) : open_render(p, t, codec);
     if (err < 0 || (err = open_codec(p, t, codec)) < 0)
         return err;
+    if (t->kind == 'v') {
+        FrameCadence *c = &t->cadence;
+        c->previous = av_frame_alloc();
+        c->current = av_frame_alloc();
+        if (!c->previous || !c->current)
+            return AVERROR(ENOMEM);
+        c->fixed = frame_plan_opt(p, "r") != NULL || (!(out->oformat->flags & AVFMT_VARIABLE_FPS) &&
+                                                      strcmp(out->oformat->name, "avi"));
+        if (frame_plan_opt(p, "fps_mode") || out->oformat->flags & AVFMT_NOTIMESTAMPS)
+            c->fixed = 0;
+        c->preserve_initial_offset =
+            t->input->nb_streams == 1 && !frame_plan_opt(p, "filter_complex");
+    }
     t->packet_tb = t->encoder->time_base;
     t->dst->time_base = t->packet_tb;
     return avcodec_parameters_from_context(t->dst->codecpar, t->encoder);
@@ -300,7 +346,10 @@ int frame_read_encoded(ConvertTrack *t, AVPacket *packet) {
         AVRational tb;
         if (t->frame_limit >= 0 && t->frames >= t->frame_limit)
             err = AVERROR_EOF;
-        else if (t->kind == 'a' && t->encoder->frame_size > 0)
+        else if (t->kind == 'v') {
+            err = frame_cadence_next(t);
+            tb = t->encoder->time_base;
+        } else if (t->kind == 'a' && t->encoder->frame_size > 0)
             err = frame_render_samples(t->render, t->frame, &tb, t->encoder->frame_size);
         else
             err = frame_render_next(t->render, t->frame, &tb);

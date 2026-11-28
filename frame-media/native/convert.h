@@ -1,5 +1,6 @@
 #ifndef FRAME_CONVERT_H
 #define FRAME_CONVERT_H
+#include "media_clock.h"
 #include "render.h"
 #include <errno.h>
 #include <inttypes.h>
@@ -23,6 +24,8 @@ typedef struct {
 typedef struct {
     const char *path;
     int64_t seek;
+    int *mapped;
+    int mapped_count;
 } Source;
 typedef struct {
     Option *options;
@@ -33,9 +36,16 @@ typedef struct {
 } ConvertPlan;
 
 typedef struct {
+    AVFrame *previous, *current;
+    int64_t next_tick, repeat_previous, pending, history[3];
+    int eof, fixed, preserve_initial_offset;
+} FrameCadence;
+
+typedef struct {
     AVFormatContext *input;
     AVStream *src, *dst;
-    const Source *source;
+    Source *source;
+    FramePacketClock clock;
     char kind;
     int ordinal, input_num;
     int64_t origin, duration, frame_limit, frames;
@@ -44,8 +54,9 @@ typedef struct {
     FrameRenderer *render;
     AVCodecContext *encoder, *subdecoder;
     AVFrame *frame;
+    FrameCadence cadence;
     AVBSFContext *bsf;
-    int source_done, codec_done, done, seen_key;
+    int source_done, codec_done, done, seen_key, strict;
 } ConvertTrack;
 
 int frame_convert_parse(ConvertPlan *plan, int argc, const char *const *argv);
@@ -54,10 +65,12 @@ const char *frame_track_opt(const ConvertPlan *plan, const ConvertTrack *track, 
 int frame_option_matches(const char *option, const char *name, const ConvertTrack *track);
 int frame_prepare_encoder(const ConvertPlan *plan, ConvertTrack *track, AVFormatContext *out,
                           const char *codec);
+int frame_cadence_next(ConvertTrack *track);
 int frame_read_encoded(ConvertTrack *track, AVPacket *packet);
 int frame_read_selected(ConvertTrack *track, AVPacket *packet);
 extern int frame_output_open(void *io, const char *path, int overwrite, int progress);
 extern int frame_output_write(void *io, const uint8_t *buffer, int size);
 extern int64_t frame_output_seek(void *io, int64_t offset, int whence);
+extern void frame_output_quiet(void *io, int quiet);
 extern void frame_output_stats(void *io, int64_t frames, int64_t time_us);
 #endif
