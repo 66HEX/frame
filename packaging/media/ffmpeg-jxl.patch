@@ -15,7 +15,7 @@
        "dependencies": [
 --- a/portfile.cmake
 +++ b/portfile.cmake
-@@ -556,6 +556,11 @@
+@@ -556,4 +556,9 @@
      set(OPTIONS "${OPTIONS} --enable-vulkan")
  else()
      set(OPTIONS "${OPTIONS} --disable-vulkan")
@@ -25,5 +25,3 @@
 +    # Frame links codec dependencies statically into its shared macOS libavcodec.
 +    string(APPEND OPTIONS " --enable-libjxl --pkg-config-flags=--static --extra-libs=-lc++")
  endif()
- 
- if("webp" IN_LIST FEATURES)

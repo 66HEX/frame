@@ -4,20 +4,11 @@ use super::*;
 #[ignore = "requires a JPEG XL-enabled worker and FFmpeg reference tools"]
 fn jpeg_xl_should_preserve_lossless_pixels_and_encode_lossy_stills() -> TestResult {
     let tools = Toolchain::discover()?;
-    let inventory = tools.native("capabilities", &args(&["-encoders"]))?;
-    let inventory = String::from_utf8(inventory).map_err(|error| error.to_string())?;
-    if !frame_core::capabilities::parse_available_encoders(inventory).libjxl {
-        if env::var("FRAME_TEST_REQUIRE_JXL").as_deref() == Ok("1") {
-            return Err("release SDK is missing the libjxl encoder".into());
-        }
-        eprintln!("Skipping JPEG XL conversion: local worker has no libjxl encoder");
+    if !encoder_available(&tools)? {
         return Ok(());
     }
     let sandbox = Sandbox::new("jxl")?;
-    let reference_decoders = run_tool_output(&tools.ffmpeg, &args(&["-hide_banner", "-decoders"]))?;
-    let reference_decodes_jxl = String::from_utf8_lossy(&reference_decoders)
-        .lines()
-        .any(|line| matches!(line.split_whitespace().nth(1), Some("jpegxl" | "libjxl")));
+    let reference_decodes = reference_decodes_jxl(&tools)?;
 
     for (format, bytes_per_pixel) in [("rgb24", 3), ("rgba", 4), ("rgba64le", 8)] {
         let mut pixels: Vec<u8> = (0..17 * 9 * bytes_per_pixel)
@@ -69,14 +60,10 @@ fn jpeg_xl_should_preserve_lossless_pixels_and_encode_lossy_stills() -> TestResu
                 (Some(17), Some(9))
             );
 
-            // Some historical macOS reference binaries cannot decode JPEG XL. In
-            // that case pass a lossless PNG from the worker to the reference decoder.
-            let decoded = if reference_decodes_jxl {
+            let decoded = if reference_decodes {
                 output
             } else {
-                let png = sandbox.path(&format!("{format}-{lossless}.png"));
-                convert(&tools, &output, &png, &image_config("png", "png"))?;
-                png
+                decode_to_png(&tools, &output)?
             };
             let result = run_tool_output(
                 &tools.ffmpeg,
@@ -110,4 +97,32 @@ fn jpeg_xl_should_preserve_lossless_pixels_and_encode_lossy_stills() -> TestResu
         }
     }
     Ok(())
+}
+
+pub fn encoder_available(tools: &Toolchain) -> TestResult<bool> {
+    let inventory = tools.native("capabilities", &args(&["-encoders"]))?;
+    let inventory = String::from_utf8(inventory).map_err(|error| error.to_string())?;
+    if frame_core::capabilities::parse_available_encoders(inventory).libjxl {
+        return Ok(true);
+    }
+    if env::var("FRAME_TEST_REQUIRE_JXL").as_deref() == Ok("1") {
+        return Err("release SDK is missing the libjxl encoder".into());
+    }
+    eprintln!("Skipping JPEG XL conversion: local worker has no libjxl encoder");
+    Ok(false)
+}
+
+pub fn reference_decodes_jxl(tools: &Toolchain) -> TestResult<bool> {
+    let decoders = run_tool_output(&tools.ffmpeg, &args(&["-hide_banner", "-decoders"]))?;
+    Ok(String::from_utf8_lossy(&decoders)
+        .lines()
+        .any(|line| matches!(line.split_whitespace().nth(1), Some("jpegxl" | "libjxl"))))
+}
+
+// Historical macOS reference binaries cannot decode JPEG XL. Decode the
+// worker's output to PNG so the independent reference can still check pixels.
+pub fn decode_to_png(tools: &Toolchain, output: &Path) -> TestResult<PathBuf> {
+    let png = output.with_extension("reference.png");
+    convert(tools, output, &png, &image_config("png", "png"))?;
+    Ok(png)
 }

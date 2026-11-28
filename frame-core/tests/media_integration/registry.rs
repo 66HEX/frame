@@ -21,6 +21,7 @@ fn expected_codec(name: &str) -> &str {
         "libx264" | "h264_nvenc" | "h264_videotoolbox" | "h264_vaapi" => "h264",
         "libx265" | "hevc_nvenc" | "hevc_videotoolbox" | "hevc_vaapi" | "hevc_amf" => "hevc",
         "libsvtav1" | "av1_nvenc" | "av1_vaapi" => "av1",
+        "libjxl" => "jpegxl",
         "libwebp" => "webp",
         "libopus" => "opus",
         "libfdk_aac" => "aac",
@@ -171,7 +172,7 @@ fn check_video_registry(hardware: Option<&std::collections::BTreeMap<&str, bool>
                 || !HARDWARE_ENCODERS.contains(&encoder.as_str()),
                 |available| available.contains_key(encoder.as_str()),
             );
-            if !use_encoder {
+            if !use_encoder || (encoder == "libjxl" && !jxl::encoder_available(&tools)?) {
                 continue;
             }
             let formats = rules["containerEncoderPixelFormatCompatibility"]
@@ -204,7 +205,7 @@ fn check_video_registry(hardware: Option<&std::collections::BTreeMap<&str, bool>
                 let output = sandbox.path(&format!("{encoder}-{format}.{container}"));
                 convert(&tools, &input, &output, &config)
                     .map_err(|e| format!("{container}/{encoder}/{format}: {e}"))?;
-                let metadata = probe_media(&tools, &output)?;
+                let metadata = probe_and_decode_export(&tools, &output, encoder)?;
                 assert_eq!(
                     metadata.video_codec.as_deref(),
                     Some(expected_codec(encoder)),
@@ -224,7 +225,6 @@ fn check_video_registry(hardware: Option<&std::collections::BTreeMap<&str, bool>
                         output.display()
                     );
                 }
-                decode_media(&tools, &output)?;
                 if hardware.is_some()
                     && container == "mp4"
                     && format == "auto"
@@ -260,6 +260,25 @@ fn check_video_registry(hardware: Option<&std::collections::BTreeMap<&str, bool>
         }
     }
     Ok(())
+}
+
+fn probe_and_decode_export(
+    tools: &Toolchain,
+    output: &Path,
+    encoder: &str,
+) -> TestResult<ProbeMetadata> {
+    if encoder == "libjxl" && !jxl::reference_decodes_jxl(tools)? {
+        let png = jxl::decode_to_png(tools, output)?;
+        decode_media(tools, &png)?;
+        let metadata = tools.native("probe", &["metadata".into(), path_arg(output)])?;
+        return parse_ffprobe_stdout(
+            &path_arg(output),
+            String::from_utf8(metadata).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string());
+    }
+    decode_media(tools, output)?;
+    probe_media(tools, output)
 }
 
 fn audio_packet_hashes(tools: &Toolchain, output: &Path) -> TestResult<String> {
