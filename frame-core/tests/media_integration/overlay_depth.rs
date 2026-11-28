@@ -389,11 +389,10 @@ fn check_first_dynamic_snapshot(
     Ok(())
 }
 
-#[test]
-#[ignore = "requires the worker and reference media tools"]
-fn playback_reconfigures_a_changing_raster_and_overlay_without_losing_the_clip() -> TestResult {
-    let tools = Toolchain::discover()?;
-    let sandbox = Sandbox::new("changing_raster")?;
+fn changing_raster_inputs(
+    tools: &Toolchain,
+    sandbox: &Sandbox,
+) -> TestResult<(PathBuf, PathBuf, PathBuf)> {
     let mut sequence = Vec::new();
     for (i, (width, height, rgb)) in [
         (128, 96, [255, 0, 0]),
@@ -404,8 +403,8 @@ fn playback_reconfigures_a_changing_raster_and_overlay_without_losing_the_clip()
     .enumerate()
     {
         let path = write_png(
-            &tools,
-            &sandbox,
+            tools,
+            sandbox,
             &format!("frame-{i}"),
             (width, height),
             "rgb24",
@@ -413,11 +412,12 @@ fn playback_reconfigures_a_changing_raster_and_overlay_without_losing_the_clip()
         )?;
         // Allow the fps and overlay filters to emit steady frames on both
         // sides of each format change before their pending state is reset.
+        let encoded = fs::read(&path).map_err(|err| err.to_string())?;
         for frame in i * 4..i * 4 + 4 {
+            sequence.extend_from_slice(&encoded);
             fs::copy(&path, sandbox.path(&format!("primary-{frame}.png")))
                 .map_err(|err| err.to_string())?;
         }
-        sequence.extend(fs::read(path).map_err(|err| err.to_string())?);
     }
     let variable_overlay = sandbox.path("sequence.png");
     fs::write(&variable_overlay, sequence).map_err(|err| err.to_string())?;
@@ -451,6 +451,15 @@ fn playback_reconfigures_a_changing_raster_and_overlay_without_losing_the_clip()
             &path_arg(&solid),
         ]),
     )?;
+    Ok((movie, solid, variable_overlay))
+}
+
+#[test]
+#[ignore = "requires the worker and reference media tools"]
+fn playback_reconfigures_a_changing_raster_and_overlay_without_losing_the_clip() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("changing_raster")?;
+    let (movie, solid, variable_overlay) = changing_raster_inputs(&tools, &sandbox)?;
     for (input, overlay) in [
         (&movie, sandbox.path("frame-2.png")),
         (&solid, variable_overlay),
@@ -459,7 +468,7 @@ fn playback_reconfigures_a_changing_raster_and_overlay_without_losing_the_clip()
         config.overlay = Some(overlay_config(&overlay, 1.0, 0.25));
         let options = PreviewFfmpegOptions {
             start_seconds: 0.0,
-            end_seconds: Some(if input == &movie { 0.48 } else { 0.12 }),
+            end_seconds: Some(0.48),
             source_width: Some(128),
             source_height: Some(96),
             source_is_palette: false,
@@ -475,12 +484,11 @@ fn playback_reconfigures_a_changing_raster_and_overlay_without_losing_the_clip()
         };
         let plan = build_ffmpeg_preview_args(&path_arg(input), &config, &options)
             .map_err(|err| err.to_string())?;
-        let expected = run_tool_output(&tools.ffmpeg, &plan.args)?;
         let actual = tools.native("preview", &plan.args)?;
-        let expected_frames = if input == &movie { 12 } else { 3 };
-        assert_eq!(expected.len(), expected_frames * plan.frame_bytes);
-        assert_eq!(actual.len(), expected.len());
+        assert_eq!(actual.len(), 12 * plan.frame_bytes);
         if input == &movie {
+            let expected = run_tool_output(&tools.ffmpeg, &plan.args)?;
+            assert_eq!(actual.len(), expected.len());
             // When two demux threads reach a filter rebuild together, the
             // reference can discard a different pending boundary picture.
             // Compare every pixel of the steady frames in each source raster.
@@ -493,7 +501,31 @@ fn playback_reconfigures_a_changing_raster_and_overlay_without_losing_the_clip()
                 )?;
             }
         } else {
-            assert_bytes_match(&actual, &expected, "changing PNG overlay")?;
+            // The reference CLI can discard arbitrary pictures (even the
+            // entire output) when its threaded overlay input changes size.
+            // Render each still independently through the same Frame plan.
+            // The animation must show four exact copies of each result.
+            for phase in 0..3 {
+                let still = sandbox.path(&format!("frame-{phase}.png"));
+                config.overlay = Some(overlay_config(&still, 1.0, 0.25));
+                let still_options = PreviewFfmpegOptions {
+                    end_seconds: Some(0.04),
+                    ..options
+                };
+                let still_plan =
+                    build_ffmpeg_preview_args(&path_arg(input), &config, &still_options)
+                        .map_err(|err| err.to_string())?;
+                let expected = run_tool_output(&tools.ffmpeg, &still_plan.args)?;
+                assert_eq!(expected.len(), plan.frame_bytes);
+                for index in phase * 4..phase * 4 + 4 {
+                    let frame = index * plan.frame_bytes..(index + 1) * plan.frame_bytes;
+                    assert_bytes_match(
+                        &actual[frame],
+                        &expected,
+                        &format!("PNG overlay frame {index}"),
+                    )?;
+                }
+            }
         }
     }
     Ok(())

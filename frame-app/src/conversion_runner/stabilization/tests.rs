@@ -149,7 +149,7 @@ mod controlled {
         let _serial = crate::bounded_process::serial_test_processes();
         let mut config = config();
         config.video_filters.stabilization_enabled = true;
-        let runtime = FakeRuntime::new(": > \"$0.started\"; exec /bin/sleep 30");
+        let runtime = FakeRuntime::new(": > \"$0.started\"; exec sleep 30");
         let marker = runtime.0.with_extension("started");
         let controller = ConversionProcessController::default();
         let worker_controller = controller.clone();
