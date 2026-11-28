@@ -69,7 +69,7 @@ class MediaWorkerPackages(unittest.TestCase):
         workflow = (SCRIPT.parents[1] / ".github/workflows/publish_nixpkgs.yml").read_text()
         changes = [line.strip().split("'", 2)[1] for line in workflow.splitlines()
                    if "perl -0pi" in line and ("cargo(?:Build|Test)?Flags" in line or "buildInputs" in line)]
-        self.assertEqual(len(changes), 2)
+        self.assertEqual(len(changes), 3)
         for previous in ('cargoFlags = [ "--package" "frame-app" ];',
                          'cargoBuildFlags = [ "--package" "frame-app" ];\ncargoTestFlags = [ "--package" "frame-app" ];'):
             with self.subTest(previous=previous), tempfile.TemporaryDirectory() as temporary:
@@ -81,6 +81,7 @@ class MediaWorkerPackages(unittest.TestCase):
                     updated = package.read_text()
                     self.assertEqual(updated.count('"frame-media"'), previous.count('"frame-app"'))
                     self.assertEqual(updated.count('ffmpeg'), 1)
+                    self.assertIn("(ffmpeg.override { withJxl = true; })", updated)
                     self.assertIn("vulkan-loader", updated)
 
     @unittest.skipUnless(os.environ.get("FFMPEG_DIR"), "requires release media SDK")
