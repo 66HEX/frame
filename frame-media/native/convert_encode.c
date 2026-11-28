@@ -2,7 +2,7 @@
 
 /* Codec names in saved presets may use the descriptor name (mp3, vp9)
  * while the library exposes a specific implementation (libmp3lame). */
-static const AVCodec *find_encoder(const char *name) {
+const AVCodec *frame_find_encoder(const char *name) {
     const AVCodec *codec = avcodec_find_encoder_by_name(name);
     const AVCodecDescriptor *desc = avcodec_descriptor_get_by_name(name);
     if (desc && (!codec || codec->capabilities & AV_CODEC_CAP_EXPERIMENTAL)) {
@@ -245,6 +245,36 @@ static int open_render(const ConvertPlan *p, ConvertTrack *t, const AVCodec *cod
     return 0;
 }
 
+static int set_pass_options(const ConvertPlan *p, AVCodecContext *ctx, AVDictionary **options) {
+    ctx->flags |= p->video_pass == 1 ? AV_CODEC_FLAG_PASS1 : AV_CODEC_FLAG_PASS2;
+    const char *codec = ctx->codec->name;
+    if (!strcmp(codec, "libvpx-vp9")) {
+        // libvpx exports its entire base64 statistics block when drained.
+        // The caller owns stats_in until the second encoder is closed.
+        ctx->stats_in = p->vpx_stats;
+        return 0;
+    }
+    if (!strcmp(codec, "libx264"))
+        return av_dict_set(options, "stats", p->stats_path, 0);
+
+    // Set the x265 dictionary directly. Windows drive letters and colons in
+    // filenames must remain part of the filename. Older libavcodec releases
+    // also require pass and stats through this dictionary.
+    AVDictionary *params = NULL;
+    const AVDictionaryEntry *existing = av_dict_get(*options, "x265-params", NULL, 0);
+    int err = existing ? av_dict_parse_string(&params, existing->value, "=", ":", 0) : 0;
+    if (err >= 0)
+        err = av_dict_set(&params, "pass", p->video_pass == 1 ? "1" : "2", 0);
+    if (err >= 0)
+        err = av_dict_set(&params, "stats", p->stats_path, 0);
+    if (err >= 0)
+        err = av_opt_set_dict_val(ctx->priv_data, "x265-params", params, 0);
+    av_dict_free(&params);
+    if (err >= 0)
+        err = av_dict_set(options, "x265-params", NULL, 0);
+    return err;
+}
+
 static int open_codec(const ConvertPlan *p, ConvertTrack *t, const AVCodec *codec) {
     static const char *const video[] = {"b",
                                         "g",
@@ -280,6 +310,8 @@ static int open_codec(const ConvertPlan *p, ConvertTrack *t, const AVCodec *code
         t->encoder->flags |= AV_CODEC_FLAG_QSCALE;
         t->encoder->global_quality = FF_QP2LAMBDA * atoi(quality);
     }
+    if (p->video_pass && t->kind == 'v' && (err = set_pass_options(p, t->encoder, &options)) < 0)
+        goto end;
     err = avcodec_open2(t->encoder, codec, &options);
     if (err >= 0 && av_dict_count(options)) {
         fprintf(stderr, "Encoder %s does not accept option %s\n", codec->name,
@@ -293,7 +325,7 @@ end:
 
 int frame_prepare_encoder(const ConvertPlan *p, ConvertTrack *t, AVFormatContext *out,
                           const char *name) {
-    const AVCodec *codec = find_encoder(name);
+    const AVCodec *codec = frame_find_encoder(name);
     if (!codec || codec->type != t->src->codecpar->codec_type)
         return AVERROR_ENCODER_NOT_FOUND;
     t->encoder = avcodec_alloc_context3(codec);
@@ -364,7 +396,8 @@ int frame_encode_subtitle(ConvertTrack *t, AVPacket *output) {
 }
 
 /* Keep the unconsumed input outside libavfilter. A format change rebuilds the
- * graph, but the encoder still needs every sample in its partially filled block. */
+ * graph, but the encoder still needs every sample in its partially filled
+ * block. */
 static int read_audio_block(ConvertTrack *t) {
     AVCodecContext *ctx = t->encoder;
     AVFrame *block = t->frame, *in = t->audio_input;
@@ -449,6 +482,12 @@ int frame_read_encoded(ConvertTrack *t, AVPacket *packet) {
             if (t->encoder->flags & AV_CODEC_FLAG_QSCALE)
                 t->frame->quality = t->encoder->global_quality;
             err = avcodec_send_frame(t->encoder, t->frame);
+            if (t->analysis_io && err >= 0 && t->frame->pts != AV_NOPTS_VALUE) {
+                int64_t end = av_rescale_q(av_sat_add64(t->frame->pts, t->frame->duration),
+                                           t->encoder->time_base, AV_TIME_BASE_Q);
+                t->analysis_end = FFMAX(t->analysis_end, end);
+                frame_output_stats(t->analysis_io, t->frames + 1, t->analysis_end);
+            }
             av_frame_unref(t->frame);
             t->frames++;
         }

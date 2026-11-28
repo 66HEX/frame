@@ -96,6 +96,7 @@ int frame_convert_parse(ConvertPlan *plan, int argc, const char *const *argv) {
                                          "compression_algo",
                                          "pred",
                                          "x265-params",
+                                         "frame_two_pass",
                                          "vbr",
                                          NULL};
     if (argc < 3)

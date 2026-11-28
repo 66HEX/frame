@@ -288,3 +288,47 @@ fn staged_command_preserves_non_utf8_output_path_without_shell_reconstruction() 
             .collect::<Vec<_>>()
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn final_worker_removes_pass_statistics_after_success_failure_and_cancellation() {
+    use std::os::unix::fs::PermissionsExt;
+    let fixture = tempfile::tempdir().unwrap();
+    let worker = fixture.path().join("frame-media");
+    let report = fixture.path().join("used-directory");
+    for (finish, cancel, success) in [
+        ("exit 0", false, true),
+        ("exit 1", false, false),
+        ("exec sleep 5", true, false),
+    ] {
+        let script = format!(
+            "#!/bin/sh\nset -eu\nprintf '%s' \"$FRAME_PASS_DIRECTORY\" > \"$REPORT\"\nmkdir \"$FRAME_PASS_DIRECTORY/job\"\ntouch \"$FRAME_PASS_DIRECTORY/job/encoder.stats\"\necho ready >&2\n{finish}\n"
+        );
+        std::fs::write(&worker, script).unwrap();
+        std::fs::set_permissions(&worker, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let task = task();
+        let controller = ConversionProcessController::default();
+        let mut command = Command::new(&worker);
+        command
+            .args(["convert", "-frame_two_pass", "1"])
+            .env("REPORT", &report)
+            .stderr(Stdio::piped());
+        let mut cancelled = false;
+        let result = run_final_child(
+            &mut command,
+            &task,
+            &controller,
+            &mut |event| {
+                if cancel && matches!(event, ConversionEvent::Log(ref log) if log.line == "ready") {
+                    controller.cancel_task(&task.id).unwrap();
+                }
+            },
+            &mut cancelled,
+        );
+        assert_eq!(result.is_ok(), success);
+        assert_eq!(cancelled, cancel);
+        let dir = std::fs::read_to_string(&report).unwrap();
+        assert!(!std::path::Path::new(&dir).exists(), "left behind {dir}");
+        assert_eq!(controller.active_process_count().unwrap(), 0);
+    }
+}

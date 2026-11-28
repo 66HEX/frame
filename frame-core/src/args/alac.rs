@@ -1,6 +1,7 @@
 use super::{
-    build_ffmpeg_args, collect_selected_audio_tracks, collect_selected_subtitle_tracks,
-    container_supports_subtitles, has_overlay, is_audio_only_container,
+    OutputPurpose, build_ffmpeg_args, build_output_args, collect_selected_audio_tracks,
+    collect_selected_subtitle_tracks, container_supports_subtitles, has_overlay,
+    is_audio_only_container,
 };
 use crate::alac_copy::{AlacOutputMap, AlacRepairPlan, ObservationError, ParsedCopyManifest};
 use crate::error::ConversionError;
@@ -18,6 +19,7 @@ pub struct CopyAudioOutput {
 #[derive(Clone, Debug)]
 pub struct AlacCopyObserver {
     ordinary: Vec<String>,
+    observation: Option<Vec<String>>,
     audio: Vec<CopyAudioOutput>,
     stream_types: Vec<&'static str>,
     dependencies: Vec<String>,
@@ -69,7 +71,7 @@ impl AlacCopyObserver {
         Ok(())
     }
 
-    /// Preserves the validated command, changing only its known final sink.
+    /// Preserves the validated stream map and hashes packets in a framehash sink.
     ///
     /// The execution layer attaches a retained OS-path completion sidecar.
     ///
@@ -83,7 +85,8 @@ impl AlacCopyObserver {
             .into_iter()
             .map(str::to_owned)
             .collect();
-        args.extend_from_slice(&self.ordinary[..self.ordinary.len() - 2]);
+        let plan = self.observation.as_ref().unwrap_or(&self.ordinary);
+        args.extend_from_slice(&plan[..plan.len() - 2]);
         self.append_repairs(&mut args, repairs)?;
         args.extend(
             [
@@ -215,8 +218,20 @@ pub fn build_alac_copy_observer(
             .iter()
             .map(|track| track.path.clone()),
     );
+    let observation = if !config.copies_video() && !is_audio_only_container(&config.container) {
+        Some(build_output_args(
+            input,
+            output,
+            config,
+            probe,
+            OutputPurpose::ObserveCopiedAudio,
+        )?)
+    } else {
+        None
+    };
     Ok(Some(AlacCopyObserver {
         ordinary,
+        observation,
         audio,
         stream_types,
         dependencies,

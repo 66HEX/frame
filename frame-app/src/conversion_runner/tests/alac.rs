@@ -497,35 +497,40 @@ fn mixed_video_encoding_preserves_repaired_duplicate_alac_tracks() {
         String::from_utf8_lossy(&generate.stderr)
     );
     zero_terminal_duration(&input, 5000);
-    let name = "mixed.mov";
-    let mut job = task(&sandbox, &input, name, true);
-    job.config = core_config_from_gpui(&GpuiConversionConfig {
-        container: "mov".into(),
-        processing_mode: ProcessingMode::CopyAudio,
-        video_codec: "libx264".into(),
-        selected_audio_tracks: vec![1, 1],
-        ..GpuiConversionConfig::default()
-    });
-    let mut events = Vec::new();
-    run_conversion_task(job, |event| events.push(event))
-        .unwrap_or_else(|error| panic!("{error}: {events:?}"));
-    assert!(
-        has_log(&events, "output verified; preparing publication"),
-        "{events:?}"
-    );
-    let output = sandbox.path(name);
-    let metadata = crate::source_metadata::probe_source_metadata(output.to_str().unwrap()).unwrap();
-    assert_eq!(metadata.video_codec.as_deref(), Some("h264"));
-    let original = packets(&input, 0);
-    for ordinal in 0..2 {
-        assert_samples(&decoded(&output, ordinal), &expected);
-        let copied = packets(&output, ordinal);
-        assert_eq!(copied.len(), original.len());
+    for (name, video_two_pass) in [("mixed.mov", false), ("mixed-two-pass.mov", true)] {
+        let mut job = task(&sandbox, &input, name, true);
+        job.config = core_config_from_gpui(&GpuiConversionConfig {
+            container: "mov".into(),
+            processing_mode: ProcessingMode::CopyAudio,
+            video_codec: "libx264".into(),
+            video_two_pass,
+            video_bitrate_mode: "bitrate".into(),
+            video_bitrate: "128".into(),
+            selected_audio_tracks: vec![1, 1],
+            ..GpuiConversionConfig::default()
+        });
+        let mut events = Vec::new();
+        run_conversion_task(job, |event| events.push(event))
+            .unwrap_or_else(|error| panic!("{error}: {events:?}"));
         assert!(
-            copied
-                .iter()
-                .zip(&original)
-                .all(|(a, b)| a["data_hash"] == b["data_hash"])
+            has_log(&events, "output verified; preparing publication"),
+            "{events:?}"
         );
+        let output = sandbox.path(name);
+        let metadata =
+            crate::source_metadata::probe_source_metadata(output.to_str().unwrap()).unwrap();
+        assert_eq!(metadata.video_codec.as_deref(), Some("h264"));
+        let original = packets(&input, 0);
+        for ordinal in 0..2 {
+            assert_samples(&decoded(&output, ordinal), &expected);
+            let copied = packets(&output, ordinal);
+            assert_eq!(copied.len(), original.len());
+            assert!(
+                copied
+                    .iter()
+                    .zip(&original)
+                    .all(|(a, b)| a["data_hash"] == b["data_hash"])
+            );
+        }
     }
 }

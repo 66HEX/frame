@@ -222,6 +222,8 @@ fn preview_runtime_key_tracks_visual_config_but_ignores_encoder_quality() {
 
     root.update_selected_config(|config| {
         config.crf = 18;
+        config.video_bitrate_mode = "bitrate".into();
+        config.video_two_pass = true;
         true
     });
     let quality_request = root

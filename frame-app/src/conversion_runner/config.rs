@@ -44,6 +44,7 @@ pub fn core_config_from_gpui(config: &GpuiConversionConfig) -> CoreConversionCon
         } else {
             config.video_codec.clone()
         },
+        video_two_pass: config.video_two_pass,
         video_bitrate_mode: non_empty_or(&config.video_bitrate_mode, DEFAULT_VIDEO_BITRATE_MODE),
         video_bitrate: non_empty_or(&config.video_bitrate, DEFAULT_VIDEO_BITRATE),
         audio_codec: config.audio_codec.clone(),

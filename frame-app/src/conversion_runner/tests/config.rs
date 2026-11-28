@@ -143,6 +143,7 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
         selected_subtitle_tracks: vec![3],
         video_codec: "libx265".to_string(),
         video_bitrate_mode: "bitrate".to_string(),
+        video_two_pass: false,
         video_bitrate: "9000".to_string(),
         resolution: "custom".to_string(),
         custom_width: Some("1920".to_string()),

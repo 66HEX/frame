@@ -26,6 +26,7 @@ pub struct ConversionConfig {
     pub container: String,
     pub video_codec: String,
     pub video_bitrate_mode: String,
+    pub video_two_pass: bool,
     pub video_bitrate: String,
     pub audio_codec: String,
     pub audio_bitrate: String,
@@ -81,6 +82,20 @@ pub struct ConversionConfig {
     pub hw_decode: bool,
 }
 
+impl ConversionConfig {
+    #[must_use]
+    pub fn video_two_pass_available(&self) -> bool {
+        !self.processing_mode.copies_video()
+            && !crate::settings::is_audio_only_container(&self.container)
+            && !crate::settings::is_gif_container(&self.container)
+            && !crate::settings::is_image_container(&self.container)
+            && frame_core::codec::supports_video_two_pass(
+                &self.video_codec,
+                &self.video_bitrate_mode,
+            )
+    }
+}
+
 impl Default for ConversionConfig {
     fn default() -> Self {
         Self {
@@ -88,6 +103,7 @@ impl Default for ConversionConfig {
             container: "mp4".to_string(),
             video_codec: DEFAULT_VIDEO_CODEC.to_string(),
             video_bitrate_mode: DEFAULT_VIDEO_BITRATE_MODE.to_string(),
+            video_two_pass: false,
             video_bitrate: DEFAULT_VIDEO_BITRATE.to_string(),
             audio_codec: media_rules::default_audio_codec_for_container("mp4").to_string(),
             audio_bitrate: DEFAULT_AUDIO_BITRATE.to_string(),

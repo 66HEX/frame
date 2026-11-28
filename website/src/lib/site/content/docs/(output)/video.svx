@@ -34,6 +34,8 @@ The Output inspector lets you choose a processing mode for video and a separate 
 
 **Target bitrate** controls the requested bitrate. It is useful when you have a delivery requirement, but the same bitrate can look very different across codecs, resolutions, and scenes.
 
+With x264, x265 or VP9, enable **Two-pass encoding** in target bitrate mode to analyze the video first. The second pass uses that analysis to distribute the available bits across the clip. Both passes use the selected trim and video filters.
+
 Encoder presets trade encoding speed for compression efficiency. A slower preset can reduce size at comparable quality, but takes longer to process. The available preset scale depends on the codec.
 
 ## Resolution and frame rate

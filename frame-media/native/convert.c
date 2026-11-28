@@ -1,5 +1,7 @@
 #include "convert.h"
 #include <libavutil/intreadwrite.h>
+#include <libavutil/eval.h>
+#include <math.h>
 
 static int log_level(const char *name) {
     if (!name || !strcmp(name, "info"))
@@ -228,7 +230,7 @@ static int setup_muxer(const ConvertPlan *p, AVFormatContext *out, ConvertTrack 
             return err;
         if ((err = copy_chapters(p, primary, out)) < 0)
             return err;
-        if (primary->duration > 0 && av_log_get_level() >= AV_LOG_INFO) {
+        if (!p->video_pass && primary->duration > 0 && av_log_get_level() >= AV_LOG_INFO) {
             int64_t secs = primary->duration / AV_TIME_BASE;
             fprintf(stderr, "Duration: %02" PRId64 ":%02" PRId64 ":%02" PRId64 ".%03" PRId64 "\n",
                     secs / 3600, (secs / 60) % 60, secs % 60,
@@ -280,7 +282,89 @@ done:
     return err;
 }
 
-static int convert(const ConvertPlan *p, AVFormatContext **outp, ConvertTrack *tracks, int *count,
+static void free_track(ConvertTrack *t) {
+    av_packet_free(&t->next);
+    av_packet_free(&t->raw);
+    av_packet_free(&t->filtered_input);
+    av_frame_free(&t->frame);
+    av_frame_free(&t->audio_input);
+    av_frame_free(&t->cadence.previous);
+    av_frame_free(&t->cadence.current);
+    av_bsf_free(&t->bsf);
+    frame_render_close(&t->render);
+    avcodec_free_context(&t->encoder);
+    avcodec_free_context(&t->subdecoder);
+}
+
+static int analyze_video(ConvertPlan *p, const AVFormatContext *out, ConvertTrack *tracks,
+                         int count, void *io) {
+    const ConvertTrack *video = NULL;
+    for (int i = 0; i < count; ++i) {
+        if (tracks[i].kind == 'v') {
+            if (video)
+                return AVERROR(EINVAL);
+            video = &tracks[i];
+        }
+    }
+    if (!video)
+        return AVERROR_STREAM_NOT_FOUND;
+    const char *name = frame_track_opt(p, video, "c");
+    const AVCodec *encoder = name ? frame_find_encoder(name) : NULL;
+    const char *codec = encoder ? encoder->name : NULL;
+    const char *rate = frame_track_opt(p, video, "b");
+    char *end = NULL;
+    double bitrate = rate ? av_strtod(rate, &end) : 0;
+    if (!codec ||
+        (strcmp(codec, "libx264") && strcmp(codec, "libx265") && strcmp(codec, "libvpx-vp9")) ||
+        !isfinite(bitrate) || bitrate <= 0 || *end || frame_track_opt(p, video, "crf") ||
+        frame_track_opt(p, video, "q")) {
+        fprintf(stderr, "Two-pass encoding requires a bitrate and libx264, libx265 "
+                        "or libvpx-vp9\n");
+        return AVERROR(EINVAL);
+    }
+    p->stats_path = frame_pass_path(io);
+    if (!p->stats_path)
+        return AVERROR(EIO);
+    AVFormatContext *analysis = NULL;
+    int err = avformat_alloc_output_context2(&analysis, out->oformat, NULL, NULL);
+    if (err < 0)
+        return err;
+    // input_for_map has only borrowed its stream/source pointers. Reuse all
+    // mapped clock facts, but give the analysis encoder its own filter graph,
+    // stream descriptor and cadence. Only the final pass opens the destination.
+    ConvertTrack first = *video;
+    first.analysis_io = io;
+    p->video_pass = 1;
+    int64_t duration = p->duration >= 0
+                           ? p->duration
+                           : FFMAX(0, av_sat_sub64(video->input->duration, video->source->seek));
+    frame_output_pass(io, 1, duration);
+    err = configure_track(p, &first, analysis);
+    if (err >= 0) {
+        while ((err = frame_read_encoded(&first, first.next)) == 0)
+            av_packet_unref(first.next);
+        if (err == AVERROR_EOF)
+            err = first.frames ? 0 : AVERROR_INVALIDDATA;
+        if (err >= 0 && !strcmp(codec, "libvpx-vp9")) {
+            const char *stats = first.encoder->stats_out;
+            if (!stats || !*stats)
+                err = AVERROR_INVALIDDATA;
+            else if (!(p->vpx_stats = av_strdup(stats)))
+                err = AVERROR(ENOMEM);
+        }
+    }
+    if (!duration)
+        duration = first.analysis_end;
+    free_track(&first); // x264 and x265 finalize their stats files on close
+    avformat_free_context(analysis);
+    if (err >= 0) {
+        p->video_pass = 2;
+        frame_output_pass(io, 2, duration);
+    }
+    return err;
+}
+
+static int convert(ConvertPlan *p, AVFormatContext **outp, ConvertTrack *tracks, int *count,
                    void *io, AVIOContext **pb) {
     const char *format = frame_plan_opt(p, "f");
     /* Still-image exports use the same exclusive file handle as containers.
@@ -307,6 +391,13 @@ static int convert(const ConvertPlan *p, AVFormatContext **outp, ConvertTrack *t
             return err;
         for (int k = 0; k < *count - 1; ++k)
             track->ordinal += tracks[k].kind == track->kind;
+    }
+    const char *two_pass = frame_plan_opt(p, "frame_two_pass");
+    if (two_pass) {
+        if (strcmp(two_pass, "1"))
+            return AVERROR(EINVAL);
+        if ((err = analyze_video(p, out, tracks, *count, io)) < 0)
+            return err;
     }
     const char *progress = frame_plan_opt(p, "progress");
     if (progress && frame_output_open(io, progress, 1, 1) < 0)
@@ -353,17 +444,7 @@ int frame_convert(int argc, const char *const *argv, void *io) {
     }
     for (int i = 0; i < count; ++i) {
         ConvertTrack *t = &tracks[i];
-        av_packet_free(&t->next);
-        av_packet_free(&t->raw);
-        av_packet_free(&t->filtered_input);
-        av_frame_free(&t->frame);
-        av_frame_free(&t->audio_input);
-        av_frame_free(&t->cadence.previous);
-        av_frame_free(&t->cadence.current);
-        av_bsf_free(&t->bsf);
-        frame_render_close(&t->render);
-        avcodec_free_context(&t->encoder);
-        avcodec_free_context(&t->subdecoder);
+        free_track(t);
     }
     av_free(tracks);
     if (pb) {
@@ -382,5 +463,6 @@ int frame_convert(int argc, const char *const *argv, void *io) {
     }
     av_free(p.sources);
     av_free(p.options);
+    av_free(p.vpx_stats);
     return err;
 }

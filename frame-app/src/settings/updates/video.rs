@@ -199,6 +199,17 @@ pub fn apply_video_bitrate_mode(config: &mut ConversionConfig, mode: &str) -> bo
     }
 
     config.video_bitrate_mode = mode;
+    if !config.video_two_pass_available() {
+        config.video_two_pass = false;
+    }
+    true
+}
+
+pub fn apply_video_two_pass(config: &mut ConversionConfig, enabled: bool) -> bool {
+    if (enabled && !config.video_two_pass_available()) || config.video_two_pass == enabled {
+        return false;
+    }
+    config.video_two_pass = enabled;
     true
 }
 

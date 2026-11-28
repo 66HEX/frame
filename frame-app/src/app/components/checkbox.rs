@@ -154,6 +154,7 @@ fn frame_checkbox_row_inner(
         cx,
     )
     .id(format!("{id}-indicator"))
+    .debug_selector(|| format!("{id}-indicator"))
     .mt(theme::ui_rem(FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y))
     .on_click(cx.listener(move |root, event: &ClickEvent, window, cx| {
         cx.stop_propagation();
@@ -170,6 +171,7 @@ fn frame_checkbox_row_inner(
     };
 
     div()
+        .debug_selector(|| id.clone())
         .id(id)
         .min_w_0()
         .flex_1()

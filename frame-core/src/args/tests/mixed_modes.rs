@@ -71,10 +71,31 @@ fn video_reencode_with_alac_copy_tracks_video_dependencies_and_correct_ordinals(
     config.set_audio_copy(true);
     config.selected_audio_tracks = vec![1, 1];
     config.subtitle_burn_path = Some("captions.srt".into());
+    config.start_time = Some("0.2".into());
+    config.overlay = Some(crate::types::OverlayConfig {
+        enabled: true,
+        path: "logo.png".into(),
+        x: 0.0,
+        y: 0.0,
+        width: 0.2,
+        opacity: 1.0,
+        anchor: "top-left".into(),
+    });
+    config
+        .external_subtitle_tracks
+        .push(crate::types::ExternalSubtitleTrack {
+            path: "selectable.srt".into(),
+            ..Default::default()
+        });
+    config.video_two_pass = true;
+    config.video_bitrate_mode = "bitrate".into();
     let observer = build_alac_copy_observer("in", "out.mp4", &config, &probe)
         .unwrap()
         .unwrap();
-    assert_eq!(observer.dependencies(), &["in", "captions.srt"]);
+    assert_eq!(
+        observer.dependencies(),
+        &["in", "logo.png", "captions.srt", "selectable.srt"]
+    );
     assert_eq!(
         observer
             .alac_mappings()
@@ -84,6 +105,20 @@ fn video_reencode_with_alac_copy_tracks_video_dependencies_and_correct_ordinals(
         [1, 2]
     );
     let args = observer.observer_args(&[]).unwrap();
-    assert!(args_contains_pair(&args, "-c:v", "libx264"));
+    assert!(args_contains_pair(&args, "-map", "0:v:0"));
+    assert!(args_contains_pair(&args, "-c:v", "copy"));
+    assert!(
+        !args
+            .iter()
+            .any(|arg| matches!(arg.as_str(), "-frame_two_pass" | "-vf" | "-filter_complex"))
+    );
+    let export = observer.export_args(&[]).unwrap();
+    assert!(args_contains_pair(&export, "-c:v", "libx264"));
+    assert!(args_contains_pair(&export, "-frame_two_pass", "1"));
+    assert!(args_contains_pair(&export, "-map", "[vout]"));
+    for plan in [&args, &export] {
+        assert!(args_contains_pair(plan, "-map", "2:s:0"));
+        assert!(args_contains_pair(plan, "-ss", "0.2"));
+    }
     assert!(args_contains_pair(&args, "-c:a", "copy"));
 }

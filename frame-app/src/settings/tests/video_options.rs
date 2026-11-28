@@ -276,3 +276,37 @@ fn unavailable_selected_hardware_preserves_the_draft_and_distinguishes_inventory
     }
     assert_eq!(config, before);
 }
+
+#[test]
+fn two_pass_round_trips_through_presets_and_only_applies_to_eligible_video() {
+    let old: ConversionConfig = serde_json::from_str(r#"{"videoBitrateMode":"bitrate"}"#).unwrap();
+    assert!(!old.video_two_pass);
+    for (encoder, container) in [("libx264", "mp4"), ("libx265", "mov"), ("vp9", "webm")] {
+        let mut config = ConversionConfig {
+            video_codec: encoder.into(),
+            container: container.into(),
+            ..old.clone()
+        };
+        assert!(apply_video_two_pass(&mut config, true));
+        let preset = create_custom_preset("saved".into(), "Two-pass", &config);
+        let encoded = serde_json::to_value(&preset).unwrap();
+        assert_eq!(encoded["config"]["videoTwoPass"], true);
+        let mut restored = ConversionConfig::default();
+        apply_preset(
+            &mut restored,
+            &serde_json::from_value(encoded).unwrap(),
+            None,
+        );
+        assert!(crate::conversion_runner::core_config_from_gpui(&restored).video_two_pass);
+        apply_processing_mode(&mut restored, None, ProcessingMode::CopyAudio);
+        assert!(restored.video_two_pass);
+        apply_processing_mode(&mut restored, None, ProcessingMode::CopyVideo);
+        assert!(!restored.video_two_pass);
+        assert!(!apply_video_two_pass(&mut restored, true));
+        for container in ["mp3", "gif", "png"] {
+            let mut other = config.clone();
+            apply_output_container(&mut other, container);
+            assert!(!other.video_two_pass);
+        }
+    }
+}

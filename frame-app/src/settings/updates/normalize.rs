@@ -242,6 +242,10 @@ fn normalize_video_config_values(config: &mut ConversionConfig, metadata: Option
         config.hw_decode = false;
     }
 
+    if !config.video_two_pass_available() {
+        config.video_two_pass = false;
+    }
+
     normalize_image_encoding_settings(config);
 
     config.gif_colors = config

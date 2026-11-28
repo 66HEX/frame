@@ -40,6 +40,9 @@ typedef struct {
     Source *sources;
     int options_len, sources_len;
     const char *output;
+    int video_pass;
+    const char *stats_path;
+    char *vpx_stats;
     int64_t duration;
 } ConvertPlan;
 
@@ -64,6 +67,8 @@ typedef struct {
     AVFrame *frame, *audio_input;
     AVRational audio_input_tb;
     int consumed_samples, audio_eof;
+    void *analysis_io;
+    int64_t analysis_end;
     FrameCadence cadence;
     AVBSFContext *bsf;
     int source_done, done, seen_key, strict;
@@ -73,6 +78,7 @@ int frame_convert_parse(ConvertPlan *plan, int argc, const char *const *argv);
 const char *frame_plan_opt(const ConvertPlan *plan, const char *name);
 const char *frame_track_opt(const ConvertPlan *plan, const ConvertTrack *track, const char *name);
 int frame_option_matches(const char *option, const char *name, const ConvertTrack *track);
+const AVCodec *frame_find_encoder(const char *name);
 int frame_prepare_encoder(const ConvertPlan *plan, ConvertTrack *track, AVFormatContext *out,
                           const char *codec);
 int frame_cadence_next(ConvertTrack *track);
@@ -83,6 +89,8 @@ int frame_mux_packets(const ConvertPlan *plan, ConvertTrack *tracks, int count,
 extern int frame_output_open(void *io, const char *path, int overwrite, int progress);
 extern int frame_output_write(void *io, const uint8_t *buffer, int size);
 extern int64_t frame_output_seek(void *io, int64_t offset, int whence);
+extern const char *frame_pass_path(void *io);
+extern void frame_output_pass(void *io, int pass, int64_t duration);
 extern void frame_output_quiet(void *io, int quiet);
 extern void frame_output_stats(void *io, int64_t frames, int64_t time_us);
 #endif

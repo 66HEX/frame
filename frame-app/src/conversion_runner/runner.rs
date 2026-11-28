@@ -521,6 +521,13 @@ pub(super) fn run_final_child_observed(
     was_cancelled: &mut bool,
     started: &mut bool,
 ) -> Result<(), ConversionError> {
+    let pass_directory = super::pass_directory::for_worker(
+        std::path::Path::new(command.get_program()),
+        command.get_args(),
+    )?;
+    if let Some(directory) = &pass_directory {
+        command.env(super::pass_directory::ENVIRONMENT, directory.path());
+    }
     let mut child = crate::process_launch::spawn(command).map_err(ConversionError::Io)?;
     *started = true;
     let started_cancelled = match controller.register_started_process(&task.id, child.id()) {

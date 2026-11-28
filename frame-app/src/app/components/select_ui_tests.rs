@@ -834,3 +834,28 @@ fn opus_bitrate_and_vbr_controls_support_keyboard_and_copy_in_both_themes_and_sc
         }
     }
 }
+
+#[test]
+fn two_pass_checkbox_follows_target_bitrate_and_rejects_incompatible_video_modes() {
+    let case = SelectCase {
+        fixture: VisualFixture::SettingsVideo,
+        trigger: "video-bitrate-mode-bitrate",
+        panel: "video-two-pass",
+    };
+    let mut app = TestAppContext::single();
+    let (root, cx) = select_window(&mut app, &case, ColorTheme::Dark, ScalePreset::Percent100);
+    assert!(cx.debug_bounds(case.panel).is_none());
+    click(cx, case.trigger);
+    click(cx, case.panel);
+    assert!(root.read_with(cx, |root, _| root.selected_config().unwrap().video_two_pass));
+    click(cx, "video-bitrate-mode-crf");
+    assert!(cx.debug_bounds(case.panel).is_none());
+    click(cx, case.trigger);
+    assert!(!root.read_with(cx, |root, _| root.selected_config().unwrap().video_two_pass));
+    click(cx, "video-two-pass-indicator");
+    assert!(root.read_with(cx, |root, _| root.selected_config().unwrap().video_two_pass));
+    click(cx, "video-encoder-select");
+    click(cx, "video-codec-libsvtav1");
+    assert!(cx.debug_bounds(case.panel).is_none());
+    assert!(!root.read_with(cx, |root, _| root.selected_config().unwrap().video_two_pass));
+}

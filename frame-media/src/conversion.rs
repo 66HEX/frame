@@ -39,6 +39,9 @@ struct Output {
     quiet: bool,
     frames: i64,
     time_us: i64,
+    pass: c_int,
+    duration_us: i64,
+    scratch: Option<(tempfile::TempDir, CString)>,
 }
 
 impl Output {
@@ -140,6 +143,58 @@ extern "C" fn frame_output_seek(state: &mut Output, offset: i64, whence: c_int) 
     state.checked(result, |n| i64::try_from(n).unwrap_or(-1))
 }
 
+// The application may own a surrounding directory so it can remove all
+// encoder sidecars even after force-terminating this process.
+#[unsafe(no_mangle)]
+extern "C" fn frame_pass_path(state: &mut Output) -> *const c_char {
+    let workspace = || -> io::Result<_> {
+        let mut builder = tempfile::Builder::new();
+        builder.prefix("frame-two-pass-");
+        let directory = match std::env::var_os("FRAME_PASS_DIRECTORY") {
+            Some(parent) => builder.tempdir_in(parent)?,
+            None => builder.tempdir()?,
+        };
+        let path = directory.path().join("video.stats");
+        #[cfg(windows)]
+        let bytes = path.to_str().ok_or(io::ErrorKind::InvalidInput)?.as_bytes();
+        #[cfg(not(windows))]
+        let bytes = path.as_os_str().as_encoded_bytes();
+        let name = CString::new(bytes)?;
+        Ok((directory, name))
+    };
+    match workspace() {
+        Ok(pair) => state.scratch.insert(pair).1.as_ptr(),
+        Err(err) => {
+            state.error = Some(err);
+            std::ptr::null()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn frame_output_pass(state: &mut Output, pass: c_int, duration: i64) {
+    state.pass = pass;
+    state.duration_us = duration;
+    state.last_report = None;
+    state.time_us = 0;
+    state.frames = 0;
+    if !state.quiet {
+        let mut log = io::stderr().lock();
+        if duration > 0 {
+            let sec = duration / 1_000_000;
+            let _ = writeln!(
+                log,
+                "Duration: {:02}:{:02}:{:02}.{:03}",
+                sec / 3600,
+                sec % 3600 / 60,
+                sec % 60,
+                duration % 1_000_000 / 1000
+            );
+        }
+        let _ = writeln!(log, "Video pass {pass}/2");
+    }
+}
+
 #[unsafe(no_mangle)]
 const extern "C" fn frame_output_quiet(state: &mut Output, quiet: c_int) {
     state.quiet = quiet != 0;
@@ -157,14 +212,19 @@ extern "C" fn frame_output_stats(state: &mut Output, frames: i64, time_us: i64) 
         return;
     }
     state.last_report = Some(Instant::now());
-    let sec = state.time_us / 1_000_000;
+    let time = match state.pass {
+        1 => state.time_us.min(state.duration_us) / 2,
+        2 => state.duration_us / 2 + state.time_us.min(state.duration_us) / 2,
+        _ => state.time_us,
+    };
+    let sec = time / 1_000_000;
     let _ = writeln!(
         io::stderr(),
         "frame={frames} time={:02}:{:02}:{:02}.{:03}",
         sec / 3600,
         sec % 3600 / 60,
         sec % 60,
-        state.time_us % 1_000_000 / 1000
+        time % 1_000_000 / 1000
     );
 }
 

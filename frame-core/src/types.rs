@@ -331,6 +331,8 @@ pub struct ConversionConfig {
     pub video_codec: String,
     pub video_bitrate_mode: String,
     pub video_bitrate: String,
+    #[serde(default)]
+    pub video_two_pass: bool,
     pub audio_codec: String,
     pub audio_bitrate: String,
     #[serde(default = "default_audio_bitrate_mode")]

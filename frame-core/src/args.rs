@@ -544,16 +544,38 @@ pub enum GifFramePolicy {
 ///
 /// # Errors
 /// Returns the same validation errors as [`build_ffmpeg_args`].
-#[expect(
-    clippy::too_many_lines,
-    reason = "FFmpeg command assembly stays in one place to keep ordering guarantees explicit"
-)]
 pub fn build_ffmpeg_args_with_gif_policy(
     input: &str,
     output: &str,
     config: &ConversionConfig,
     probe: &ProbeMetadata,
     gif_policy: GifFramePolicy,
+) -> Result<Vec<String>, ConversionError> {
+    build_output_args(
+        input,
+        output,
+        config,
+        probe,
+        OutputPurpose::Export(gif_policy),
+    )
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum OutputPurpose {
+    Export(GifFramePolicy),
+    ObserveCopiedAudio,
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "Media command assembly stays in one place to keep mapping and option ordering explicit"
+)]
+fn build_output_args(
+    input: &str,
+    output: &str,
+    config: &ConversionConfig,
+    probe: &ProbeMetadata,
+    purpose: OutputPurpose,
 ) -> Result<Vec<String>, ConversionError> {
     validate_audio_encoding_tracks(config, probe)?;
     let trim = OutputTrim::from_config(config)?;
@@ -564,6 +586,7 @@ pub fn build_ffmpeg_args_with_gif_policy(
 
     // Hardware decode acceleration (must be before -i)
     if config.hw_decode
+        && purpose != OutputPurpose::ObserveCopiedAudio
         && let Some(encoder) = effective_video_encoder(config, probe)
     {
         args.extend(get_hwaccel_args(encoder));
@@ -638,7 +661,7 @@ pub fn build_ffmpeg_args_with_gif_policy(
         add_output_audio_codec(&mut args, config, &audio_tracks);
     } else if is_video_only && is_gif_output {
         args.push("-filter_complex".to_string());
-        let recover = gif_policy == GifFramePolicy::ConfirmedMinimumFrame
+        let recover = purpose == OutputPurpose::Export(GifFramePolicy::ConfirmedMinimumFrame)
             && is_gif_minimum_frame_candidate(config);
         args.push(build_gif_filter_complex_with_eof(
             config,
@@ -717,6 +740,10 @@ pub fn build_ffmpeg_args_with_gif_policy(
                 // Matroska uses its VFW representation for untagged raw RGB.
                 args.extend(["-allow_raw_vfw".to_string(), "1".to_string()]);
             }
+        } else if purpose == OutputPurpose::ObserveCopiedAudio {
+            // Keep the same main-input stream and output ordinal as the filtered video map.
+            // Hashing source packets avoids encoding video during the bounded audio proof.
+            args.extend(["-map", "0:v:0", "-c:v", "copy"].map(str::to_owned));
         } else {
             add_encoded_video(&mut args, config, probe, filter_context, use_overlay);
         }
@@ -793,6 +820,12 @@ fn add_encoded_video(
     use_overlay: bool,
 ) {
     add_video_codec_args(args, config);
+    if config.video_two_pass
+        && crate::codec::supports_video_two_pass(&config.video_codec, &config.video_bitrate_mode)
+        && effective_video_encoder(config, probe).is_some()
+    {
+        args.extend(["-frame_two_pass".into(), "1".into()]);
+    }
     // Stock x265 builds can crash with automatic SIMD on narrow frames.
     // This also affects the Intel macOS library build. Use the final
     // padded raster so wider exports retain automatic SIMD.
@@ -1889,6 +1922,7 @@ mod tests {
             video_codec: video_codec.to_string(),
             video_bitrate_mode: "crf".to_string(),
             video_bitrate: "5000".to_string(),
+            video_two_pass: false,
             audio_codec: "aac".to_string(),
             audio_bitrate: "128".to_string(),
             audio_bitrate_mode: "bitrate".to_string(),
@@ -1992,6 +2026,44 @@ mod tests {
             probe.audio_tracks[1].codec_tag = tag;
             assert!(build_ffmpeg_args("input.mov", "output.mkv", &config, &probe).is_ok());
         }
+    }
+
+    #[test]
+    fn two_pass_requires_an_encoded_video_and_a_supported_bitrate_mode() {
+        let probe = sample_probe();
+        for (container, codec, supported) in [
+            ("mp4", "libx264", true),
+            ("mov", "libx265", true),
+            ("webm", "vp9", true),
+            ("mp4", "libsvtav1", false),
+            ("mp4", "h264_nvenc", false),
+            ("mov", "prores", false),
+        ] {
+            let mut config = sample_config(container, codec);
+            config.selected_audio_tracks.clear();
+            for (mode, enabled, processing) in [
+                ("bitrate", true, "reencode"),
+                ("bitrate", true, "copyAudio"),
+                ("bitrate", false, "reencode"),
+                ("crf", true, "reencode"),
+            ] {
+                config.video_bitrate_mode = mode.into();
+                config.video_two_pass = enabled;
+                config.processing_mode = processing.into();
+                let plan = build_ffmpeg_args("source.mkv", "result", &config, &probe).unwrap();
+                assert_eq!(
+                    args_contains_pair(&plan, "-frame_two_pass", "1"),
+                    supported && mode == "bitrate" && enabled,
+                    "{container}, {codec}, {mode}, {processing}"
+                );
+            }
+        }
+        let mut config = sample_config("mp4", "libx264");
+        config.video_two_pass = true;
+        config.video_bitrate_mode = "bitrate".into();
+        config.set_video_copy(true);
+        let plan = build_ffmpeg_args("source.mkv", "result.mp4", &config, &probe).unwrap();
+        assert!(!plan.iter().any(|arg| arg == "-frame_two_pass"));
     }
 
     #[test]

@@ -3291,6 +3291,7 @@ fn base_config(container: &str, video_codec: &str) -> ConversionConfig {
         video_codec: video_codec.to_string(),
         video_bitrate_mode: "crf".to_string(),
         video_bitrate: "5000".to_string(),
+        video_two_pass: false,
         audio_codec: "aac".to_string(),
         audio_bitrate: "96".to_string(),
         audio_bitrate_mode: "bitrate".to_string(),
